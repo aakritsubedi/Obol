@@ -1,0 +1,19 @@
+{
+  "name": "token-cost-widget",
+  "private": true,
+  "version": "0.1.0",
+  "description": "A macOS menu bar widget and local dashboard for AI coding-agent spend.",
+  "workspaces": [
+    "daemon",
+    "dashboard"
+  ],
+  "scripts": {
+    "build": "npm run build --workspaces && npm run bundle:daemon",
+    "build:daemon": "npm run build -w daemon",
+    "bundle:daemon": "npm run bundle -w daemon",
+    "build:dashboard": "npm run build -w dashboard",
+    "dev:daemon": "npm run dev -w daemon",
+    "dev:dashboard": "npm run dev -w dashboard",
+    "typecheck": "npm run typecheck --workspaces"
+  }
+}

@@ -1,0 +1,391 @@
+export type BudgetStatus = "ok" | "warn" | "over";
+
+export interface CcusageRow {
+  period: string;
+  agent?: string;
+  agents: Array<Record<string, unknown>>;
+  modelBreakdowns: Array<Record<string, unknown>>;
+  modelsUsed: string[];
+  inputTokens: number;
+  outputTokens: number;
+  cacheCreationTokens: number;
+  cacheReadTokens: number;
+  totalCost: number;
+  totalTokens: number;
+  metadata: Record<string, unknown>;
+  [key: string]: unknown;
+}
+
+export interface CcusageReport {
+  daily: CcusageRow[];
+  weekly: CcusageRow[];
+  monthly: CcusageRow[];
+  session: CcusageRow[];
+  projects: ProjectUsageRow[];
+  totals: Record<string, unknown>;
+  [key: string]: unknown;
+}
+
+export interface BurnRate {
+  costPerHour: number;
+  tokensPerMinute?: number;
+  tokensPerMinuteForIndicator?: number;
+  [key: string]: unknown;
+}
+
+export interface Projection {
+  totalCost: number;
+  totalTokens?: number;
+  remainingMinutes?: number;
+  [key: string]: unknown;
+}
+
+export interface TokenCounts {
+  inputTokens: number;
+  outputTokens: number;
+  cacheCreationTokens: number;
+  cacheReadTokens: number;
+  [key: string]: unknown;
+}
+
+export interface TokenLimitStatus {
+  limit: number | null;
+  percentUsed: number;
+  projectedUsage: number;
+  status: string | null;
+  [key: string]: unknown;
+}
+
+export interface UsageBlock {
+  id: string;
+  startTime: string;
+  endTime: string;
+  actualEndTime: string | null;
+  isActive: boolean;
+  isGap: boolean;
+  entries: number;
+  models: string[];
+  costUSD: number;
+  totalTokens: number;
+  burnRate: BurnRate;
+  projection: Projection;
+  tokenCounts: TokenCounts;
+  tokenLimitStatus: TokenLimitStatus | null;
+  [key: string]: unknown;
+}
+
+export interface BlocksReport {
+  blocks: UsageBlock[];
+  burnRate: BurnRate;
+  projection: Projection;
+  tokenLimitStatus: TokenLimitStatus | null;
+  raw: Record<string, unknown>;
+}
+
+export interface ProjectUsageRow extends CcusageRow {
+  project: string;
+}
+
+export interface ProviderSummary {
+  agent: string;
+  totalCost: number;
+  totalTokens: number;
+  inputTokens: number;
+  outputTokens: number;
+  cacheCreationTokens: number;
+  cacheReadTokens: number;
+  [key: string]: unknown;
+}
+
+export interface SummaryToday {
+  period: string;
+  totalCost: number;
+  totalTokens: number;
+  inputTokens: number;
+  outputTokens: number;
+  cacheCreationTokens: number;
+  cacheReadTokens: number;
+  modelsUsed: string[];
+  modelBreakdowns: Array<Record<string, unknown>>;
+  [key: string]: unknown;
+}
+
+export interface BudgetConfig {
+  dailyBudget: number | null;
+  monthlyBudget: number | null;
+  warningThreshold: number;
+}
+
+export interface WidgetConfig extends BudgetConfig {
+  port: number;
+  refreshIntervalMs: number;
+  launchAtLogin: boolean;
+  historyDays: number;
+}
+
+export interface BudgetEvaluation {
+  status: BudgetStatus;
+  dailyRatio: number | null;
+  monthlyRatio: number | null;
+  reason: string | null;
+}
+
+export interface Summary {
+  today: SummaryToday;
+  agents: ProviderSummary[];
+  burnRate: BurnRate;
+  projection: Projection;
+  budgetStatus: BudgetStatus;
+  budget: BudgetEvaluation;
+  updatedAt: string | null;
+  stale: boolean;
+  error: string | null;
+}
+
+export interface Snapshot {
+  report: CcusageReport;
+  blocks: BlocksReport;
+  summary: Summary;
+  updatedAt: string | null;
+  refreshedAt: string | null;
+  error: string | null;
+}
+
+export interface RuntimeState {
+  port: number;
+  token: string;
+  pid: number;
+  startedAt: string;
+  dashboardUrl: string;
+}
+
+export interface RefreshResult {
+  report: CcusageReport | null;
+  fullReport?: CcusageReport | null;
+  blocks: BlocksReport | null;
+  errors: string[];
+}
+
+export function asRecord(value: unknown): Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : {};
+}
+
+export function numberValue(value: unknown, fallback = 0): number {
+  const number = typeof value === "number" ? value : Number(value);
+  return Number.isFinite(number) ? number : fallback;
+}
+
+export function stringValue(value: unknown, fallback = ""): string {
+  return typeof value === "string" || typeof value === "number" ? String(value) : fallback;
+}
+
+export function normalizeRow(value: unknown, index = 0): CcusageRow {
+  const input = asRecord(value);
+  const agents = Array.isArray(input.agents)
+    ? input.agents.map((agent) => asRecord(agent))
+    : [];
+  const modelBreakdowns = Array.isArray(input.modelBreakdowns)
+    ? input.modelBreakdowns.map((model) => {
+      const breakdown = asRecord(model);
+      const totalTokens = numberValue(
+        breakdown.totalTokens,
+        numberValue(breakdown.inputTokens) + numberValue(breakdown.outputTokens) +
+          numberValue(breakdown.cacheCreationTokens) + numberValue(breakdown.cacheReadTokens)
+      );
+      const totalCost = numberValue(breakdown.totalCost, numberValue(breakdown.cost));
+      return {
+        ...breakdown,
+        totalCost,
+        cost: numberValue(breakdown.cost, totalCost),
+        totalTokens,
+        inputTokens: numberValue(breakdown.inputTokens),
+        outputTokens: numberValue(breakdown.outputTokens),
+        cacheCreationTokens: numberValue(breakdown.cacheCreationTokens),
+        cacheReadTokens: numberValue(breakdown.cacheReadTokens)
+      };
+    })
+    : [];
+
+  return {
+    ...input,
+    period: stringValue(input.period, `unknown-${index}`),
+    agents,
+    modelBreakdowns,
+    modelsUsed: Array.isArray(input.modelsUsed) ? input.modelsUsed.map(String) : [],
+    inputTokens: numberValue(input.inputTokens),
+    outputTokens: numberValue(input.outputTokens),
+    cacheCreationTokens: numberValue(input.cacheCreationTokens),
+    cacheReadTokens: numberValue(input.cacheReadTokens),
+    totalCost: numberValue(input.totalCost),
+    totalTokens: numberValue(input.totalTokens),
+    metadata: asRecord(input.metadata)
+  };
+}
+
+export function normalizeReport(value: unknown): CcusageReport {
+  const input = asRecord(value);
+  const normalizeRows = (key: string): CcusageRow[] => {
+    const values = input[key];
+    if (!Array.isArray(values)) return [];
+    return values.map((value, index) => {
+      const row = asRecord(value);
+      if (typeof row.period !== "string" && typeof row.period !== "number") {
+        throw new Error(`ccusage report ${key}[${index}] is missing period`);
+      }
+      if (!("totalCost" in row) || !Number.isFinite(Number(row.totalCost))) {
+        throw new Error(`ccusage report ${key}[${index}] is missing a numeric totalCost`);
+      }
+      return normalizeRow(row, index);
+    });
+  };
+  const daily = normalizeRows("daily");
+  const weekly = normalizeRows("weekly");
+  const monthly = normalizeRows("monthly");
+  const session = normalizeRows("session").sort((left, right) => right.totalCost - left.totalCost);
+  const projects = normalizeProjectRows(input.projects);
+
+  if (!(Array.isArray(input.daily) || Array.isArray(input.weekly) || Array.isArray(input.monthly) || Array.isArray(input.session))) {
+    throw new Error("ccusage report did not contain daily, weekly, monthly, or session arrays");
+  }
+
+  return {
+    ...input,
+    daily: sortRowsAscending(daily),
+    weekly: sortRowsAscending(weekly),
+    monthly: sortRowsAscending(monthly),
+    session,
+    projects,
+    totals: asRecord(input.totals)
+  };
+}
+
+function sortRowsAscending(rows: CcusageRow[]): CcusageRow[] {
+  return [...rows].sort((left, right) => left.period.localeCompare(right.period));
+}
+
+function normalizeProjectRows(value: unknown): ProjectUsageRow[] {
+  if (!Array.isArray(value)) return [];
+  return value.map((item, index) => {
+    const row = asRecord(item);
+    const project = stringValue(row.project, "unknown-project");
+    const period = stringValue(row.period ?? row.date, `unknown-${index}`);
+    return {
+      ...normalizeRow({ ...row, period, agent: stringValue(row.agent, "claude") }, index),
+      project
+    };
+  }).sort((left, right) => left.period.localeCompare(right.period) || right.totalCost - left.totalCost);
+}
+
+export function normalizeProjects(value: unknown): ProjectUsageRow[] {
+  const input = asRecord(value);
+  const projects = asRecord(input.projects);
+  return Object.entries(projects).flatMap(([project, rows]) => {
+    if (!Array.isArray(rows)) return [];
+    return rows.map((item, index) => {
+      const row = asRecord(item);
+      const period = stringValue(row.period ?? row.date, `unknown-${index}`);
+      return {
+        ...normalizeRow({ ...row, period, agent: stringValue(row.agent, "claude") }, index),
+        project: stringValue(row.project, project)
+      };
+    });
+  }).sort((left, right) => left.period.localeCompare(right.period) || right.totalCost - left.totalCost);
+}
+
+export function normalizeBlocks(value: unknown): BlocksReport {
+  const input = Array.isArray(value) ? { blocks: value } : asRecord(value);
+  if (!Array.isArray(input.blocks)) {
+    throw new Error("ccusage blocks did not contain a blocks array");
+  }
+  const blocks = input.blocks.map((value, index) => normalizeBlock(value, index));
+  const activeBlock = blocks.find((block) => block.isActive && !block.isGap) ?? blocks.find((block) => !block.isGap) ?? blocks[0];
+  const burnRate = { ...activeBlock?.burnRate, ...asRecord(input.burnRate) };
+  const projection = { ...activeBlock?.projection, ...asRecord(input.projection) };
+  const tokenLimitStatus = normalizeTokenLimitStatus(activeBlock?.tokenLimitStatus ?? input.tokenLimitStatus);
+
+  return {
+    blocks,
+    burnRate: {
+      ...burnRate,
+      costPerHour: numberValue(burnRate.costPerHour),
+      ...(burnRate.tokensPerMinute !== undefined ? { tokensPerMinute: numberValue(burnRate.tokensPerMinute) } : {}),
+      ...(burnRate.tokensPerMinuteForIndicator !== undefined ? { tokensPerMinuteForIndicator: numberValue(burnRate.tokensPerMinuteForIndicator) } : {})
+    },
+    projection: {
+      ...projection,
+      totalCost: numberValue(projection.totalCost),
+      ...(projection.totalTokens !== undefined ? { totalTokens: numberValue(projection.totalTokens) } : {}),
+      ...(projection.remainingMinutes !== undefined ? { remainingMinutes: numberValue(projection.remainingMinutes) } : {})
+    },
+    tokenLimitStatus,
+    raw: input
+  };
+}
+
+function normalizeBlock(value: unknown, index: number): UsageBlock {
+  const input = asRecord(value);
+  const burnRate = asRecord(input.burnRate);
+  const projection = asRecord(input.projection);
+  const tokenCounts = asRecord(input.tokenCounts);
+  return {
+    ...input,
+    id: stringValue(input.id, `block-${index}`),
+    startTime: stringValue(input.startTime),
+    endTime: stringValue(input.endTime),
+    actualEndTime: input.actualEndTime === null || input.actualEndTime === undefined ? null : stringValue(input.actualEndTime),
+    isActive: input.isActive === true,
+    isGap: input.isGap === true,
+    entries: numberValue(input.entries),
+    models: Array.isArray(input.models) ? input.models.map(String) : [],
+    costUSD: numberValue(input.costUSD ?? input.totalCost ?? input.cost),
+    totalTokens: numberValue(input.totalTokens),
+    burnRate: {
+      ...burnRate,
+      costPerHour: numberValue(burnRate.costPerHour),
+      ...(burnRate.tokensPerMinute !== undefined ? { tokensPerMinute: numberValue(burnRate.tokensPerMinute) } : {}),
+      ...(burnRate.tokensPerMinuteForIndicator !== undefined ? { tokensPerMinuteForIndicator: numberValue(burnRate.tokensPerMinuteForIndicator) } : {})
+    },
+    projection: {
+      ...projection,
+      totalCost: numberValue(projection.totalCost),
+      ...(projection.totalTokens !== undefined ? { totalTokens: numberValue(projection.totalTokens) } : {}),
+      ...(projection.remainingMinutes !== undefined ? { remainingMinutes: numberValue(projection.remainingMinutes) } : {})
+    },
+    tokenCounts: {
+      ...tokenCounts,
+      inputTokens: numberValue(tokenCounts.inputTokens),
+      outputTokens: numberValue(tokenCounts.outputTokens),
+      cacheCreationTokens: numberValue(tokenCounts.cacheCreationTokens ?? tokenCounts.cacheCreationInputTokens),
+      cacheReadTokens: numberValue(tokenCounts.cacheReadTokens ?? tokenCounts.cacheReadInputTokens)
+    },
+    tokenLimitStatus: normalizeTokenLimitStatus(input.tokenLimitStatus)
+  };
+}
+
+function normalizeTokenLimitStatus(value: unknown): TokenLimitStatus | null {
+  if (value === null || value === undefined) return null;
+  const input = asRecord(value);
+  return {
+    ...input,
+    limit: input.limit === null || input.limit === undefined || input.limit === "max" ? null : numberValue(input.limit),
+    percentUsed: numberValue(input.percentUsed),
+    projectedUsage: numberValue(input.projectedUsage),
+    status: input.status === null || input.status === undefined ? null : stringValue(input.status)
+  };
+}
+
+export function emptyReport(): CcusageReport {
+  return { daily: [], weekly: [], monthly: [], session: [], projects: [], totals: {} };
+}
+
+export function emptyBlocks(): BlocksReport {
+  return {
+    blocks: [],
+    burnRate: { costPerHour: 0 },
+    projection: { totalCost: 0 },
+    tokenLimitStatus: null,
+    raw: {}
+  };
+}

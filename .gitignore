@@ -1,0 +1,41 @@
+# Dependencies and package-manager output
+node_modules/
+.pnpm-store/
+.npm/
+pnpm-lock.yaml
+npm-debug.log*
+pnpm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Build output and caches
+dist/
+build/
+.build/
+.xcodebuild/
+DerivedData/
+coverage/
+.vite/
+
+# Local app state
+.token-cost-widget/
+
+# Environment files and secrets
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+
+# macOS and Xcode user files
+.DS_Store
+xcuserdata/
+*.xcuserstate
+*.xcscmblueprint
+*.xccheckout
+
+# Temporary files
+*.log
+*.tmp
+*.swp
+*.swo

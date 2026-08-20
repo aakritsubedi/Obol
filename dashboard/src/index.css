@@ -1,0 +1,55 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    color-scheme: light dark;
+    --color-surface: #f4f4f6;
+    --color-card: #ffffff;
+    --color-panel: #fafafa;
+    --color-ink: #111114;
+    --color-subtle: #4a4e56;
+    --color-muted: #797f89;
+    --color-hairline: rgba(17, 17, 20, 0.08);
+    --color-wash: rgba(17, 17, 20, 0.045);
+    --color-track: rgba(17, 17, 20, 0.08);
+    --color-ok-soft: #ecfdf3;
+    --color-ok: #059669;
+    --color-ok-strong: #047857;
+    --color-warn-soft: #fffbeb;
+    --color-warn: #d97706;
+    --color-warn-strong: #b45309;
+    --color-over-soft: #fef2f2;
+    --color-over: #dc2626;
+    --color-over-strong: #b91c1c;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --color-surface: #101114;
+      --color-card: #1b1d21;
+      --color-panel: #22252a;
+      --color-ink: #f5f6f8;
+      --color-subtle: #d1d5db;
+      --color-muted: #aeb4bf;
+      --color-hairline: rgba(255, 255, 255, 0.12);
+      --color-wash: rgba(255, 255, 255, 0.06);
+      --color-track: rgba(255, 255, 255, 0.12);
+      --color-ok-soft: #123126;
+      --color-ok: #34d399;
+      --color-ok-strong: #6ee7b7;
+      --color-warn-soft: #342613;
+      --color-warn: #f59e0b;
+      --color-warn-strong: #fbbf24;
+      --color-over-soft: #35191b;
+      --color-over: #f87171;
+      --color-over-strong: #fca5a5;
+    }
+  }
+
+  html { background: var(--color-surface); }
+  body { min-width: 320px; min-height: 100vh; overflow-x: hidden; background: var(--color-surface); color: var(--color-ink); font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", Inter, "Segoe UI", sans-serif; font-synthesis: none; text-rendering: optimizeLegibility; }
+  button, input { font: inherit; }
+  button { cursor: pointer; }
+}

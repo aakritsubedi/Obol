@@ -1,0 +1,257 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 77;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		A10000010000000000000001 /* TokenCostWidgetApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000010000000000000001 /* TokenCostWidgetApp.swift */; };
+		A10000010000000000000002 /* DaemonController.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000010000000000000002 /* DaemonController.swift */; };
+		A10000010000000000000003 /* UsageClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000010000000000000003 /* UsageClient.swift */; };
+		A10000010000000000000004 /* PopoverView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000010000000000000004 /* PopoverView.swift */; };
+		A10000010000000000000009 /* WidgetStyle.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000010000000000000009 /* WidgetStyle.swift */; };
+		A10000010000000000000005 /* Notifier.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000010000000000000005 /* Notifier.swift */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXFileReference section */
+		A20000010000000000000000 /* TokenCostWidget.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = TokenCostWidget.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		A20000010000000000000001 /* TokenCostWidgetApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TokenCostWidgetApp.swift; sourceTree = "<group>"; };
+		A20000010000000000000002 /* DaemonController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DaemonController.swift; sourceTree = "<group>"; };
+		A20000010000000000000003 /* UsageClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UsageClient.swift; sourceTree = "<group>"; };
+		A20000010000000000000004 /* PopoverView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PopoverView.swift; sourceTree = "<group>"; };
+		A20000010000000000000009 /* WidgetStyle.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WidgetStyle.swift; sourceTree = "<group>"; };
+		A20000010000000000000005 /* Notifier.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Notifier.swift; sourceTree = "<group>"; };
+		A20000010000000000000006 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+/* End PBXFileReference section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		A30000010000000000000001 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+		A40000010000000000000000 = {
+			isa = PBXGroup;
+			children = (
+				A40000010000000000000001 /* Sources */,
+				A40000010000000000000002 /* Resources */,
+				A40000010000000000000003 /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+		A40000010000000000000001 /* Sources */ = {
+			isa = PBXGroup;
+			children = (
+				A20000010000000000000001 /* TokenCostWidgetApp.swift */,
+				A20000010000000000000002 /* DaemonController.swift */,
+				A20000010000000000000003 /* UsageClient.swift */,
+				A20000010000000000000004 /* PopoverView.swift */,
+				A20000010000000000000009 /* WidgetStyle.swift */,
+				A20000010000000000000005 /* Notifier.swift */,
+			);
+			path = TokenCostWidget/Sources;
+			sourceTree = "<group>";
+		};
+		A40000010000000000000002 /* Resources */ = {
+			isa = PBXGroup;
+			children = (
+				A20000010000000000000006 /* Info.plist */,
+			);
+			path = TokenCostWidget/Resources;
+			sourceTree = "<group>";
+		};
+		A40000010000000000000003 /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				A20000010000000000000000 /* TokenCostWidget.app */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		A50000010000000000000001 /* TokenCostWidget */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = A70000010000000000000002 /* Build configuration list for PBXNativeTarget "TokenCostWidget" */;
+			buildPhases = (
+				A30000010000000000000002 /* Sources */,
+				A30000010000000000000001 /* Frameworks */,
+				A30000010000000000000003 /* Resources */,
+				A30000010000000000000004 /* Bundle daemon */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = TokenCostWidget;
+			productName = TokenCostWidget;
+			productReference = A20000010000000000000000 /* TokenCostWidget.app */;
+			productType = "com.apple.product-type.application";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		A60000010000000000000001 /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = 1;
+				LastSwiftUpdateCheck = 1640;
+				LastUpgradeCheck = 1640;
+			};
+			buildConfigurationList = A70000010000000000000001 /* Build configuration list for PBXProject "TokenCostWidget" */;
+			compatibilityVersion = "Xcode 16.0";
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				en,
+				Base,
+			);
+			mainGroup = A40000010000000000000000;
+			productRefGroup = A40000010000000000000003 /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				A50000010000000000000001 /* TokenCostWidget */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		A30000010000000000000003 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXShellScriptBuildPhase section */
+		A30000010000000000000004 /* Bundle daemon */ = {
+			isa = PBXShellScriptBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputFileListPaths = (
+			);
+			name = "Bundle daemon";
+			outputFileListPaths = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+		shellScript = "set -e\n/bin/sh \"${SRCROOT}/scripts/bundle-daemon.sh\"\n";
+		};
+/* End PBXShellScriptBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		A30000010000000000000002 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				A10000010000000000000001 /* TokenCostWidgetApp.swift in Sources */,
+				A10000010000000000000002 /* DaemonController.swift in Sources */,
+				A10000010000000000000003 /* UsageClient.swift in Sources */,
+				A10000010000000000000004 /* PopoverView.swift in Sources */,
+				A10000010000000000000009 /* WidgetStyle.swift in Sources */,
+				A10000010000000000000005 /* Notifier.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin XCBuildConfiguration section */
+		A80000010000000000000001 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ENABLE_MODULES = YES;
+				CODE_SIGNING_ALLOWED = NO;
+				CODE_SIGNING_REQUIRED = NO;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				GCC_C_LANGUAGE_STANDARD = gnu17;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = TokenCostWidget/Resources/Info.plist;
+				MACOSX_DEPLOYMENT_TARGET = 15.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.local.tokencostwidget;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = macosx;
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 1;
+			};
+			name = Debug;
+		};
+		A80000010000000000000002 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ENABLE_MODULES = YES;
+				CODE_SIGNING_ALLOWED = NO;
+				CODE_SIGNING_REQUIRED = NO;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				GCC_C_LANGUAGE_STANDARD = gnu17;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = TokenCostWidget/Resources/Info.plist;
+				MACOSX_DEPLOYMENT_TARGET = 15.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.local.tokencostwidget;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = macosx;
+				SWIFT_OPTIMIZATION_LEVEL = "-O";
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 1;
+			};
+			name = Release;
+		};
+		A80000010000000000000003 /* Project Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				SWIFT_VERSION = 5.0;
+			};
+			name = Debug;
+		};
+		A80000010000000000000004 /* Project Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				SWIFT_VERSION = 5.0;
+			};
+			name = Release;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		A70000010000000000000001 /* Build configuration list for PBXProject "TokenCostWidget" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				A80000010000000000000003 /* Project Debug */,
+				A80000010000000000000004 /* Project Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		A70000010000000000000002 /* Build configuration list for PBXNativeTarget "TokenCostWidget" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				A80000010000000000000001 /* Debug */,
+				A80000010000000000000002 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+/* End XCConfigurationList section */
+	};
+	rootObject = A60000010000000000000001 /* Project object */;
+}
