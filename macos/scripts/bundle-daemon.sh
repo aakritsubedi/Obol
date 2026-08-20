@@ -12,15 +12,15 @@ RESOURCE_ROOT="${TARGET_BUILD_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}"
 DAEMON_DEST="${RESOURCE_ROOT}/daemon"
 
 if [ ! -f "${DAEMON_ROOT}/dist/index.bundle.js" ]; then
-  echo "error: daemon bundle missing; run npm run build before building TokenCostWidget" >&2
+  echo "error: daemon bundle missing; run npm run build before building Obol" >&2
   exit 1
 fi
 if [ ! -f "${DASHBOARD_ROOT}/dist/index.html" ]; then
-  echo "error: dashboard bundle missing; run npm run build before building TokenCostWidget" >&2
+  echo "error: dashboard bundle missing; run npm run build before building Obol" >&2
   exit 1
 fi
 if [ ! -d "${NODE_MODULES_ROOT}/ccusage" ]; then
-  echo "error: ccusage dependency missing; run npm install before building TokenCostWidget" >&2
+  echo "error: ccusage dependency missing; run npm install before building Obol" >&2
   exit 1
 fi
 

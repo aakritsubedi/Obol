@@ -11,7 +11,7 @@ interface RuntimeState {
 
 function runtimeState(): RuntimeState {
   try {
-    return JSON.parse(readFileSync(join(homedir(), ".token-cost-widget", "runtime.json"), "utf8")) as RuntimeState;
+    return JSON.parse(readFileSync(join(homedir(), ".obol", "runtime.json"), "utf8")) as RuntimeState;
   } catch {
     return { port: 4737, token: "" };
   }

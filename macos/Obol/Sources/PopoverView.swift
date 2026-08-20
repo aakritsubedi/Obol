@@ -173,7 +173,7 @@ struct PopoverView: View {
                 showingSettings = true
             }
             Spacer()
-            iconButton(systemName: "power", help: "Quit Token Cost Widget") {
+            iconButton(systemName: "power", help: "Quit Obol") {
                 controller.quit()
             }
         }

@@ -1,7 +1,10 @@
 import { homedir } from "node:os";
 import { join } from "node:path";
-import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { constants as fsConstants } from "node:fs";
+import { copyFile, mkdir, readFile, writeFile } from "node:fs/promises";
 import type { RuntimeState, WidgetConfig } from "./types.js";
+
+const LEGACY_STATE_DIRECTORY = ".token-cost-widget";
 
 export const DEFAULT_CONFIG: WidgetConfig = {
   port: 4737,
@@ -14,7 +17,32 @@ export const DEFAULT_CONFIG: WidgetConfig = {
 };
 
 export function stateDirectory(): string {
-  return process.env.TOKEN_COST_WIDGET_HOME || process.env.TCW_HOME || join(homedir(), ".token-cost-widget");
+  return process.env.OBOL_HOME || join(homedir(), ".obol");
+}
+
+// The app was called Token Cost Widget before it was called Obol. Carry the
+// settings and last snapshot over once, so a rename does not reset budgets.
+// runtime.json is deliberately left behind: it names a port and pid that belong
+// to whichever daemon wrote it, and a stale copy would misdirect the menu bar.
+export async function migrateLegacyState(): Promise<void> {
+  if (process.env.OBOL_HOME) return;
+  const directory = join(homedir(), ".obol");
+  const legacy = join(homedir(), LEGACY_STATE_DIRECTORY);
+  if (legacy === directory) return;
+
+  try {
+    await readFile(join(legacy, "config.json"), "utf8");
+  } catch {
+    return;
+  }
+
+  await mkdir(directory, { recursive: true });
+  for (const file of ["config.json", "snapshot.json"]) {
+    // COPYFILE_EXCL: a file already in the new directory is newer than the
+    // legacy one and must win, so migration stays safe to attempt on every run.
+    await copyFile(join(legacy, file), join(directory, file), fsConstants.COPYFILE_EXCL)
+      .catch(() => undefined);
+  }
 }
 
 export function statePaths() {

@@ -113,7 +113,7 @@ final class DaemonController: ObservableObject {
 
     private func loadSnapshot() {
         let path = FileManager.default.homeDirectoryForCurrentUser
-            .appendingPathComponent(".token-cost-widget/snapshot.json")
+            .appendingPathComponent(".obol/snapshot.json")
         guard let data = try? Data(contentsOf: path), let snapshot = try? JSONDecoder().decode(SnapshotEnvelope.self, from: data) else { return }
         summary = snapshot.summary
         notifier.observe(summary)
@@ -148,7 +148,7 @@ final class DaemonController: ObservableObject {
             return
         }
         let runtimePath = FileManager.default.homeDirectoryForCurrentUser
-            .appendingPathComponent(".token-cost-widget/runtime.json")
+            .appendingPathComponent(".obol/runtime.json")
         if let daemonPid = daemon?.processIdentifier,
            let data = try? Data(contentsOf: runtimePath),
            let runtime = try? JSONDecoder().decode(RuntimeState.self, from: data),

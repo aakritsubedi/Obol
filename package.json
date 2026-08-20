@@ -1,5 +1,5 @@
 {
-  "name": "token-cost-widget",
+  "name": "obol",
   "private": true,
   "version": "0.1.0",
   "description": "A macOS menu bar widget and local dashboard for AI coding-agent spend.",
@@ -12,6 +12,7 @@
     "build:daemon": "npm run build -w daemon",
     "bundle:daemon": "npm run bundle -w daemon",
     "build:dashboard": "npm run build -w dashboard",
+    "package:dmg": "./macos/scripts/package-dmg.sh",
     "dev:daemon": "npm run dev -w daemon",
     "dev:dashboard": "npm run dev -w dashboard",
     "typecheck": "npm run typecheck --workspaces"

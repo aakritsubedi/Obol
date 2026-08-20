@@ -1,6 +1,6 @@
-# Token Cost Widget
+# Obol
 
-Token Cost Widget is a local-first macOS menu bar companion for [ccusage](https://github.com/ryoppippi/ccusage). It keeps one daemon as the source of truth for the menu bar and dashboard, watches agent logs for changes, and stores the last good snapshot on disk.
+Obol is a local-first macOS menu bar companion for [ccusage](https://github.com/ryoppippi/ccusage). It keeps one daemon as the source of truth for the menu bar and dashboard, watches agent logs for changes, and stores the last good snapshot on disk.
 
 ## Requirements
 
@@ -20,7 +20,7 @@ npm run dev:daemon
 npm run dev:dashboard
 ```
 
-The daemon binds to `127.0.0.1:4737` by default. If that port is unavailable it chooses an ephemeral port and records the actual port and token in `~/.token-cost-widget/runtime.json`. The Vite dashboard proxies `/api` to the daemon during development.
+The daemon binds to `127.0.0.1:4737` by default. If that port is unavailable it chooses an ephemeral port and records the actual port and token in `~/.obol/runtime.json`. The Vite dashboard proxies `/api` to the daemon during development.
 
 For a parser smoke test without starting the HTTP server:
 
@@ -28,13 +28,22 @@ For a parser smoke test without starting the HTTP server:
 npm run once -w daemon
 ```
 
-Runtime data lives in `~/.token-cost-widget/`:
+Runtime data lives in `~/.obol/`:
 
 - `config.json` — budgets, history window, and refresh interval
 - `runtime.json` — the current local port and API token
 - `snapshot.json` — the last good ccusage report
 
-Set `TOKEN_COST_WIDGET_HOME` to use another state directory while developing or testing.
+Set `OBOL_HOME` to use another state directory while developing or testing.
+
+## Install
+
+```sh
+npm install
+npm run package:dmg
+```
+
+That writes `dist/Obol-<version>.dmg`. Open it and drag the app to Applications. The disk image is ad-hoc signed rather than notarized, so the first launch on a Mac that downloaded it needs a right click on the app and **Open**. Node must be present at `/opt/homebrew/bin/node`, `/usr/local/bin/node`, or `/usr/bin/node`; see [macos/README.md](macos/README.md) for the packaging options and signing details.
 
 ## Dashboard
 

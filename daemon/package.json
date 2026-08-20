@@ -1,5 +1,5 @@
 {
-  "name": "@token-cost-widget/daemon",
+  "name": "@obol/daemon",
   "private": true,
   "version": "0.1.0",
   "type": "module",

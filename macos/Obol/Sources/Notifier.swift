@@ -17,7 +17,7 @@ final class Notifier {
         content.title = summary.budgetStatus == .over ? "Token budget exceeded" : "Token budget warning"
         content.body = summary.budget.reason ?? "Your configured token budget threshold was crossed."
         content.sound = .default
-        let request = UNNotificationRequest(identifier: "token-cost-widget-budget", content: content, trigger: nil)
+        let request = UNNotificationRequest(identifier: "obol-budget", content: content, trigger: nil)
         UNUserNotificationCenter.current().add(request)
     }
 }

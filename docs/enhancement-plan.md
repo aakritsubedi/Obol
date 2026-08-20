@@ -1,4 +1,4 @@
-# Token Cost Widget — Enhancement Plan
+# Obol — Enhancement Plan
 
 Grounded in the [ccusage docs](https://ccusage.com/guide/) (v20.0.20, the pinned version) and the current
 daemon / dashboard / menu-bar code.
@@ -41,14 +41,14 @@ This is the explicit ask, and the current implementation is thinner than it look
 
 ### 2.1 What's broken today
 
-`macos/TokenCostWidget/Sources/Notifier.swift` is 23 lines and has five real defects:
+`macos/Obol/Sources/Notifier.swift` is 23 lines and has five real defects:
 
 1. **The first crossing never fires.** `guard let previousStatus` (line 13) bails when `previousStatus`
    is `nil`. Worse, `DaemonController.loadSnapshot()` (line 119) calls `observe()` with the disk
    snapshot *before* any network fetch — so if you launch the app already over budget, that first call
    silently seeds `previousStatus = .over` and you are never told.
 2. **Alerts overwrite each other.** The request identifier is the constant
-   `"token-cost-widget-budget"` (line 20). A monthly alert replaces a daily one in Notification Center.
+   `"obol-budget"` (line 20). A monthly alert replaces a daily one in Notification Center.
 3. **Alerts die with the UI.** Detection lives in the Swift app, not in the daemon that actually owns
    state. Nothing survives an app restart, so a quit/relaunch re-arms and re-fires the same alert.
 4. **No cooldown.** A ratio oscillating around the threshold (80.1% → 79.8% → 80.2%) re-notifies on
@@ -90,7 +90,7 @@ interface Alert {
 Scoping the id by period is what makes this correct: `daily-over:2026-08-20` can only fire once per
 day, and tomorrow's identical crossing gets a fresh id naturally — no manual reset logic.
 
-**New file `daemon/src/alert-ledger.ts`** — persists to `~/.token-cost-widget/alerts.json`:
+**New file `daemon/src/alert-ledger.ts`** — persists to `~/.obol/alerts.json`:
 
 - `evaluate(summary, config)` returns alerts whose id isn't already in the ledger.
 - Records `firedAt`; applies a per-*kind* cooldown (default 30 min) so flapping can't spam.

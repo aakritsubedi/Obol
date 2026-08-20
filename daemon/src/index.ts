@@ -3,7 +3,7 @@ import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { runOnce, runUsage } from "./ccusage.js";
 import { SnapshotStore } from "./cache.js";
-import { ConfigStore } from "./config.js";
+import { ConfigStore, migrateLegacyState } from "./config.js";
 import { AgentLogWatcher } from "./watcher.js";
 import { DaemonServer } from "./server.js";
 import { emptyBlocks, type CcusageReport, type WidgetConfig } from "./types.js";
@@ -11,7 +11,7 @@ import { emptyBlocks, type CcusageReport, type WidgetConfig } from "./types.js";
 const daemonDirectory = resolve(fileURLToPath(new URL(".", import.meta.url)));
 
 function dashboardRoot(): string {
-  return process.env.TCW_DASHBOARD_DIST || resolve(daemonDirectory, "../../dashboard/dist");
+  return process.env.OBOL_DASHBOARD_DIST || resolve(daemonDirectory, "../../dashboard/dist");
 }
 
 function hasFlag(name: string): boolean {
@@ -24,6 +24,7 @@ function flagValue(name: string): string | undefined {
 }
 
 async function main(): Promise<void> {
+  await migrateLegacyState();
   const configStore = new ConfigStore();
   let config = await configStore.load();
   const store = new SnapshotStore(configStore.paths.snapshot, config);

@@ -103,12 +103,12 @@ export interface WidgetConfig {
 }
 
 function token(): string {
-  return new URLSearchParams(window.location.search).get("t") || localStorage.getItem("token-cost-widget-token") || "";
+  return new URLSearchParams(window.location.search).get("t") || localStorage.getItem("obol-token") || "";
 }
 
 export function rememberToken(): void {
   const value = new URLSearchParams(window.location.search).get("t");
-  if (value) localStorage.setItem("token-cost-widget-token", value);
+  if (value) localStorage.setItem("obol-token", value);
 }
 
 function endpoint(path: string): string {

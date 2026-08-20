@@ -1,7 +1,7 @@
 import SwiftUI
 
 @main
-struct TokenCostWidgetApp: App {
+struct ObolApp: App {
     @StateObject private var controller = DaemonController()
 
     var body: some Scene {
