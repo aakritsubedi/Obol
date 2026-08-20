@@ -39,3 +39,6 @@ xcuserdata/
 *.tmp
 *.swp
 *.swo
+
+# Env file
+.env

@@ -41,7 +41,7 @@ final class DaemonController: ObservableObject {
         switch summary.budgetStatus {
         case .ok: return WidgetStyle.codex
         case .warn: return .orange
-        case .over: return .red
+        case .over: return .green
         }
     }
 
