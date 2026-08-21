@@ -57,6 +57,12 @@ For a one-shot daemon refresh:
 
     npm run once -w daemon
 
+## Releasing
+
+Merging to main is enough. The release workflow bumps the patch version, commits `chore(release): vX.Y.Z`, tags it, builds the universal DMG, ZIP, and checksums on GitHub Actions, and publishes a GitHub Release. Put `[minor]` or `[major]` in the merge commit subject to bump 0.2.0-style instead. Pushing a `v*` tag manually releases that exact version without a bump, and a manual workflow run with dry_run enabled only uploads build artifacts.
+
+The public build stays ad-hoc signed; adding `MACOS_CERTIFICATE`, `MACOS_CERTIFICATE_PASSWORD`, `MACOS_SIGN_IDENTITY`, `AC_API_KEY_ID`, `AC_API_ISSUER`, and `AC_API_KEY` secrets switches the same workflow to Developer ID signing and notarization.
+
 ## Architecture
 
     macOS menu-bar app

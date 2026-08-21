@@ -2,19 +2,20 @@ name: Release
 
 on:
   push:
+    branches:
+      - main
     tags:
       - "v*"
   workflow_dispatch:
     inputs:
       version:
-        description: Version to stamp for a workflow dry run
-        required: true
-        default: 0.1.0
+        description: Optional explicit version for a manual run
+        required: false
         type: string
       dry_run:
-        description: Build and upload artifacts without creating a GitHub Release
+        description: Build artifacts without committing, tagging, or publishing
         required: true
-        default: true
+        default: false
         type: boolean
 
 permissions:
@@ -42,22 +43,52 @@ jobs:
         with:
           node-version: 20
           cache: npm
-      - name: Resolve release version
+      - name: Resolve or cut the release version
         run: |
           if [ "$GITHUB_REF_TYPE" = "tag" ]; then
             TAG_VERSION="$(printf '%s' "$GITHUB_REF_NAME" | sed 's/^v//')"
             echo "OBOL_VERSION=$TAG_VERSION" >> "$GITHUB_ENV"
+            echo "RELEASE_TAG=$GITHUB_REF_NAME" >> "$GITHUB_ENV"
           else
-            ./scripts/set-version.sh "${{ inputs.version }}"
-            echo "OBOL_VERSION=$(node -p 'require("./package.json").version')" >> "$GITHUB_ENV"
+            if [ "$GITHUB_REF_TYPE" = "branch" ] && [ "$GITHUB_REF_NAME" != "main" ] && [ "${{ inputs.dry_run }}" != "true" ]; then
+              echo "error: publishing is automatic only for main; run again with dry_run enabled for other branches" >&2
+              exit 1
+            fi
+            VERSION="$(node -p 'require("./package.json").version')"
+            MAJOR="$(printf '%s' "$VERSION" | cut -d. -f1)"
+            MINOR="$(printf '%s' "$VERSION" | cut -d. -f2)"
+            PATCH="$(printf '%s' "$VERSION" | cut -d. -f3)"
+            SUBJECT="$(git log -1 --pretty=%s)"
+            case "$SUBJECT" in
+              *"[major]"*) NEXT="$((MAJOR + 1)).0.0" ;;
+              *"[minor]"*) NEXT="$MAJOR.$((MINOR + 1)).0" ;;
+              *)           NEXT="$MAJOR.$MINOR.$((PATCH + 1))" ;;
+            esac
+            if [ -n "${{ inputs.version }}" ]; then
+              NEXT="${{ inputs.version }}"
+            fi
+            echo "OBOL_VERSION=$NEXT" >> "$GITHUB_ENV"
+            echo "RELEASE_TAG=v$NEXT" >> "$GITHUB_ENV"
+            if [ "${{ inputs.dry_run }}" != "true" ]; then
+              ./scripts/set-version.sh "$NEXT"
+              git config user.name "github-actions[bot]"
+              git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+              git add -A
+              git commit -m "chore(release): v$NEXT"
+              git push origin "HEAD:main"
+              git tag "v$NEXT"
+              git push origin "v$NEXT"
+            else
+              # Stamp locally so the dry-run build carries the candidate version.
+              ./scripts/set-version.sh "$NEXT"
+            fi
           fi
-          echo "CURRENT_PROJECT_VERSION=$(git rev-list --count HEAD)" >> "$GITHUB_ENV"
       - name: Check version before building
         run: |
           if [ "$GITHUB_REF_TYPE" = "tag" ]; then
             ./scripts/check-version.sh
           else
-            ./scripts/check-version.sh --no-tag
+            GITHUB_REF_NAME="$RELEASE_TAG" ./scripts/check-version.sh
           fi
       - run: npm ci
       - name: Add both Darwin ccusage runtimes
@@ -84,7 +115,7 @@ jobs:
           SIGN_IDENTITY: ${{ secrets.MACOS_SIGN_IDENTITY }}
         run: |
           npm run build
-          OBOL_VERSION="$OBOL_VERSION" CURRENT_PROJECT_VERSION="$CURRENT_PROJECT_VERSION" npm run package:dmg
+          OBOL_VERSION="$OBOL_VERSION" CURRENT_PROJECT_VERSION="$(git rev-list --count HEAD)" npm run package:dmg
       - name: Verify release artifacts
         run: |
           test -f "dist/Obol-$OBOL_VERSION.dmg"
@@ -103,19 +134,21 @@ jobs:
             dist/Obol-*.zip
             dist/SHA256SUMS
       - name: Create GitHub Release
-        if: github.ref_type == 'tag' && inputs.dry_run != true
+        if: inputs.dry_run != true
         uses: softprops/action-gh-release@v2
         with:
+          tag_name: ${{ env.RELEASE_TAG }}
+          target_commitish: ${{ github.sha }}
           files: |
             dist/Obol-*.dmg
             dist/Obol-*.zip
             dist/SHA256SUMS
           generate_release_notes: true
-          prerelease: ${{ contains(github.ref_name, '-') }}
+          prerelease: ${{ contains(env.RELEASE_TAG, '-') }}
           append_body: true
           body: |
 
             ---
-            The app needs Node at /opt/homebrew/bin/node, /usr/local/bin/node, or /usr/bin/node. The first launch of the ad-hoc-signed DMG on another Mac needs right-click -> Open; in-app updates download the ZIP and skip that quarantine prompt after their integrity checks. Verify a download with:
+            The app needs Node.js 20+ at /opt/homebrew/bin/node, /usr/local/bin/node, /opt/local/bin/node, /usr/bin/node, ~/.volta/bin/node, or inside nvm/mise/fnm folders. The first launch of the ad-hoc-signed DMG on another Mac needs right-click -> Open; in-app updates download the ZIP and skip that quarantine prompt after their integrity checks. Verify a download with:
 
                 cd dist && shasum -c SHA256SUMS
