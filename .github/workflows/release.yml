@@ -125,7 +125,7 @@ jobs:
           lipo -info ".xcodebuild/Build/Products/Release/Obol.app/Contents/MacOS/Obol" | grep -q x86_64
           unzip -l "dist/Obol-$OBOL_VERSION.zip" | grep -q ccusage-darwin-x64
           (cd dist && shasum -c SHA256SUMS)
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         if: inputs.dry_run == true
         with:
           name: Obol-${{ env.OBOL_VERSION }}
