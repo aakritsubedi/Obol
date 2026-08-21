@@ -14,10 +14,10 @@ jobs:
   javascript:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
         with:
-          node-version: 20
+          node-version: 22
           cache: npm
       - run: npm ci
       - run: npm run lint
@@ -26,15 +26,15 @@ jobs:
       - run: ./scripts/check-version.sh --no-tag
       - uses: rhysd/actionlint@v1
         with:
-          version: 1.7.7
+          version: 1.7.12
 
   macos:
     runs-on: macos-15
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
         with:
-          node-version: 20
+          node-version: 22
           cache: npm
       - name: Install SwiftFormat
         run: brew install swiftformat
