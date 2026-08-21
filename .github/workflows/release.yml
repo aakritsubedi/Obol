@@ -139,12 +139,19 @@ jobs:
           lipo -info ".xcodebuild/Build/Products/Release/Obol.app/Contents/MacOS/Obol" | grep -q x86_64
           unzip -l "dist/Obol-$OBOL_VERSION.zip" | grep -q ccusage-darwin-x64
           (cd dist && shasum -c SHA256SUMS)
+      - name: Publish stable-name DMG for the latest download link
+        run: |
+          # /releases/latest/download/Obol.dmg always resolves to the newest
+          # release's copy, giving the README a permanent download URL.
+          cp "dist/Obol-$OBOL_VERSION.dmg" dist/Obol.dmg
+          (cd dist && shasum -a 256 Obol.dmg >> SHA256SUMS)
       - uses: actions/upload-artifact@v7
         if: inputs.dry_run == true
         with:
           name: Obol-${{ env.OBOL_VERSION }}
           path: |
             dist/Obol-*.dmg
+            dist/Obol.dmg
             dist/Obol-*.zip
             dist/SHA256SUMS
       - name: Draft release notes with GitHub Models
@@ -192,6 +199,7 @@ jobs:
           target_commitish: ${{ github.sha }}
           files: |
             dist/Obol-*.dmg
+            dist/Obol.dmg
             dist/Obol-*.zip
             dist/SHA256SUMS
           generate_release_notes: true
