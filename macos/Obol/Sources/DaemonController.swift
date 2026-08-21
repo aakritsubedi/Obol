@@ -153,7 +153,7 @@ final class DaemonController: ObservableObject {
         // before writing runtime.json and the wait loop would spin to its
         // timeout with nothing to show for it. Say so up front instead.
         guard let node = nodeURL() else {
-            statusMessage = "Node.js isn't installed. Install it from nodejs.org or run brew install node, then reopen Obol."
+            statusMessage = "Node.js isn't available. The packaged app ships one; if you launched a dev build, install Node from nodejs.org."
             return
         }
         let process = Process()
@@ -254,6 +254,15 @@ final class DaemonController: ObservableObject {
     }
 
     private func nodeURL() -> URL? {
+        // The release bundle ships its own interpreter; users need nothing.
+        if let resource = Bundle.main.resourceURL {
+            let vendored = resource.appendingPathComponent("runtime/bin/node")
+            if FileManager.default.isExecutableFile(atPath: vendored.path) {
+                return vendored
+            }
+        }
+
+        // Development builds fall back to whatever the machine provides.
         let direct = [
             "/opt/homebrew/bin/node",
             "/usr/local/bin/node",

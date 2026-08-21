@@ -85,6 +85,12 @@ echo "==> Staging disk image contents"
 ditto "$APP_SOURCE" "$STAGING/$APP_NAME.app"
 ln -s /Applications "$STAGING/Applications"
 
+# Vendor a Node interpreter into the bundle so users need no system install.
+# The signing loop below seals it like any other executable resource.
+if [ "${OBOL_SKIP_NODE_RUNTIME:-0}" != "1" ]; then
+  "$ROOT/macos/scripts/fetch-node-runtime.sh" "$STAGING/$APP_NAME.app"
+fi
+
 sign_file() {
   if [ "$SIGN_IDENTITY" = "-" ]; then
     codesign --force --timestamp=none --sign "$SIGN_IDENTITY" "$1"
