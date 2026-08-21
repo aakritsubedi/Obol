@@ -27,8 +27,13 @@ public struct ReleaseFeedEntry: Codable, Equatable, Identifiable, Sendable {
     public let publishedAt: String?
     public let assets: [ReleaseAsset]
 
-    public var id: String { tagName }
-    public var version: SemanticVersion? { SemanticVersion(parsing: tagName) }
+    public var id: String {
+        tagName
+    }
+
+    public var version: SemanticVersion? {
+        SemanticVersion(parsing: tagName)
+    }
 
     private enum CodingKeys: String, CodingKey {
         case tagName = "tag_name"
@@ -52,7 +57,9 @@ public struct ReleaseFeedEntry: Codable, Equatable, Identifiable, Sendable {
             let fields = line.split(maxSplits: 1, omittingEmptySubsequences: true, whereSeparator: { $0.isWhitespace })
             guard fields.count == 2 else { continue }
             var name = String(fields[1]).trimmingCharacters(in: .whitespacesAndNewlines)
-            if name.first == "*" { name.removeFirst() }
+            if name.first == "*" {
+                name.removeFirst()
+            }
             guard name == filename else { continue }
             let digest = String(fields[0]).lowercased()
             guard digest.count == 64, digest.allSatisfy({ $0.isHexDigit }) else { return nil }

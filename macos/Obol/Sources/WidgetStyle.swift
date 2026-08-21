@@ -3,7 +3,6 @@ import SwiftUI
 
 /// Visual constants shared by the popover and the menu bar label.
 enum WidgetStyle {
-
     // MARK: - Metrics
 
     static let popoverWidth: CGFloat = 340

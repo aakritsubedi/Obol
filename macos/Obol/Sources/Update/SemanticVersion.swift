@@ -8,7 +8,9 @@ public struct SemanticVersion: Comparable, Equatable, Hashable, Sendable, Custom
     public let patch: Int
     public let prerelease: [String]
 
-    public var isPrerelease: Bool { !prerelease.isEmpty }
+    public var isPrerelease: Bool {
+        !prerelease.isEmpty
+    }
 
     public var description: String {
         let core = "\(major).\(minor).\(patch)"
@@ -18,24 +20,32 @@ public struct SemanticVersion: Comparable, Equatable, Hashable, Sendable, Custom
     public init?(parsing rawValue: String) {
         guard !rawValue.isEmpty else { return nil }
         var value = rawValue
-        if value.first == "v" { value.removeFirst() }
+        if value.first == "v" {
+            value.removeFirst()
+        }
         guard !value.isEmpty else { return nil }
 
         let buildParts = value.split(separator: "+", maxSplits: 1, omittingEmptySubsequences: false)
         guard buildParts.count <= 2 else { return nil }
-        if buildParts.count == 2, !Self.isValidBuild(String(buildParts[1])) { return nil }
+        if buildParts.count == 2, !Self.isValidBuild(String(buildParts[1])) {
+            return nil
+        }
         let coreAndPrerelease = String(buildParts[0])
         let hyphenIndex = coreAndPrerelease.firstIndex(of: "-")
         let core = hyphenIndex.map { String(coreAndPrerelease[..<$0]) } ?? coreAndPrerelease
         let prerelease = hyphenIndex.map {
-            String(coreAndPrerelease[coreAndPrerelease.index(after: $0)...]).split(separator: ".", omittingEmptySubsequences: false).map(String.init)
+            String(coreAndPrerelease[coreAndPrerelease.index(after: $0)...]).split(
+                separator: ".",
+                omittingEmptySubsequences: false
+            ).map(String.init)
         } ?? []
         guard core.split(separator: ".", omittingEmptySubsequences: false).count == 3 else { return nil }
         let numbers = core.split(separator: ".", omittingEmptySubsequences: false)
         guard let major = Self.parseNumericIdentifier(String(numbers[0])),
               let minor = Self.parseNumericIdentifier(String(numbers[1])),
               let patch = Self.parseNumericIdentifier(String(numbers[2])),
-              prerelease.allSatisfy(Self.isValidPrereleaseIdentifier) else {
+              prerelease.allSatisfy(Self.isValidPrereleaseIdentifier)
+        else {
             return nil
         }
         self.major = major
@@ -49,7 +59,11 @@ public struct SemanticVersion: Comparable, Equatable, Hashable, Sendable, Custom
     }
 
     public static func < (lhs: SemanticVersion, rhs: SemanticVersion) -> Bool {
-        let coreComparison = [lhs.major, lhs.minor, lhs.patch].lexicographicallyPrecedes([rhs.major, rhs.minor, rhs.patch])
+        let coreComparison = [lhs.major, lhs.minor, lhs.patch].lexicographicallyPrecedes([
+            rhs.major,
+            rhs.minor,
+            rhs.patch,
+        ])
         if lhs.major != rhs.major || lhs.minor != rhs.minor || lhs.patch != rhs.patch {
             return coreComparison
         }
@@ -57,7 +71,9 @@ public struct SemanticVersion: Comparable, Equatable, Hashable, Sendable, Custom
             return !lhs.prerelease.isEmpty
         }
         for (left, right) in zip(lhs.prerelease, rhs.prerelease) {
-            if left == right { continue }
+            if left == right {
+                continue
+            }
             let leftNumber = Int(left)
             let rightNumber = Int(right)
             switch (leftNumber, rightNumber) {

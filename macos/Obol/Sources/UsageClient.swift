@@ -38,7 +38,9 @@ struct ProviderSummary: Decodable, Identifiable {
     let totalCost: Double
     let totalTokens: Double
 
-    var id: String { agent }
+    var id: String {
+        agent
+    }
 
     init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
@@ -105,14 +107,27 @@ struct UsageSummary: Decodable {
         burnRate = try container.decodeIfPresent(BurnRate.self, forKey: .burnRate) ?? BurnRate(costPerHour: 0)
         projection = try container.decodeIfPresent(Projection.self, forKey: .projection) ?? Projection(totalCost: 0)
         budgetStatus = try container.decodeIfPresent(BudgetStatus.self, forKey: .budgetStatus) ?? .ok
-        budget = try container.decodeIfPresent(BudgetEvaluation.self, forKey: .budget) ?? BudgetEvaluation(dailyRatio: nil, monthlyRatio: nil, reason: nil)
+        budget = try container.decodeIfPresent(BudgetEvaluation.self, forKey: .budget) ?? BudgetEvaluation(
+            dailyRatio: nil,
+            monthlyRatio: nil,
+            reason: nil
+        )
         updatedAt = try container.decodeIfPresent(String.self, forKey: .updatedAt)
         stale = try container.decodeIfPresent(Bool.self, forKey: .stale) ?? false
         error = try container.decodeIfPresent(String.self, forKey: .error)
     }
 
     init() {
-        today = TodayUsage(period: "", totalCost: 0, totalTokens: 0, inputTokens: 0, outputTokens: 0, cacheCreationTokens: 0, cacheReadTokens: 0, modelsUsed: [])
+        today = TodayUsage(
+            period: "",
+            totalCost: 0,
+            totalTokens: 0,
+            inputTokens: 0,
+            outputTokens: 0,
+            cacheCreationTokens: 0,
+            cacheReadTokens: 0,
+            modelsUsed: []
+        )
         agents = []
         burnRate = BurnRate(costPerHour: 0)
         projection = Projection(totalCost: 0)
@@ -123,7 +138,8 @@ struct UsageSummary: Decodable {
         error = nil
     }
 
-    private enum CodingKeys: String, CodingKey { case today, agents, burnRate, projection, budgetStatus, budget, updatedAt, stale, error }
+    private enum CodingKeys: String,
+        CodingKey { case today, agents, burnRate, projection, budgetStatus, budget, updatedAt, stale, error }
 }
 
 struct WidgetConfig: Codable {
@@ -134,7 +150,14 @@ struct WidgetConfig: Codable {
     var warningThreshold: Double
     var launchAtLogin: Bool
 
-    static let `default` = WidgetConfig(port: 4737, refreshIntervalMs: 300_000, dailyBudget: nil, monthlyBudget: nil, warningThreshold: 0.8, launchAtLogin: false)
+    static let `default` = WidgetConfig(
+        port: 4737,
+        refreshIntervalMs: 300_000,
+        dailyBudget: nil,
+        monthlyBudget: nil,
+        warningThreshold: 0.8,
+        launchAtLogin: false
+    )
 }
 
 struct RuntimeState: Decodable {
@@ -182,7 +205,7 @@ struct UsageClient {
 
     private func perform<T: Decodable>(_ request: URLRequest) async throws -> T {
         let (data, response) = try await URLSession.shared.data(for: request)
-        guard let http = response as? HTTPURLResponse, (200..<300).contains(http.statusCode) else {
+        guard let http = response as? HTTPURLResponse, (200 ..< 300).contains(http.statusCode) else {
             throw URLError(.badServerResponse)
         }
         return try JSONDecoder().decode(T.self, from: data)
@@ -219,8 +242,8 @@ struct UsageClient {
             return (formatter.string(from: NSNumber(value: value / 1_000_000_000)) ?? "0") + "B"
         case 1_000_000...:
             return (formatter.string(from: NSNumber(value: value / 1_000_000)) ?? "0") + "M"
-        case 1_000...:
-            return (formatter.string(from: NSNumber(value: value / 1_000)) ?? "0") + "K"
+        case 1000...:
+            return (formatter.string(from: NSNumber(value: value / 1000)) ?? "0") + "K"
         default:
             return formatter.string(from: NSNumber(value: value.rounded())) ?? "0"
         }
@@ -228,7 +251,16 @@ struct UsageClient {
 }
 
 private extension TodayUsage {
-    init(period: String, totalCost: Double, totalTokens: Double, inputTokens: Double, outputTokens: Double, cacheCreationTokens: Double, cacheReadTokens: Double, modelsUsed: [String]) {
+    init(
+        period: String,
+        totalCost: Double,
+        totalTokens: Double,
+        inputTokens: Double,
+        outputTokens: Double,
+        cacheCreationTokens: Double,
+        cacheReadTokens: Double,
+        modelsUsed: [String]
+    ) {
         self.period = period
         self.totalCost = totalCost
         self.totalTokens = totalTokens
@@ -241,11 +273,15 @@ private extension TodayUsage {
 }
 
 private extension BurnRate {
-    init(costPerHour: Double) { self.costPerHour = costPerHour }
+    init(costPerHour: Double) {
+        self.costPerHour = costPerHour
+    }
 }
 
 private extension Projection {
-    init(totalCost: Double) { self.totalCost = totalCost }
+    init(totalCost: Double) {
+        self.totalCost = totalCost
+    }
 }
 
 private extension BudgetEvaluation {

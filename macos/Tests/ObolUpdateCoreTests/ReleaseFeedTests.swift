@@ -1,5 +1,5 @@
-import XCTest
 @testable import ObolUpdateCore
+import XCTest
 
 final class ReleaseFeedTests: XCTestCase {
     private func fixture(_ name: String) throws -> Data {

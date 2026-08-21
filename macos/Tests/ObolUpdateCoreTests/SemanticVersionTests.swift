@@ -1,5 +1,5 @@
-import XCTest
 @testable import ObolUpdateCore
+import XCTest
 
 final class SemanticVersionTests: XCTestCase {
     func testStrictParsingAndBuildMetadata() {
@@ -10,27 +10,38 @@ final class SemanticVersionTests: XCTestCase {
         XCTAssertNil(SemanticVersion(parsing: "1.2.3-01"))
     }
 
-    func testSemverPrecedence() {
-        XCTAssertLessThan(SemanticVersion(parsing: "1.0.0-rc.1")!, SemanticVersion(parsing: "1.0.0")!)
-        XCTAssertGreaterThan(SemanticVersion(parsing: "0.10.0")!, SemanticVersion(parsing: "0.9.0")!)
-        XCTAssertEqual(SemanticVersion(parsing: "v0.2.0")!, SemanticVersion(parsing: "0.2.0")!)
+    func testSemverPrecedence() throws {
+        XCTAssertLessThan(
+            try XCTUnwrap(SemanticVersion(parsing: "1.0.0-rc.1")),
+            try XCTUnwrap(SemanticVersion(parsing: "1.0.0"))
+        )
+        XCTAssertGreaterThan(
+            try XCTUnwrap(SemanticVersion(parsing: "0.10.0")),
+            try XCTUnwrap(SemanticVersion(parsing: "0.9.0"))
+        )
+        XCTAssertEqual(SemanticVersion(parsing: "v0.2.0"), SemanticVersion(parsing: "0.2.0"))
     }
 
-    func testUpdatePolicy() {
+    func testUpdatePolicy() throws {
         XCTAssertEqual(
             evaluateUpdate(current: "0.2.0", candidateTag: "v0.2.0", skippedVersion: nil, allowPrerelease: false),
             .upToDate
         )
         XCTAssertEqual(
             evaluateUpdate(current: "0.2.0", candidateTag: "v0.3.0", skippedVersion: "0.3.0", allowPrerelease: false),
-            .skipped(SemanticVersion(parsing: "0.3.0")!)
+            try .skipped(XCTUnwrap(SemanticVersion(parsing: "0.3.0")))
         )
         XCTAssertEqual(
             evaluateUpdate(current: "0.2.0", candidateTag: "v0.3.0", skippedVersion: nil, allowPrerelease: false),
-            .update(to: SemanticVersion(parsing: "0.3.0")!)
+            try .update(to: XCTUnwrap(SemanticVersion(parsing: "0.3.0")))
         )
         XCTAssertEqual(
-            evaluateUpdate(current: "not-a-version", candidateTag: "v0.3.0", skippedVersion: nil, allowPrerelease: false),
+            evaluateUpdate(
+                current: "not-a-version",
+                candidateTag: "v0.3.0",
+                skippedVersion: nil,
+                allowPrerelease: false
+            ),
             .unreadable("The installed version is unreadable")
         )
         XCTAssertEqual(

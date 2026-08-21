@@ -6,7 +6,7 @@ import ObolUpdateCore
  The updater trust model is documented once in SECURITY.md. Summary: TLS to GitHub is the real
  boundary, the SHA-256 digest makes the download tamper-evident, and codesign --verify --deep
  --strict below is an integrity check only — an ad-hoc signature carries no identity.
-*/
+ */
 
 struct StagedUpdate: Equatable {
     let rootURL: URL
@@ -40,7 +40,9 @@ enum UpdateInstallerError: LocalizedError {
 final class UpdateInstaller {
     private let fileManager = FileManager.default
 
-    func stage(archiveURL: URL, currentVersion: SemanticVersion, stagingRoot suppliedRoot: URL? = nil) throws -> StagedUpdate {
+    func stage(archiveURL: URL, currentVersion: SemanticVersion,
+               stagingRoot suppliedRoot: URL? = nil) throws -> StagedUpdate
+    {
         let root = suppliedRoot ?? fileManager.temporaryDirectory
             .appendingPathComponent("Obol-update-\(UUID().uuidString)", isDirectory: true)
         let ownsRoot = suppliedRoot == nil
@@ -54,21 +56,29 @@ final class UpdateInstaller {
             }
             guard let bundle = Bundle(url: appURL),
                   let identifier = bundle.bundleIdentifier,
-                  identifier == Bundle.main.bundleIdentifier else {
+                  identifier == Bundle.main.bundleIdentifier
+            else {
                 throw UpdateInstallerError.wrongBundleIdentifier
             }
             guard let versionString = bundle.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String,
-                  let version = SemanticVersion(parsing: versionString) else {
+                  let version = SemanticVersion(parsing: versionString)
+            else {
                 throw UpdateInstallerError.invalidArchive("The downloaded app has an unreadable version.")
             }
             guard version > currentVersion else { throw UpdateInstallerError.downgrade }
             // TODO(dev-id): pin SecRequirement at this exact call site once Developer ID signing exists.
-            guard try run("/usr/bin/codesign", arguments: ["--verify", "--deep", "--strict", appURL.path], allowsFailure: true) == 0 else {
+            guard try run(
+                "/usr/bin/codesign",
+                arguments: ["--verify", "--deep", "--strict", appURL.path],
+                allowsFailure: true
+            ) == 0 else {
                 throw UpdateInstallerError.unsignedBundle
             }
             return StagedUpdate(rootURL: root, appURL: appURL, version: version)
         } catch {
-            if ownsRoot { try? fileManager.removeItem(at: root) }
+            if ownsRoot {
+                try? fileManager.removeItem(at: root)
+            }
             throw error
         }
     }
@@ -118,7 +128,8 @@ final class UpdateInstaller {
         try process.run()
         process.waitUntilExit()
         if !allowsFailure, process.terminationStatus != 0 {
-            throw UpdateInstallerError.invalidArchive("\((executable as NSString).lastPathComponent) could not process the update archive.")
+            throw UpdateInstallerError
+                .invalidArchive("\((executable as NSString).lastPathComponent) could not process the update archive.")
         }
         return process.terminationStatus
     }

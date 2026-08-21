@@ -2,7 +2,7 @@
 // so it can be compiled and tested by the ObolUpdateCore SwiftPM target.
 import Foundation
 #if canImport(FoundationNetworking)
-import FoundationNetworking
+    import FoundationNetworking
 #endif
 
 public enum ReleaseFetchResult: Equatable, Sendable {
@@ -45,7 +45,9 @@ public struct ReleaseClient {
         request.setValue("application/vnd.github+json", forHTTPHeaderField: "Accept")
         request.setValue("2022-11-28", forHTTPHeaderField: "X-GitHub-Api-Version")
         request.setValue("Obol-Updater/1.0 (https://github.com/aakritsubedi/obol)", forHTTPHeaderField: "User-Agent")
-        if let etag { request.setValue(etag, forHTTPHeaderField: "If-None-Match") }
+        if let etag {
+            request.setValue(etag, forHTTPHeaderField: "If-None-Match")
+        }
 
         let (data, response) = try await session.data(for: request)
         guard let http = response as? HTTPURLResponse else { throw ReleaseClientError.invalidResponse }
@@ -64,7 +66,8 @@ public struct ReleaseClient {
         case 403, 429:
             if http.value(forHTTPHeaderField: "x-ratelimit-remaining") == "0" {
                 let reset = http.value(forHTTPHeaderField: "x-ratelimit-reset").flatMap(TimeInterval.init)
-                return .rateLimited(retryAfter: reset.map(Date.init(timeIntervalSince1970:)) ?? Date().addingTimeInterval(3600))
+                return .rateLimited(retryAfter: reset.map(Date.init(timeIntervalSince1970:)) ?? Date()
+                    .addingTimeInterval(3600))
             }
             throw ReleaseClientError.httpStatus(http.statusCode)
         default:
@@ -73,7 +76,9 @@ public struct ReleaseClient {
     }
 
     private func makeFeedURL() throws -> URL {
-        if let feedURL { return feedURL }
+        if let feedURL {
+            return feedURL
+        }
         guard let url = URL(string: "https://api.github.com/repos/\(repo)/releases/latest") else {
             throw ReleaseClientError.invalidFeedURL
         }

@@ -3,7 +3,7 @@ import Combine
 import CryptoKit
 import Foundation
 #if canImport(FoundationNetworking)
-import FoundationNetworking
+    import FoundationNetworking
 #endif
 import ObolUpdateCore
 
@@ -34,12 +34,12 @@ final class UpdateController: ObservableObject {
 
     init() {
         #if DEBUG
-        let environment = ProcessInfo.processInfo.environment
-        let feedURL = environment["OBOL_UPDATE_FEED_URL"].flatMap(URL.init(string:))
-        let repo = environment["OBOL_UPDATE_REPO"] ?? "aakritsubedi/obol"
-        client = ReleaseClient(repo: repo, feedURL: feedURL)
+            let environment = ProcessInfo.processInfo.environment
+            let feedURL = environment["OBOL_UPDATE_FEED_URL"].flatMap(URL.init(string:))
+            let repo = environment["OBOL_UPDATE_REPO"] ?? "aakritsubedi/obol"
+            client = ReleaseClient(repo: repo, feedURL: feedURL)
         #else
-        client = ReleaseClient()
+            client = ReleaseClient()
         #endif
 
         if let cachedRelease = defaults.cachedRelease {
@@ -86,7 +86,8 @@ final class UpdateController: ObservableObject {
         guard !isBusy else { return }
         guard defaults.rateLimitedUntil.map({ $0 > Date() }) != true else { return }
         if let lastCheckedAt = defaults.lastCheckedAt,
-           Date().timeIntervalSince(lastCheckedAt) < 24 * 60 * 60 {
+           Date().timeIntervalSince(lastCheckedAt) < 24 * 60 * 60
+        {
             return
         }
         startCheck(ignoreCadence: false, ignoreSkippedVersion: false)
@@ -106,7 +107,8 @@ final class UpdateController: ObservableObject {
     func beginUpdate() {
         guard case let .available(entry) = state,
               let version = entry.version,
-              let asset = entry.updateAsset(expectedName: "Obol-\(version).zip") else {
+              let asset = entry.updateAsset(expectedName: "Obol-\(version).zip")
+        else {
             state = .failed("This release does not contain an Obol ZIP.")
             return
         }
@@ -151,7 +153,8 @@ final class UpdateController: ObservableObject {
         guard checkTask == nil, !isBusy else { return }
         if !ignoreCadence {
             guard defaults.rateLimitedUntil.map({ $0 > Date() }) != true,
-                  defaults.lastCheckedAt.map({ Date().timeIntervalSince($0) < 24 * 60 * 60 }) != true else {
+                  defaults.lastCheckedAt.map({ Date().timeIntervalSince($0) < 24 * 60 * 60 }) != true
+            else {
                 return
             }
         }
@@ -221,15 +224,18 @@ final class UpdateController: ObservableObject {
         }
     }
 
-    // Only CFBundleShortVersionString participates in update comparisons. CFBundleVersion is a
-    // git revision count and is not comparable across shallow clones or release branches.
+    /// Only CFBundleShortVersionString participates in update comparisons. CFBundleVersion is a
+    /// git revision count and is not comparable across shallow clones or release branches.
     private var currentVersionString: String {
         (Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String) ?? ""
     }
 
-    private func download(entry: ReleaseFeedEntry, version: SemanticVersion, asset: ReleaseAsset) async {
+    private func download(entry: ReleaseFeedEntry, version _: SemanticVersion, asset: ReleaseAsset) async {
         let fileManager = FileManager.default
-        let root = fileManager.temporaryDirectory.appendingPathComponent("Obol-update-\(UUID().uuidString)", isDirectory: true)
+        let root = fileManager.temporaryDirectory.appendingPathComponent(
+            "Obol-update-\(UUID().uuidString)",
+            isDirectory: true
+        )
         do {
             try fileManager.createDirectory(at: root, withIntermediateDirectories: true)
             let delegate = DownloadDelegate { [weak self] progress in
@@ -241,9 +247,12 @@ final class UpdateController: ObservableObject {
             let session = URLSession(configuration: .ephemeral, delegate: delegate, delegateQueue: nil)
             downloadSession = session
             var request = URLRequest(url: asset.browserDownloadURL)
-            request.setValue("Obol-Updater/1.0 (https://github.com/aakritsubedi/obol)", forHTTPHeaderField: "User-Agent")
+            request.setValue(
+                "Obol-Updater/1.0 (https://github.com/aakritsubedi/obol)",
+                forHTTPHeaderField: "User-Agent"
+            )
             let (temporaryURL, response) = try await session.download(for: request, delegate: delegate)
-            guard let http = response as? HTTPURLResponse, (200..<300).contains(http.statusCode) else {
+            guard let http = response as? HTTPURLResponse, (200 ..< 300).contains(http.statusCode) else {
                 throw UpdateDownloadError.badResponse
             }
             let archive = root.appendingPathComponent(asset.name)
@@ -281,7 +290,8 @@ final class UpdateController: ObservableObject {
         if let digest = asset.digest {
             let parts = digest.split(separator: ":", maxSplits: 1, omittingEmptySubsequences: false)
             if parts.count == 2, parts[0].lowercased() == "sha256",
-               parts[1].count == 64, parts[1].allSatisfy(\.isHexDigit) {
+               parts[1].count == 64, parts[1].allSatisfy(\.isHexDigit)
+            {
                 return String(parts[1]).lowercased()
             }
         }
@@ -289,9 +299,10 @@ final class UpdateController: ObservableObject {
             throw UpdateDownloadError.missingChecksum
         }
         let (data, response) = try await URLSession.shared.data(from: sumsAsset.browserDownloadURL)
-        guard let http = response as? HTTPURLResponse, (200..<300).contains(http.statusCode),
+        guard let http = response as? HTTPURLResponse, (200 ..< 300).contains(http.statusCode),
               let sums = String(data: data, encoding: .utf8),
-              let hash = entry.sha256(forFileNamed: asset.name, inSums: sums) else {
+              let hash = entry.sha256(forFileNamed: asset.name, inSums: sums)
+        else {
             throw UpdateDownloadError.missingChecksum
         }
         return hash
@@ -336,7 +347,7 @@ private final class DownloadDelegate: NSObject, URLSessionDownloadDelegate {
     func urlSession(
         _: URLSession,
         downloadTask _: URLSessionDownloadTask,
-        didWriteData bytesWritten: Int64,
+        didWriteData _: Int64,
         totalBytesWritten: Int64,
         totalBytesExpectedToWrite: Int64
     ) {

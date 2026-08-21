@@ -1,13 +1,18 @@
 import Foundation
-import XCTest
 @testable import ObolUpdateCore
+import XCTest
 
 final class ReleaseClientTests: XCTestCase {
     private final class StubURLProtocol: URLProtocol {
         static var handler: ((URLRequest) throws -> (HTTPURLResponse, Data))!
 
-        override class func canInit(with request: URLRequest) -> Bool { true }
-        override class func canonicalRequest(for request: URLRequest) -> URLRequest { request }
+        override class func canInit(with _: URLRequest) -> Bool {
+            true
+        }
+
+        override class func canonicalRequest(for request: URLRequest) -> URLRequest {
+            request
+        }
 
         override func startLoading() {
             do {
@@ -30,15 +35,18 @@ final class ReleaseClientTests: XCTestCase {
             XCTAssertEqual(request.value(forHTTPHeaderField: "Accept"), "application/vnd.github+json")
             XCTAssertEqual(request.value(forHTTPHeaderField: "X-GitHub-Api-Version"), "2022-11-28")
             XCTAssertNotNil(request.value(forHTTPHeaderField: "User-Agent"))
-            let response = HTTPURLResponse(
-                url: try XCTUnwrap(request.url),
+            let response = try HTTPURLResponse(
+                url: XCTUnwrap(request.url),
                 statusCode: status,
                 httpVersion: "HTTP/1.1",
                 headerFields: headers
             )!
             return (response, body)
         }
-        return ReleaseClient(session: URLSession(configuration: configuration), feedURL: URL(string: "http://fixture.test/latest"))
+        return ReleaseClient(
+            session: URLSession(configuration: configuration),
+            feedURL: URL(string: "http://fixture.test/latest")
+        )
     }
 
     func testNotModifiedSendsConditionalETag() async throws {
@@ -46,8 +54,8 @@ final class ReleaseClientTests: XCTestCase {
         configuration.protocolClasses = [StubURLProtocol.self]
         StubURLProtocol.handler = { request in
             XCTAssertEqual(request.value(forHTTPHeaderField: "If-None-Match"), "\"etag-1\"")
-            let response = HTTPURLResponse(
-                url: try XCTUnwrap(request.url),
+            let response = try HTTPURLResponse(
+                url: XCTUnwrap(request.url),
                 statusCode: 304,
                 httpVersion: "HTTP/1.1",
                 headerFields: [:]

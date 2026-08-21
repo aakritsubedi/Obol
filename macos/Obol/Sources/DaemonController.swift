@@ -6,7 +6,7 @@ import SwiftUI
 
 @MainActor
 final class DaemonController: ObservableObject {
-    static weak var shared: DaemonController?
+    weak static var shared: DaemonController?
 
     @Published private(set) var summary = UsageSummary()
     @Published private(set) var config = WidgetConfig.default
@@ -39,10 +39,14 @@ final class DaemonController: ObservableObject {
         UsageClient.currencySymbol + UsageClient.amount(summary.today.totalCost)
     }
 
-    var liveLabel: String { summary.stale ? "Cached" : "Live" }
+    var liveLabel: String {
+        summary.stale ? "Cached" : "Live"
+    }
 
     var liveColor: Color {
-        if summary.stale { return WidgetStyle.warning }
+        if summary.stale {
+            return WidgetStyle.warning
+        }
         switch summary.budgetStatus {
         case .ok: return WidgetStyle.codex
         case .warn: return WidgetStyle.warning
@@ -50,7 +54,9 @@ final class DaemonController: ObservableObject {
         }
     }
 
-    var launchAtLogin: Bool { config.launchAtLogin }
+    var launchAtLogin: Bool {
+        config.launchAtLogin
+    }
 
     func start() {
         guard !started else { return }
@@ -89,14 +95,19 @@ final class DaemonController: ObservableObject {
         guard let baseURL else { return }
         var components = URLComponents(url: baseURL, resolvingAgainstBaseURL: false)
         components?.queryItems = [URLQueryItem(name: "t", value: token)]
-        if let url = components?.url { NSWorkspace.shared.open(url) }
+        if let url = components?.url {
+            NSWorkspace.shared.open(url)
+        }
     }
 
     func setLaunchAtLogin(_ enabled: Bool) {
         config.launchAtLogin = enabled
         do {
-            if enabled { try SMAppService.mainApp.register() }
-            else { try SMAppService.mainApp.unregister() }
+            if enabled {
+                try SMAppService.mainApp.register()
+            } else {
+                try SMAppService.mainApp.unregister()
+            }
             Task { await saveConfig() }
         } catch {
             config.launchAtLogin = !enabled
@@ -115,7 +126,9 @@ final class DaemonController: ObservableObject {
         pollingTimer?.invalidate()
         runtimeTimer = nil
         pollingTimer = nil
-        if let daemon, daemon.isRunning { daemon.terminate() }
+        if let daemon, daemon.isRunning {
+            daemon.terminate()
+        }
         daemon = nil
         connected = false
     }
@@ -123,7 +136,10 @@ final class DaemonController: ObservableObject {
     private func loadSnapshot() {
         let path = FileManager.default.homeDirectoryForCurrentUser
             .appendingPathComponent(".obol/snapshot.json")
-        guard let data = try? Data(contentsOf: path), let snapshot = try? JSONDecoder().decode(SnapshotEnvelope.self, from: data) else { return }
+        guard let data = try? Data(contentsOf: path), let snapshot = try? JSONDecoder().decode(
+            SnapshotEnvelope.self,
+            from: data
+        ) else { return }
         summary = snapshot.summary
         notifier.observe(summary)
     }
@@ -147,7 +163,10 @@ final class DaemonController: ObservableObject {
         // run's output in ~/.obol/daemon.log so failures are diagnosable.
         let logURL = FileManager.default.homeDirectoryForCurrentUser
             .appendingPathComponent(".obol/daemon.log")
-        try? FileManager.default.createDirectory(at: logURL.deletingLastPathComponent(), withIntermediateDirectories: true)
+        try? FileManager.default.createDirectory(
+            at: logURL.deletingLastPathComponent(),
+            withIntermediateDirectories: true
+        )
         if let log = FileHandle(forWritingAtPath: logURL.path) {
             try? log.seekToEnd()
             process.standardOutput = log
@@ -179,10 +198,10 @@ final class DaemonController: ObservableObject {
         guard let daemon, daemon.isRunning else { return }
         let runtimePath = FileManager.default.homeDirectoryForCurrentUser
             .appendingPathComponent(".obol/runtime.json")
-        if let daemonPid = daemon?.processIdentifier,
-           let data = try? Data(contentsOf: runtimePath),
+        if let data = try? Data(contentsOf: runtimePath),
            let runtime = try? JSONDecoder().decode(RuntimeState.self, from: data),
-           runtime.pid == Int(daemonPid) {
+           runtime.pid == Int(daemon.processIdentifier)
+        {
             token = runtime.token
             baseURL = URL(string: "http://127.0.0.1:\(runtime.port)/")
             connected = true
@@ -218,7 +237,9 @@ final class DaemonController: ObservableObject {
 
     private func saveConfig() async {
         guard let baseURL, !token.isEmpty else { return }
-        do { config = try await client.update(config: config, baseURL: baseURL, token: token) } catch { statusMessage = "Could not save preferences." }
+        do { config = try await client.update(config: config, baseURL: baseURL, token: token) } catch {
+            statusMessage = "Could not save preferences."
+        }
     }
 
     private func apply(_ next: UsageSummary) {
@@ -239,7 +260,7 @@ final class DaemonController: ObservableObject {
             "/opt/local/bin/node",
             "/usr/bin/node",
             NSString(string: "~/.volta/bin/node").expandingTildeInPath,
-        ].map(URL.init(fileURLWithPath))
+        ].map { URL(fileURLWithPath: $0) }
         if let hit = direct.first(where: { FileManager.default.isExecutableFile(atPath: $0.path) }) {
             return hit
         }
@@ -249,7 +270,10 @@ final class DaemonController: ObservableObject {
         let managed: [(parent: String, subpath: String)] = [
             (NSString(string: "~/.nvm/versions/node").expandingTildeInPath, "bin/node"),
             (NSString(string: "~/.local/share/mise/installs/node").expandingTildeInPath, "bin/node"),
-            (NSString(string: "~/Library/Application Support/fnm/node-versions").expandingTildeInPath, "installation/bin/node"),
+            (
+                NSString(string: "~/Library/Application Support/fnm/node-versions").expandingTildeInPath,
+                "installation/bin/node"
+            ),
             (NSString(string: "~/.fnm/node-versions").expandingTildeInPath, "installation/bin/node"),
         ]
         for (parent, subpath) in managed {
@@ -259,7 +283,9 @@ final class DaemonController: ObservableObject {
                 .sorted { Self.compareVersions($0, $1) == .orderedDescending }
                 .compactMap { URL(fileURLWithPath: parent).appendingPathComponent($0 + "/" + subpath).path }
                 .first { FileManager.default.isExecutableFile(atPath: $0) }
-            if let candidate { return URL(fileURLWithPath: candidate) }
+            if let candidate {
+                return URL(fileURLWithPath: candidate)
+            }
         }
         return nil
     }
@@ -268,18 +294,26 @@ final class DaemonController: ObservableObject {
     static func compareVersions(_ lhs: String, _ rhs: String) -> ComparisonResult {
         let left = lhs.split(separator: ".").map { Int($0.filter(\.isNumber)) ?? 0 }
         let right = rhs.split(separator: ".").map { Int($0.filter(\.isNumber)) ?? 0 }
-        for index in 0..<max(left.count, right.count) {
+        for index in 0 ..< max(left.count, right.count) {
             let l = index < left.count ? left[index] : 0
             let r = index < right.count ? right[index] : 0
-            if l != r { return l < r ? .orderedAscending : .orderedDescending }
+            if l != r {
+                return l < r ? .orderedAscending : .orderedDescending
+            }
         }
         return .orderedSame
     }
 
     private func daemonScriptURL() -> URL? {
-        if let bundled = Bundle.main.resourceURL?.appendingPathComponent("daemon/dist/index.js"), FileManager.default.fileExists(atPath: bundled.path) { return bundled }
+        if let bundled = Bundle.main.resourceURL?.appendingPathComponent("daemon/dist/index.js"),
+           FileManager.default.fileExists(atPath: bundled.path)
+        {
+            return bundled
+        }
         var root = URL(fileURLWithPath: #filePath).deletingLastPathComponent()
-        for _ in 0..<3 { root.deleteLastPathComponent() }
+        for _ in 0 ..< 3 {
+            root.deleteLastPathComponent()
+        }
         let development = root.appendingPathComponent("daemon/dist/index.js")
         return FileManager.default.fileExists(atPath: development.path) ? development : nil
     }
