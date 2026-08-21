@@ -20,6 +20,7 @@ on:
 
 permissions:
   contents: write
+  models: read
 
 concurrency:
   group: release-${{ github.ref }}
@@ -58,15 +59,28 @@ jobs:
             MAJOR="$(printf '%s' "$VERSION" | cut -d. -f1)"
             MINOR="$(printf '%s' "$VERSION" | cut -d. -f2)"
             PATCH="$(printf '%s' "$VERSION" | cut -d. -f3)"
-            SUBJECT="$(git log -1 --pretty=%s)"
-            case "$SUBJECT" in
-              *"[major]"*) NEXT="$((MAJOR + 1)).0.0" ;;
-              *"[minor]"*) NEXT="$MAJOR.$((MINOR + 1)).0" ;;
-              *)           NEXT="$MAJOR.$MINOR.$((PATCH + 1))" ;;
+            # Decide the bump from every commit since the previous release:
+            # BREAKING CHANGE or type!: major, feat: minor, anything else patch.
+            PREV_TAG="$(git tag --list 'v*' --sort=-creatordate | head -1 || true)"
+            echo "PREV_TAG=$PREV_TAG" >> "$GITHUB_ENV"
+            if [ -n "$PREV_TAG" ]; then LOG_RANGE="$PREV_TAG..HEAD"; else LOG_RANGE="HEAD"; fi
+            SUBJECTS="$(git log --no-merges --pretty=%s "$LOG_RANGE")"
+            [ -n "$SUBJECTS" ] || SUBJECTS="$(git log -1 --pretty=%s)"
+            LEVEL="patch"
+            if printf '%s\n' "$SUBJECTS" | grep -Eqi '\[major\]|BREAKING[ -]CHANGE|^[a-z]+(\([^)]*\))?!:'; then
+              LEVEL="major"
+            elif printf '%s\n' "$SUBJECTS" | grep -Eqi '\[minor\]|^\s*(feat|feature)(\(|:)'; then
+              LEVEL="minor"
+            fi
+            case "$LEVEL" in
+              major) NEXT="$((MAJOR + 1)).0.0" ;;
+              minor) NEXT="$MAJOR.$((MINOR + 1)).0" ;;
+              patch) NEXT="$MAJOR.$MINOR.$((PATCH + 1))" ;;
             esac
             if [ -n "${{ inputs.version }}" ]; then
               NEXT="${{ inputs.version }}"
             fi
+            echo "Bump level: $LEVEL ($VERSION -> $NEXT)"
             echo "OBOL_VERSION=$NEXT" >> "$GITHUB_ENV"
             echo "RELEASE_TAG=v$NEXT" >> "$GITHUB_ENV"
             if [ "${{ inputs.dry_run }}" != "true" ]; then
@@ -133,6 +147,43 @@ jobs:
             dist/Obol-*.dmg
             dist/Obol-*.zip
             dist/SHA256SUMS
+      - name: Draft release notes with GitHub Models
+        if: inputs.dry_run != true
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_MODEL: openai/gpt-4o-mini
+        run: |
+          set -eu
+          NOTES_FILE="$RUNNER_TEMP/release-notes.md"
+          PREV_TAG="${PREV_TAG:-$(git tag --list 'v*' --sort=-creatordate | sed "/^${RELEASE_TAG}\$/d" | head -1 || true)}"
+          if [ -n "$PREV_TAG" ]; then LOG_RANGE="$PREV_TAG..HEAD"; else LOG_RANGE="HEAD"; fi
+          COMMITS="$(git log --no-merges --pretty=format:'- %s' "$LOG_RANGE" | head -60)"
+          [ -n "$COMMITS" ] || COMMITS="- Maintenance and dependency updates"
+
+          PAYLOAD="$(jq -n \
+            --arg model "$GH_MODEL" \
+            --arg system 'You write release notes for Obol, a macOS menu bar app that tracks AI coding-agent spend. From the commit list, write 3 to 6 concise markdown bullets describing user-facing changes. Plain bullets only: no headings, no commit hashes, no version numbers. Skip chores and CI-only changes unless they affect users.' \
+            --arg commits "$COMMITS" \
+            '{model: $model, messages: [{role: "system", content: $system}, {role: "user", content: $commits}], max_tokens: 400}')"
+
+          # Free GitHub Models inference; any failure falls back to raw commits.
+          if AI_TEXT="$(curl -sf --max-time 30 https://models.github.ai/inference/chat/completions \
+              -H "Authorization: Bearer $GH_TOKEN" \
+              -H "Content-Type: application/json" \
+              -d "$PAYLOAD" | jq -r '.choices[0].message.content // empty' 2>/dev/null)" && [ -n "$AI_TEXT" ]; then
+            printf '%s\n' "$AI_TEXT" > "$RUNNER_TEMP/ai-section.md"
+          else
+            printf '%s\n' "$COMMITS" > "$RUNNER_TEMP/ai-section.md"
+          fi
+
+          {
+            echo "## What's new"
+            cat "$RUNNER_TEMP/ai-section.md"
+            echo
+            echo "---"
+            echo "**Download \`Obol-$OBOL_VERSION.dmg\` below**, open it, and drag Obol to Applications."
+            echo "First launch on another Mac needs right-click -> Open (ad-hoc signed). Node.js 20+ required. Verify with \`cd dist && shasum -c SHA256SUMS\`."
+          } > "$NOTES_FILE"
       - name: Create GitHub Release
         if: inputs.dry_run != true
         uses: softprops/action-gh-release@v3
@@ -146,9 +197,4 @@ jobs:
           generate_release_notes: true
           prerelease: ${{ contains(env.RELEASE_TAG, '-') }}
           append_body: true
-          body: |
-
-            ---
-            The app needs Node.js 20+ at /opt/homebrew/bin/node, /usr/local/bin/node, /opt/local/bin/node, /usr/bin/node, ~/.volta/bin/node, or inside nvm/mise/fnm folders. The first launch of the ad-hoc-signed DMG on another Mac needs right-click -> Open; in-app updates download the ZIP and skip that quarantine prompt after their integrity checks. Verify a download with:
-
-                cd dist && shasum -c SHA256SUMS
+          body_path: ${{ runner.temp }}/release-notes.md
