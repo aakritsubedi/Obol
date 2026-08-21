@@ -37,6 +37,6 @@
     "check-version": "scripts/check-version.sh --no-tag"
   },
   "devDependencies": {
-    "@biomejs/biome": "2.2.2"
+    "@biomejs/biome": "2.5.9"
   }
 }
