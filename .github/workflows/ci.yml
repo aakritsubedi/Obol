@@ -24,7 +24,7 @@ jobs:
       - run: npm run typecheck
       - run: npm test
       - run: ./scripts/check-version.sh --no-tag
-      - uses: rhysd/actionlint@v1
+      - uses: rhysd/actionlint@v1.7.12
         with:
           version: 1.7.12
 
