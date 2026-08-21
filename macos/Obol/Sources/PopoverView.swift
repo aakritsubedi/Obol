@@ -71,9 +71,12 @@ struct PopoverView: View {
                 iconButton(systemName: "arrow.triangle.2.circlepath", help: "Refresh usage") {
                     Task { await controller.refresh() }
                 }
-                iconButton(systemName: "arrow.up.forward.square", help: "Open dashboard") {
+                iconButton(systemName: "arrow.up.forward.square", help: controller.connected ? "Open dashboard" : "Dashboard starts with the daemon") {
                     controller.openDashboard()
                 }
+                .disabled(!controller.connected)
+                .opacity(controller.connected ? 1 : 0.35)
+                .animation(.easeOut(duration: 0.15), value: controller.connected)
             }
 
             totalAmount

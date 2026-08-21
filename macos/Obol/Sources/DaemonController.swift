@@ -24,6 +24,7 @@ final class DaemonController: ObservableObject {
     private var token = ""
     private var fetchInFlight = false
     private var started = false
+    private var shuttingDown = false
 
     init() {
         Self.shared = self
@@ -56,6 +57,9 @@ final class DaemonController: ObservableObject {
         started = true
         loadSnapshot()
         spawnDaemon()
+        // Nothing polls if the spawn failed; the status message already
+        // explains what is missing.
+        guard daemon != nil else { return }
         waitForRuntime(attempt: 0)
     }
 
@@ -106,6 +110,7 @@ final class DaemonController: ObservableObject {
     }
 
     func stop() {
+        shuttingDown = true
         runtimeTimer?.invalidate()
         pollingTimer?.invalidate()
         runtimeTimer = nil
@@ -128,16 +133,30 @@ final class DaemonController: ObservableObject {
             statusMessage = "Build daemon/dist first, then launch the app again."
             return
         }
-        let process = Process()
-        if let node = nodeURL() {
-            process.executableURL = node
-        } else {
-            process.executableURL = URL(fileURLWithPath: "/usr/bin/env")
-            process.arguments = ["node"]
+        // The daemon is a plain Node script; without an interpreter it dies
+        // before writing runtime.json and the wait loop would spin to its
+        // timeout with nothing to show for it. Say so up front instead.
+        guard let node = nodeURL() else {
+            statusMessage = "Node.js isn't installed. Install it from nodejs.org or run brew install node, then reopen Obol."
+            return
         }
-        process.arguments = (process.arguments ?? []) + [script.path, "--parent-pid", String(getpid())]
-        process.standardOutput = FileHandle.nullDevice
-        process.standardError = FileHandle.nullDevice
+        let process = Process()
+        process.executableURL = node
+        process.arguments = [script.path, "--parent-pid", String(getpid())]
+        // Daemon crashes used to vanish into a null device; keep the last
+        // run's output in ~/.obol/daemon.log so failures are diagnosable.
+        let logURL = FileManager.default.homeDirectoryForCurrentUser
+            .appendingPathComponent(".obol/daemon.log")
+        try? FileManager.default.createDirectory(at: logURL.deletingLastPathComponent(), withIntermediateDirectories: true)
+        if let log = FileHandle(forWritingAtPath: logURL.path) {
+            try? log.seekToEnd()
+            process.standardOutput = log
+            process.standardError = log
+        }
+        process.terminationHandler = { [weak self] process in
+            let code = process.terminationStatus
+            Task { @MainActor in self?.daemonExited(code: code) }
+        }
         do {
             try process.run()
             daemon = process
@@ -146,11 +165,18 @@ final class DaemonController: ObservableObject {
         }
     }
 
+    private func daemonExited(code: Int32) {
+        guard !shuttingDown else { return }
+        statusMessage = "The local daemon exited (code \(code)). Check ~/.obol/daemon.log — usually a missing or outdated Node.js."
+    }
+
     private func waitForRuntime(attempt: Int) {
         guard attempt < 120 else {
-            statusMessage = "Waiting for the local daemon timed out."
+            statusMessage = "Waiting for the local daemon timed out. Check ~/.obol/daemon.log."
             return
         }
+        // The process is gone; the termination handler owns the message now.
+        guard let daemon, daemon.isRunning else { return }
         let runtimePath = FileManager.default.homeDirectoryForCurrentUser
             .appendingPathComponent(".obol/runtime.json")
         if let daemonPid = daemon?.processIdentifier,
@@ -207,8 +233,47 @@ final class DaemonController: ObservableObject {
     }
 
     private func nodeURL() -> URL? {
-        let candidates = ["/opt/homebrew/bin/node", "/usr/local/bin/node", "/usr/bin/node"]
-        return candidates.map(URL.init(fileURLWithPath:)).first { FileManager.default.isExecutableFile(atPath: $0.path) }
+        let direct = [
+            "/opt/homebrew/bin/node",
+            "/usr/local/bin/node",
+            "/opt/local/bin/node",
+            "/usr/bin/node",
+            NSString(string: "~/.volta/bin/node").expandingTildeInPath,
+        ].map(URL.init(fileURLWithPath))
+        if let hit = direct.first(where: { FileManager.default.isExecutableFile(atPath: $0.path) }) {
+            return hit
+        }
+
+        // Version managers keep interpreters under versioned folders; prefer
+        // the highest version so an old default doesn't shadow a newer one.
+        let managed: [(parent: String, subpath: String)] = [
+            (NSString(string: "~/.nvm/versions/node").expandingTildeInPath, "bin/node"),
+            (NSString(string: "~/.local/share/mise/installs/node").expandingTildeInPath, "bin/node"),
+            (NSString(string: "~/Library/Application Support/fnm/node-versions").expandingTildeInPath, "installation/bin/node"),
+            (NSString(string: "~/.fnm/node-versions").expandingTildeInPath, "installation/bin/node"),
+        ]
+        for (parent, subpath) in managed {
+            guard let versions = try? FileManager.default.contentsOfDirectory(atPath: parent) else { continue }
+            let candidate = versions
+                .filter { !$0.hasPrefix(".") }
+                .sorted { Self.compareVersions($0, $1) == .orderedDescending }
+                .compactMap { URL(fileURLWithPath: parent).appendingPathComponent($0 + "/" + subpath).path }
+                .first { FileManager.default.isExecutableFile(atPath: $0) }
+            if let candidate { return URL(fileURLWithPath: candidate) }
+        }
+        return nil
+    }
+
+    /// Orders `v22.1.0`-style tags by their numeric components.
+    static func compareVersions(_ lhs: String, _ rhs: String) -> ComparisonResult {
+        let left = lhs.split(separator: ".").map { Int($0.filter(\.isNumber)) ?? 0 }
+        let right = rhs.split(separator: ".").map { Int($0.filter(\.isNumber)) ?? 0 }
+        for index in 0..<max(left.count, right.count) {
+            let l = index < left.count ? left[index] : 0
+            let r = index < right.count ? right[index] : 0
+            if l != r { return l < r ? .orderedAscending : .orderedDescending }
+        }
+        return .orderedSame
     }
 
     private func daemonScriptURL() -> URL? {

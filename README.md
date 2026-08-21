@@ -15,17 +15,13 @@ The dashboard includes Today, history charts, provider and model breakdowns, Cla
 
 Download the latest DMG from [GitHub Releases](https://github.com/aakritsubedi/obol/releases), open it, and drag Obol to Applications. The public build is ad-hoc signed because this is a free open-source project without a 99 USD/year Apple Developer account. macOS therefore asks for a right-click → Open on the first launch after a download. That prompt is expected; it is not an Obol permission request.
 
-The app needs Node.js 20 or newer at one of these paths:
+The app needs Node.js 20 or newer. Obol checks /opt/homebrew/bin/node, /usr/local/bin/node, /opt/local/bin/node, /usr/bin/node, and ~/.volta/bin/node, then picks the newest interpreter from nvm (~/.nvm), mise, and fnm install folders.
 
-- /opt/homebrew/bin/node
-- /usr/local/bin/node
-- /usr/bin/node
-
-Obol is launched by Finder, so it does not inherit an nvm or shell PATH. If Node works in your terminal but Obol says the daemon could not start, check which node and install a system-visible path. One workaround is:
+Finder launches do not inherit your shell PATH, so if Node works in your terminal but none of those paths exist, link it once:
 
     sudo ln -s "$(which node)" /usr/local/bin/node
 
-Use a real path and remove an existing conflicting symlink first. The daemon runs ccusage with --offline, and your usage data stays on this Mac.
+Use a real path and remove an existing conflicting symlink first. When the popover reports that Node is missing or that the daemon exited, the daemon's own output is in ~/.obol/daemon.log. The daemon runs ccusage with --offline, and your usage data stays on this Mac.
 
 ## Requirements
 
