@@ -2,6 +2,7 @@ import SwiftUI
 
 struct PopoverView: View {
     @ObservedObject var controller: DaemonController
+    @ObservedObject var updates: UpdateController
 
     @State private var showingSettings = false
 
@@ -20,7 +21,10 @@ struct PopoverView: View {
         // The menu bar window is translucent by default, which lets the desktop
         // bleed through and muddies the text. Paint an opaque card instead.
         .background(Color(nsColor: .windowBackgroundColor))
-        .onAppear { controller.popoverOpened() }
+        .onAppear {
+            controller.popoverOpened()
+            updates.popoverOpened()
+        }
         .onDisappear {
             controller.popoverClosed()
             showingSettings = false
@@ -169,7 +173,7 @@ struct PopoverView: View {
 
     private var usageFooter: some View {
         HStack {
-            iconButton(systemName: "gearshape", help: "Settings") {
+            iconButton(systemName: "gearshape", help: "Settings", badge: updates.hasPendingUpdate) {
                 showingSettings = true
             }
             Spacer()
@@ -196,15 +200,128 @@ struct PopoverView: View {
             hairline
                 .padding(.top, 14)
 
-            Toggle("Launch at login", isOn: Binding(
-                get: { controller.launchAtLogin },
-                set: { controller.setLaunchAtLogin($0) }
-            ))
+            // Label and control are separate views rather than a plain Toggle:
+            // a Toggle sizes to its content, which parks the switch against the
+            // label instead of at the trailing edge the Version row sets.
+            HStack(spacing: 8) {
+                Text("Launch at login")
+                Spacer(minLength: 8)
+                Toggle("", isOn: Binding(
+                    get: { controller.launchAtLogin },
+                    set: { controller.setLaunchAtLogin($0) }
+                ))
+                .labelsHidden()
+                .toggleStyle(.switch)
+                .controlSize(.mini)
+                .accessibilityLabel("Launch at login")
+            }
             .font(WidgetStyle.TypeScale.row)
-            .toggleStyle(.switch)
-            .controlSize(.mini)
             .padding(.vertical, 14)
+
+            hairline
+
+            updateRow
+
+            hairline
+
+            HStack(spacing: 8) {
+                Text("Version")
+                Spacer(minLength: 8)
+                Text(Self.appVersion)
+                    .monospacedDigit()
+            }
+            .font(WidgetStyle.TypeScale.caption)
+            .foregroundStyle(.secondary)
+            .padding(.top, 12)
+            .accessibilityElement(children: .combine)
+            .accessibilityLabel("Version")
+            .accessibilityValue(Self.appVersion)
         }
+    }
+
+    private var updateRow: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            HStack(spacing: 8) {
+                Text("Updates")
+                Spacer(minLength: 8)
+                updateControl
+            }
+
+            switch updates.state {
+            case .available:
+                HStack(spacing: 10) {
+                    Button("What's new") { updates.openReleaseNotes() }
+                    Button("Skip this version") { updates.skipCurrentVersion() }
+                }
+                .buttonStyle(.link)
+                .font(WidgetStyle.TypeScale.caption)
+            case let .failed(message):
+                Text(message)
+                    .font(WidgetStyle.TypeScale.caption)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            default:
+                EmptyView()
+            }
+        }
+        .font(WidgetStyle.TypeScale.row)
+        .padding(.vertical, 14)
+        .animation(.easeInOut(duration: 0.15), value: updates.state)
+    }
+
+    @ViewBuilder
+    private var updateControl: some View {
+        switch updates.state {
+        case .idle:
+            Button("Check") { updates.manualCheck() }
+                .buttonStyle(.link)
+                .frame(height: 20)
+        case .checking:
+            ProgressView()
+                .controlSize(.small)
+                .frame(width: 20, height: 20)
+        case let .upToDate(checkedAt):
+            Text("Up to date")
+                .foregroundStyle(.secondary)
+                .frame(height: 20)
+                .help(updates.checkedAtHelp(checkedAt))
+        case let .available(entry):
+            Button("Update to \(entry.version?.description ?? entry.tagName)") { updates.beginUpdate() }
+                .buttonStyle(.link)
+                .foregroundStyle(Color.accentColor)
+                .frame(height: 20)
+        case let .downloading(progress):
+            HStack(spacing: 7) {
+                ProgressView(value: progress)
+                    .progressViewStyle(.linear)
+                    .frame(width: 110)
+                Text("\(Int(progress * 100))%")
+                    .monospacedDigit()
+                    .foregroundStyle(.secondary)
+            }
+            .frame(height: 20)
+        case .readyToInstall:
+            Button("Install and Relaunch") { updates.installReadyUpdate() }
+                .buttonStyle(.link)
+                .frame(height: 20)
+        case .installing:
+            ProgressView()
+                .controlSize(.small)
+                .frame(width: 20, height: 20)
+        case .failed:
+            Button("Retry") { updates.manualCheck() }
+                .buttonStyle(.link)
+                .frame(height: 20)
+        }
+    }
+
+    /// Read from the bundle rather than a constant, so the number in Settings
+    /// can never drift from the one the packaging script stamps on the build.
+    private static var appVersion: String {
+        let info = Bundle.main.infoDictionary
+        let short = info?["CFBundleShortVersionString"] as? String ?? "—"
+        guard let build = info?["CFBundleVersion"] as? String, build != short else { return short }
+        return "\(short) (\(build))"
     }
 
     // MARK: - Building blocks
@@ -218,6 +335,7 @@ struct PopoverView: View {
     private func iconButton(
         systemName: String,
         help: String,
+        badge: Bool = false,
         action: @escaping () -> Void
     ) -> some View {
         Button(action: action) {
@@ -225,11 +343,19 @@ struct PopoverView: View {
                 .font(WidgetStyle.TypeScale.icon)
                 .frame(width: 22, height: 22)
                 .contentShape(Rectangle())
+                .overlay(alignment: .topTrailing) {
+                    if badge {
+                        Circle()
+                            .fill(Color.accentColor)
+                            .frame(width: 5, height: 5)
+                            .offset(x: 1, y: -1)
+                    }
+                }
         }
         .buttonStyle(.plain)
         .foregroundStyle(.secondary)
         .help(help)
-        .accessibilityLabel(help)
+        .accessibilityLabel(badge ? "\(help), update available" : help)
     }
 
     private func providerColor(for name: String) -> Color {

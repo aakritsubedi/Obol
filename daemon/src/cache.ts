@@ -1,33 +1,23 @@
 import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
 import { dirname } from "node:path";
 import { evaluateBudget } from "./budget.js";
+import { dateForTimeZone } from "./time.js";
 import {
   asRecord,
+  type BlocksReport,
+  type CcusageReport,
   emptyBlocks,
   emptyReport,
   normalizeBlocks,
   normalizeReport,
   numberValue,
-  stringValue,
-  type BlocksReport,
-  type CcusageReport,
   type ProviderSummary,
   type Snapshot,
   type Summary,
   type SummaryToday,
-  type WidgetConfig
+  stringValue,
+  type WidgetConfig,
 } from "./types.js";
-
-function dateForTimeZone(date: Date, timezone: string): string {
-  const parts = new Intl.DateTimeFormat("en-CA", {
-    timeZone: timezone,
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit"
-  }).formatToParts(date);
-  const values = Object.fromEntries(parts.map((part) => [part.type, part.value]));
-  return `${values.year}-${values.month}-${values.day}`;
-}
 
 function periodMatchesToday(period: string, today: string): boolean {
   const normalized = period.replace(/[^0-9]/g, "");
@@ -51,7 +41,7 @@ function emptyToday(): SummaryToday {
     cacheCreationTokens: 0,
     cacheReadTokens: 0,
     modelsUsed: [],
-    modelBreakdowns: []
+    modelBreakdowns: [],
   };
 }
 
@@ -68,7 +58,7 @@ function providerSummaries(row: Record<string, unknown>): ProviderSummary[] {
       inputTokens: numberValue(agent.inputTokens),
       outputTokens: numberValue(agent.outputTokens),
       cacheCreationTokens: numberValue(agent.cacheCreationTokens),
-      cacheReadTokens: numberValue(agent.cacheReadTokens)
+      cacheReadTokens: numberValue(agent.cacheReadTokens),
     };
   });
 }
@@ -79,7 +69,7 @@ export function buildSummary(
   config: WidgetConfig,
   updatedAt: string | null,
   stale: boolean,
-  error: string | null
+  error: string | null,
 ): Summary {
   const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC";
   const todayKey = dateForTimeZone(new Date(), timezone);
@@ -100,7 +90,7 @@ export function buildSummary(
       cacheCreationTokens: numberValue(today.cacheCreationTokens),
       cacheReadTokens: numberValue(today.cacheReadTokens),
       modelsUsed: Array.isArray(today.modelsUsed) ? today.modelsUsed : [],
-      modelBreakdowns: Array.isArray(today.modelBreakdowns) ? today.modelBreakdowns : []
+      modelBreakdowns: Array.isArray(today.modelBreakdowns) ? today.modelBreakdowns : [],
     },
     agents: providerSummaries(today),
     burnRate: blocks.burnRate,
@@ -109,7 +99,7 @@ export function buildSummary(
     budget,
     updatedAt,
     stale,
-    error
+    error,
   };
 }
 
@@ -122,7 +112,7 @@ function emptySnapshot(config: WidgetConfig): Snapshot {
     summary: buildSummary(report, blocks, config, null, true, "No usage snapshot yet"),
     updatedAt: null,
     refreshedAt: null,
-    error: "No usage snapshot yet"
+    error: "No usage snapshot yet",
   };
 }
 
@@ -149,7 +139,7 @@ export class SnapshotStore {
         summary: buildSummary(report, blocks, config, updatedAt, Boolean(error), error),
         updatedAt,
         refreshedAt,
-        error
+        error,
       };
     } catch {
       this.snapshot = emptySnapshot(config);
@@ -165,7 +155,7 @@ export class SnapshotStore {
     report: CcusageReport,
     blocks: BlocksReport,
     config: WidgetConfig,
-    error: string | null = null
+    error: string | null = null,
   ): Promise<Snapshot> {
     const now = new Date().toISOString();
     this.snapshot = {
@@ -174,7 +164,7 @@ export class SnapshotStore {
       summary: buildSummary(report, blocks, config, now, Boolean(error), error),
       updatedAt: now,
       refreshedAt: now,
-      error
+      error,
     };
     await this.save();
     return this.get();
@@ -185,7 +175,7 @@ export class SnapshotStore {
     this.snapshot = {
       ...current,
       summary: buildSummary(current.report, current.blocks, config, current.updatedAt, true, error),
-      error
+      error,
     };
     await this.save();
     return this.get();
@@ -200,8 +190,8 @@ export class SnapshotStore {
         config,
         this.snapshot.updatedAt,
         Boolean(this.snapshot.error),
-        this.snapshot.error
-      )
+        this.snapshot.error,
+      ),
     };
     await this.save();
     return this.get();

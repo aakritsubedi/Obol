@@ -2,7 +2,6 @@
 node_modules/
 .pnpm-store/
 .npm/
-pnpm-lock.yaml
 npm-debug.log*
 pnpm-debug.log*
 yarn-debug.log*
@@ -16,6 +15,9 @@ build/
 DerivedData/
 coverage/
 .vite/
+.swiftpm/
+*.dmg
+*.zip
 
 # Local app state
 .obol/
@@ -39,6 +41,3 @@ xcuserdata/
 *.tmp
 *.swp
 *.swo
-
-# Env file
-.env

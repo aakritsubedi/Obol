@@ -1,0 +1,15 @@
+{
+  "tag_name": "v0.2.4",
+  "html_url": "https://github.com/aakritsubedi/obol/releases/tag/v0.2.4",
+  "prerelease": false,
+  "unexpected_future_field": { "enabled": true },
+  "assets": [
+    {
+      "name": "Obol-0.2.4.zip",
+      "size": 120,
+      "digest": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "browser_download_url": "https://objects.githubusercontent.com/obol/Obol-0.2.4.zip",
+      "future_asset_field": "ignored"
+    }
+  ]
+}

@@ -34,10 +34,11 @@ struct TodayUsage: Decodable {
 }
 
 struct ProviderSummary: Decodable, Identifiable {
-    let id = UUID()
     let agent: String
     let totalCost: Double
     let totalTokens: Double
+
+    var id: String { agent }
 
     init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)

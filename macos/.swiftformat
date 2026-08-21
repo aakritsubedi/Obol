@@ -1,0 +1,4 @@
+--indent 4
+--maxwidth 120
+--self remove
+--disable blankLinesAroundMark

@@ -1,7 +1,7 @@
-import { homedir } from "node:os";
-import { join } from "node:path";
 import { constants as fsConstants } from "node:fs";
 import { copyFile, mkdir, readFile, writeFile } from "node:fs/promises";
+import { homedir } from "node:os";
+import { join } from "node:path";
 import type { RuntimeState, WidgetConfig } from "./types.js";
 
 const LEGACY_STATE_DIRECTORY = ".token-cost-widget";
@@ -13,7 +13,7 @@ export const DEFAULT_CONFIG: WidgetConfig = {
   monthlyBudget: null,
   warningThreshold: 0.8,
   launchAtLogin: false,
-  historyDays: 90
+  historyDays: 90,
 };
 
 export function stateDirectory(): string {
@@ -40,8 +40,9 @@ export async function migrateLegacyState(): Promise<void> {
   for (const file of ["config.json", "snapshot.json"]) {
     // COPYFILE_EXCL: a file already in the new directory is newer than the
     // legacy one and must win, so migration stays safe to attempt on every run.
-    await copyFile(join(legacy, file), join(directory, file), fsConstants.COPYFILE_EXCL)
-      .catch(() => undefined);
+    await copyFile(join(legacy, file), join(directory, file), fsConstants.COPYFILE_EXCL).catch(
+      () => undefined,
+    );
   }
 }
 
@@ -51,7 +52,7 @@ export function statePaths() {
     directory,
     config: join(directory, "config.json"),
     runtime: join(directory, "runtime.json"),
-    snapshot: join(directory, "snapshot.json")
+    snapshot: join(directory, "snapshot.json"),
   };
 }
 
@@ -62,7 +63,7 @@ function nonNegativeOrNull(value: unknown, fallback: number | null): number | nu
 }
 
 function parseConfig(value: unknown): WidgetConfig {
-  const input = typeof value === "object" && value !== null ? value as Record<string, unknown> : {};
+  const input = typeof value === "object" && value !== null ? (value as Record<string, unknown>) : {};
   const port = Number(input.port);
   const refreshIntervalMs = Number(input.refreshIntervalMs);
   const warningThreshold = Number(input.warningThreshold);
@@ -70,18 +71,21 @@ function parseConfig(value: unknown): WidgetConfig {
 
   return {
     port: Number.isInteger(port) && port >= 0 && port <= 65535 ? port : DEFAULT_CONFIG.port,
-    refreshIntervalMs: Number.isFinite(refreshIntervalMs) && refreshIntervalMs >= 10_000
-      ? refreshIntervalMs
-      : DEFAULT_CONFIG.refreshIntervalMs,
+    refreshIntervalMs:
+      Number.isFinite(refreshIntervalMs) && refreshIntervalMs >= 10_000
+        ? refreshIntervalMs
+        : DEFAULT_CONFIG.refreshIntervalMs,
     dailyBudget: nonNegativeOrNull(input.dailyBudget, DEFAULT_CONFIG.dailyBudget),
     monthlyBudget: nonNegativeOrNull(input.monthlyBudget, DEFAULT_CONFIG.monthlyBudget),
-    warningThreshold: Number.isFinite(warningThreshold) && warningThreshold > 0 && warningThreshold <= 1
-      ? warningThreshold
-      : DEFAULT_CONFIG.warningThreshold,
+    warningThreshold:
+      Number.isFinite(warningThreshold) && warningThreshold > 0 && warningThreshold <= 1
+        ? warningThreshold
+        : DEFAULT_CONFIG.warningThreshold,
     launchAtLogin: Boolean(input.launchAtLogin),
-    historyDays: Number.isInteger(historyDays) && historyDays >= 7 && historyDays <= 365
-      ? historyDays
-      : DEFAULT_CONFIG.historyDays
+    historyDays:
+      Number.isInteger(historyDays) && historyDays >= 7 && historyDays <= 365
+        ? historyDays
+        : DEFAULT_CONFIG.historyDays,
   };
 }
 

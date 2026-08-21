@@ -2,29 +2,21 @@ import { spawn } from "node:child_process";
 import { access } from "node:fs/promises";
 import { delimiter, dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { normalizeBlocks, normalizeProjects, normalizeReport, type BlocksReport, type CcusageReport, type RefreshResult, type WidgetConfig } from "./types.js";
+import { dateForTimeZone, shiftDate } from "./time.js";
+import {
+  type BlocksReport,
+  type CcusageReport,
+  normalizeBlocks,
+  normalizeProjects,
+  normalizeReport,
+  type RefreshResult,
+  type WidgetConfig,
+} from "./types.js";
 
 const moduleDirectory = dirname(fileURLToPath(import.meta.url));
 
 function systemTimeZone(): string {
   return Intl.DateTimeFormat().resolvedOptions().timeZone || process.env.TZ || "UTC";
-}
-
-function dateForTimeZone(date: Date, timezone: string): string {
-  const parts = new Intl.DateTimeFormat("en-CA", {
-    timeZone: timezone,
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit"
-  }).formatToParts(date);
-  const values = Object.fromEntries(parts.map((part) => [part.type, part.value]));
-  return `${values.year}-${values.month}-${values.day}`;
-}
-
-function shiftDate(date: string, days: number, timezone: string): string {
-  const shifted = new Date(`${date}T12:00:00Z`);
-  shifted.setUTCDate(shifted.getUTCDate() + days);
-  return dateForTimeZone(shifted, timezone);
 }
 
 async function firstExisting(paths: string[]): Promise<string | null> {
@@ -44,11 +36,13 @@ async function ccusageCli(): Promise<string> {
     resolve(moduleDirectory, "../node_modules/ccusage/src/cli.js"),
     resolve(moduleDirectory, "../../node_modules/ccusage/src/cli.js"),
     resolve(process.cwd(), "node_modules/ccusage/src/cli.js"),
-    resolve(process.cwd(), "daemon/node_modules/ccusage/src/cli.js")
+    resolve(process.cwd(), "daemon/node_modules/ccusage/src/cli.js"),
   ];
   const cli = await firstExisting(candidates);
   if (cli) return cli;
-  throw new Error(`ccusage runtime is missing; rebuild the app after npm install (looked in ${candidates.join(delimiter)})`);
+  throw new Error(
+    `ccusage runtime is missing; rebuild the app after npm install (looked in ${candidates.join(delimiter)})`,
+  );
 }
 
 function parseJson(output: string, label: string): unknown {
@@ -79,7 +73,7 @@ function runCli(cli: string, args: string[], timeoutMs = 120_000): Promise<strin
     const child = spawn(process.execPath, [cli, ...args], {
       cwd: process.cwd(),
       env: { ...process.env, NO_COLOR: "1" },
-      stdio: ["ignore", "pipe", "pipe"]
+      stdio: ["ignore", "pipe", "pipe"],
     });
     let stdout = "";
     let stderr = "";
@@ -92,8 +86,12 @@ function runCli(cli: string, args: string[], timeoutMs = 120_000): Promise<strin
       }
     }, timeoutMs);
 
-    child.stdout.on("data", (chunk: Buffer) => { stdout += chunk.toString(); });
-    child.stderr.on("data", (chunk: Buffer) => { stderr += chunk.toString(); });
+    child.stdout.on("data", (chunk: Buffer) => {
+      stdout += chunk.toString();
+    });
+    child.stderr.on("data", (chunk: Buffer) => {
+      stderr += chunk.toString();
+    });
     child.once("error", (error) => {
       clearTimeout(timeout);
       if (!settled) {
@@ -106,7 +104,11 @@ function runCli(cli: string, args: string[], timeoutMs = 120_000): Promise<strin
       if (settled) return;
       settled = true;
       if (code !== 0) {
-        reject(new Error(`ccusage ${args[0] || "report"} exited with ${code}: ${stderr.trim() || "unknown error"}`));
+        reject(
+          new Error(
+            `ccusage ${args[0] || "report"} exited with ${code}: ${stderr.trim() || "unknown error"}`,
+          ),
+        );
       } else {
         resolvePromise(stdout);
       }
@@ -122,7 +124,7 @@ export async function runUsage(config?: Pick<WidgetConfig, "historyDays">): Prom
     return {
       report: null,
       blocks: null,
-      errors: [error instanceof Error ? error.message : String(error)]
+      errors: [error instanceof Error ? error.message : String(error)],
     };
   }
   const timezone = systemTimeZone();
@@ -140,7 +142,7 @@ export async function runUsage(config?: Pick<WidgetConfig, "historyDays">): Prom
     "--since",
     since,
     "--until",
-    until
+    until,
   ];
   const projectArgs = [
     "claude",
@@ -153,11 +155,11 @@ export async function runUsage(config?: Pick<WidgetConfig, "historyDays">): Prom
     "--since",
     since,
     "--until",
-    until
+    until,
   ];
   const [reportResult, projectResult] = await Promise.allSettled([
     runCli(cli, reportArgs),
-    runCli(cli, projectArgs)
+    runCli(cli, projectArgs),
   ]);
 
   let report: CcusageReport | null = null;
@@ -171,7 +173,9 @@ export async function runUsage(config?: Pick<WidgetConfig, "historyDays">): Prom
       errors.push(error instanceof Error ? error.message : "ccusage report could not be parsed");
     }
   } else {
-    errors.push(reportResult.reason instanceof Error ? reportResult.reason.message : String(reportResult.reason));
+    errors.push(
+      reportResult.reason instanceof Error ? reportResult.reason.message : String(reportResult.reason),
+    );
   }
 
   if (projectResult.status === "fulfilled") {
@@ -179,24 +183,28 @@ export async function runUsage(config?: Pick<WidgetConfig, "historyDays">): Prom
       const projects = normalizeProjects(parseJson(projectResult.value, "ccusage projects"));
       if (fullReport) {
         fullReport = { ...fullReport, projects };
-        report = { ...report!, projects };
+        report = fullReport;
       }
     } catch (error) {
       errors.push(error instanceof Error ? error.message : "ccusage projects could not be parsed");
     }
   } else {
-    errors.push(projectResult.reason instanceof Error ? projectResult.reason.message : String(projectResult.reason));
+    errors.push(
+      projectResult.reason instanceof Error ? projectResult.reason.message : String(projectResult.reason),
+    );
   }
 
   return { report, fullReport, blocks: null, errors };
 }
 
-export async function runOnce(config?: Pick<WidgetConfig, "historyDays">): Promise<{ report: CcusageReport; fullReport: CcusageReport; blocks: BlocksReport }> {
+export async function runOnce(
+  config?: Pick<WidgetConfig, "historyDays">,
+): Promise<{ report: CcusageReport; fullReport: CcusageReport; blocks: BlocksReport }> {
   const result = await runUsage(config);
   if (!result.report) throw new Error(result.errors.join("; ") || "ccusage report unavailable");
   return {
     report: result.report,
     fullReport: result.fullReport ?? result.report,
-    blocks: result.blocks ?? normalizeBlocks({ blocks: [] })
+    blocks: result.blocks ?? normalizeBlocks({ blocks: [] }),
   };
 }

@@ -3,6 +3,19 @@
   "private": true,
   "version": "0.1.0",
   "description": "A macOS menu bar widget and local dashboard for AI coding-agent spend.",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/aakritsubedi/obol.git"
+  },
+  "bugs": {
+    "url": "https://github.com/aakritsubedi/obol/issues"
+  },
+  "homepage": "https://github.com/aakritsubedi/obol",
+  "engines": {
+    "node": ">=20"
+  },
+  "packageManager": "npm@10.9.0",
   "workspaces": [
     "daemon",
     "dashboard"
@@ -13,8 +26,17 @@
     "bundle:daemon": "npm run bundle -w daemon",
     "build:dashboard": "npm run build -w dashboard",
     "package:dmg": "./macos/scripts/package-dmg.sh",
+    "dev:fake-release": "node scripts/dev/fake-release-server.mjs",
     "dev:daemon": "npm run dev -w daemon",
     "dev:dashboard": "npm run dev -w dashboard",
-    "typecheck": "npm run typecheck --workspaces"
+    "typecheck": "npm run typecheck --workspaces",
+    "test": "npm run test --workspaces --if-present",
+    "lint": "biome check daemon/src dashboard/src scripts",
+    "format": "biome format --write daemon/src dashboard/src scripts",
+    "format:check": "biome format daemon/src dashboard/src scripts",
+    "check-version": "scripts/check-version.sh --no-tag"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "2.2.2"
   }
 }

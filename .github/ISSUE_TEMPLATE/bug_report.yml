@@ -1,0 +1,53 @@
+name: Bug report
+description: Report a reproducible problem with Obol.
+title: "[bug] "
+labels:
+  - bug
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Please remove API keys, tokens, and private usage data before posting logs.
+  - type: input
+    id: macos
+    attributes:
+      label: macOS version
+      placeholder: macOS 14.6.1
+    validations:
+      required: true
+  - type: input
+    id: chip
+    attributes:
+      label: Chip
+      placeholder: Apple M2 Pro or Intel i7
+    validations:
+      required: true
+  - type: input
+    id: obol
+    attributes:
+      label: Obol version
+      placeholder: 0.2.0
+    validations:
+      required: true
+  - type: input
+    id: node_version
+    attributes:
+      label: node -v
+      placeholder: v20.19.0
+    validations:
+      required: true
+  - type: input
+    id: node_path
+    attributes:
+      label: Which Node executable
+      description: The app does not inherit an nvm shell PATH. Include the output of which node and the path where Node is installed.
+      placeholder: /opt/homebrew/bin/node
+    validations:
+      required: true
+  - type: textarea
+    id: repro
+    attributes:
+      label: What happened?
+      description: Include the exact steps, expected behavior, and any relevant daemon notice.
+    validations:
+      required: true

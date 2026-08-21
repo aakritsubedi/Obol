@@ -1,54 +1,85 @@
 # Obol
 
-Obol is a local-first macOS menu bar companion for [ccusage](https://github.com/ryoppippi/ccusage). It keeps one daemon as the source of truth for the menu bar and dashboard, watches agent logs for changes, and stores the last good snapshot on disk.
+Obol is a local-first macOS menu-bar widget and dashboard for estimated AI coding-agent spend.
 
-## Requirements
+[![CI](https://github.com/aakritsubedi/obol/actions/workflows/ci.yml/badge.svg)](https://github.com/aakritsubedi/obol/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
-- macOS 15 or later
-- Node.js 20 or later
-- Xcode 16 or later for the native menu bar app
+## What it is
 
-The daemon pins `ccusage` to `20.0.20` and always invokes it with `--offline`.
-When packaged, it launches ccusage through the Node executable running the daemon rather than relying on the user's shell `PATH` or `npx`.
+Obol keeps one local daemon as the source of truth for the native menu-bar widget and the Vite dashboard. It watches supported agent log directories, asks ccusage for offline estimates, stores the last good snapshot in ~/.obol, and serves the dashboard over a loopback-only HTTP endpoint.
 
-## Development
-
-```sh
-npm install
-npm run build
-npm run dev:daemon
-npm run dev:dashboard
-```
-
-The daemon binds to `127.0.0.1:4737` by default. If that port is unavailable it chooses an ephemeral port and records the actual port and token in `~/.obol/runtime.json`. The Vite dashboard proxies `/api` to the daemon during development.
-
-For a parser smoke test without starting the HTTP server:
-
-```sh
-npm run once -w daemon
-```
-
-Runtime data lives in `~/.obol/`:
-
-- `config.json` — budgets, history window, and refresh interval
-- `runtime.json` — the current local port and API token
-- `snapshot.json` — the last good ccusage report
-
-Set `OBOL_HOME` to use another state directory while developing or testing.
+The dashboard includes Today, history charts, provider and model breakdowns, Claude project history, budget settings, and CSV/JSON export. The menu-bar popover stays intentionally small: today’s total, provider split, a budget signal, and settings.
 
 ## Install
 
-```sh
-npm install
-npm run package:dmg
-```
+Download the latest DMG from [GitHub Releases](https://github.com/aakritsubedi/obol/releases), open it, and drag Obol to Applications. The public build is ad-hoc signed because this is a free open-source project without a 99 USD/year Apple Developer account. macOS therefore asks for a right-click → Open on the first launch after a download. That prompt is expected; it is not an Obol permission request.
 
-That writes `dist/Obol-<version>.dmg`. Open it and drag the app to Applications. The disk image is ad-hoc signed rather than notarized, so the first launch on a Mac that downloaded it needs a right click on the app and **Open**. Node must be present at `/opt/homebrew/bin/node`, `/usr/local/bin/node`, or `/usr/bin/node`; see [macos/README.md](macos/README.md) for the packaging options and signing details.
+The app needs Node.js 20 or newer at one of these paths:
 
-## Dashboard
+- /opt/homebrew/bin/node
+- /usr/local/bin/node
+- /usr/bin/node
 
-The dashboard includes Today, interactive History, Models, Claude Projects, Budget settings in a header popup, and CSV/JSON export. Projects are combined by display name and show the top five rows by default, with the full table available on demand. It is served by the daemon after `npm run build`; in development it runs through Vite with hot module replacement. Opening the dashboard requests one daemon-managed fresh ccusage snapshot, and returning to the window refreshes again. Concurrent refresh requests are coalesced, so the dashboard and menu bar do not spawn duplicate usage processes.
+Obol is launched by Finder, so it does not inherit an nvm or shell PATH. If Node works in your terminal but Obol says the daemon could not start, check which node and install a system-visible path. One workaround is:
 
-The daemon bounds the hot-path ccusage query to the configured history window (90 days by default). Claude project grouping uses ccusage's focused `daily --instances` command and is labeled accordingly in the dashboard.
+    sudo ln -s "$(which node)" /usr/local/bin/node
 
-Cost values are estimates from ccusage's pricing table and are not invoices.
+Use a real path and remove an existing conflicting symlink first. The daemon runs ccusage with --offline, and your usage data stays on this Mac.
+
+## Requirements
+
+- macOS 13 or later
+- Node.js 20 or later at a system-visible path
+- Xcode 16 or later only when building from source
+
+## Updating
+
+When a stable GitHub Release is available, Obol checks once after launch, when the popover opens, and every six hours. Automatic checks are quiet: there is no notification, modal, or dock bounce. A pending release adds a small dot to Settings.
+
+The Settings row can download, verify, and install the ZIP release. The updater checks the size, a SHA-256 digest or SHA256SUMS, the bundle identifier, the version, and the internal code signature before stopping the daemon and swapping the app. The replaced app is relaunched automatically. A release without a checksum is refused.
+
+The DMG remains the manual install path. Verify its paired artifacts with:
+
+    cd dist
+    shasum -c SHA256SUMS
+
+The first in-app update is v0.2.0 → v0.2.1; users on 0.1.0 should install the v0.2.0 DMG manually.
+
+## Build from source
+
+    npm ci
+    npm run build
+    npm run package:dmg
+
+The package command writes `dist/Obol-VERSION.dmg`, `dist/Obol-VERSION.zip`, and `dist/SHA256SUMS`. The ZIP is the artifact consumed by the in-app updater; it comes from the same signed staging bundle as the DMG. See macos/README.md for universal builds, version stamping, and signing.
+
+To run the pieces during development:
+
+    npm run dev:daemon
+    npm run dev:dashboard
+
+For a one-shot daemon refresh:
+
+    npm run once -w daemon
+
+## Architecture
+
+    macOS menu-bar app
+          │ loopback HTTP + per-process token
+          ▼
+    Node daemon ── offline ccusage ── local agent logs
+          │
+          └── Vite dashboard
+
+The daemon binds to 127.0.0.1 and records its ephemeral-or-default port and token in ~/.obol/runtime.json. The dashboard proxies /api to that daemon in development.
+
+## Privacy and estimates
+
+Obol has no telemetry. The daemon is loopback-only, ccusage runs offline, and snapshots/configuration remain under ~/.obol. Costs are estimates from ccusage’s pricing table, not invoices. The app does not upload agent logs or usage snapshots.
+
+Obol packages and credits [ccusage](https://github.com/ryoppippi/ccusage) prominently; its license and upstream behavior remain part of the dependency you install.
+
+## Contributing and license
+
+See CONTRIBUTING.md for prerequisites, checks, and commit conventions. See SECURITY.md for the local boundary and updater trust model. Obol is available under the MIT License; see LICENSE.

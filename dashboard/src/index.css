@@ -48,8 +48,24 @@
     }
   }
 
-  html { background: var(--color-surface); }
-  body { min-width: 320px; min-height: 100vh; overflow-x: hidden; background: var(--color-surface); color: var(--color-ink); font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", Inter, "Segoe UI", sans-serif; font-synthesis: none; text-rendering: optimizeLegibility; }
-  button, input { font: inherit; }
-  button { cursor: pointer; }
+  html {
+    background: var(--color-surface);
+  }
+  body {
+    min-width: 320px;
+    min-height: 100vh;
+    overflow-x: hidden;
+    background: var(--color-surface);
+    color: var(--color-ink);
+    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", Inter, "Segoe UI", sans-serif;
+    font-synthesis: none;
+    text-rendering: optimizeLegibility;
+  }
+  button,
+  input {
+    font: inherit;
+  }
+  button {
+    cursor: pointer;
+  }
 }

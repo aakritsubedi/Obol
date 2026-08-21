@@ -37,11 +37,11 @@ final class DaemonController: ObservableObject {
     var liveLabel: String { summary.stale ? "Cached" : "Live" }
 
     var liveColor: Color {
-        if summary.stale { return .orange }
+        if summary.stale { return WidgetStyle.warning }
         switch summary.budgetStatus {
         case .ok: return WidgetStyle.codex
-        case .warn: return .orange
-        case .over: return .green
+        case .warn: return WidgetStyle.warning
+        case .over: return WidgetStyle.danger
         }
     }
 
@@ -176,7 +176,10 @@ final class DaemonController: ObservableObject {
         do {
             let next = try await client.summary(baseURL: baseURL, token: token)
             apply(next)
-            if let nextConfig = try? await client.config(baseURL: baseURL, token: token) { config = nextConfig }
+            if let nextConfig = try? await client.config(baseURL: baseURL, token: token) {
+                config = nextConfig
+                healLaunchAtLogin()
+            }
         } catch {
             connected = false
             statusMessage = "Daemon unavailable; showing the last good snapshot."
@@ -192,6 +195,11 @@ final class DaemonController: ObservableObject {
         summary = next
         connected = true
         notifier.observe(next)
+    }
+
+    private func healLaunchAtLogin() {
+        guard config.launchAtLogin, SMAppService.mainApp.status != .enabled else { return }
+        try? SMAppService.mainApp.register()
     }
 
     private func nodeURL() -> URL? {

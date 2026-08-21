@@ -1,4 +1,4 @@
-import { existsSync, readdirSync, statSync, watch, type FSWatcher } from "node:fs";
+import { existsSync, type FSWatcher, readdirSync, statSync, watch } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
 
@@ -8,7 +8,7 @@ const knownRelativeDirectories = [
   ".config/opencode",
   ".copilot/logs",
   ".cursor/projects",
-  ".continue"
+  ".continue",
 ];
 
 function candidateDirectories(): string[] {
@@ -23,7 +23,11 @@ function candidateDirectories(): string[] {
     }
   }
   return [...new Set(candidates)].filter((path) => {
-    try { return existsSync(path) && statSync(path).isDirectory(); } catch { return false; }
+    try {
+      return existsSync(path) && statSync(path).isDirectory();
+    } catch {
+      return false;
+    }
   });
 }
 
@@ -35,7 +39,7 @@ export class AgentLogWatcher {
 
   constructor(
     private readonly onChange: () => void,
-    private readonly debounceMs = 2_000
+    private readonly debounceMs = 2_000,
   ) {}
 
   start(): void {

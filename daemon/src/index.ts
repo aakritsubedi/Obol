@@ -1,12 +1,12 @@
 import { randomBytes } from "node:crypto";
 import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { runOnce, runUsage } from "./ccusage.js";
 import { SnapshotStore } from "./cache.js";
+import { runOnce, runUsage } from "./ccusage.js";
 import { ConfigStore, migrateLegacyState } from "./config.js";
-import { AgentLogWatcher } from "./watcher.js";
 import { DaemonServer } from "./server.js";
-import { emptyBlocks, type CcusageReport, type WidgetConfig } from "./types.js";
+import { type CcusageReport, emptyBlocks, type WidgetConfig } from "./types.js";
+import { AgentLogWatcher } from "./watcher.js";
 
 const daemonDirectory = resolve(fileURLToPath(new URL(".", import.meta.url)));
 
@@ -34,14 +34,20 @@ async function main(): Promise<void> {
   if (hasFlag("--once")) {
     const { report, blocks } = await runOnce(config);
     await store.apply(report, blocks, config);
-    console.log(JSON.stringify({
-      today: store.get().summary.today,
-      agents: store.get().summary.agents,
-      burnRate: store.get().summary.burnRate,
-      projection: store.get().summary.projection,
-      budgetStatus: store.get().summary.budgetStatus,
-      updatedAt: store.get().summary.updatedAt
-    }, null, 2));
+    console.log(
+      JSON.stringify(
+        {
+          today: store.get().summary.today,
+          agents: store.get().summary.agents,
+          burnRate: store.get().summary.burnRate,
+          projection: store.get().summary.projection,
+          budgetStatus: store.get().summary.budgetStatus,
+          updatedAt: store.get().summary.updatedAt,
+        },
+        null,
+        2,
+      ),
+    );
     return;
   }
 
@@ -110,15 +116,17 @@ async function main(): Promise<void> {
         await store.reconfigure(config);
         if (patch.refreshIntervalMs !== undefined) {
           if (fallbackTimer) clearInterval(fallbackTimer);
-          fallbackTimer = setInterval(() => { void scheduleRefresh(); }, config.refreshIntervalMs);
+          fallbackTimer = setInterval(() => {
+            void scheduleRefresh();
+          }, config.refreshIntervalMs);
         }
         if (patch.historyDays !== undefined) {
           await scheduleRefresh(true);
         }
         return config;
       },
-      refresh: () => scheduleRefresh(true)
-    }
+      refresh: () => scheduleRefresh(true),
+    },
   });
 
   const port = await server.start();
@@ -127,12 +135,16 @@ async function main(): Promise<void> {
     token,
     pid: process.pid,
     startedAt: new Date().toISOString(),
-    dashboardUrl: `http://127.0.0.1:${port}/?t=${token}`
+    dashboardUrl: `http://127.0.0.1:${port}/?t=${token}`,
   });
 
-  watcher = new AgentLogWatcher(() => { void scheduleRefresh(); });
+  watcher = new AgentLogWatcher(() => {
+    void scheduleRefresh();
+  });
   watcher.start();
-  fallbackTimer = setInterval(() => { void scheduleRefresh(); }, config.refreshIntervalMs);
+  fallbackTimer = setInterval(() => {
+    void scheduleRefresh();
+  }, config.refreshIntervalMs);
   void refreshNow();
 
   const stop = async () => {
@@ -157,9 +169,15 @@ async function main(): Promise<void> {
       }
     }, 2_000);
   }
-  process.once("SIGINT", () => { void stop().finally(() => process.exit(0)); });
-  process.once("SIGTERM", () => { void stop().finally(() => process.exit(0)); });
-  process.once("exit", () => { watcher?.close(); });
+  process.once("SIGINT", () => {
+    void stop().finally(() => process.exit(0));
+  });
+  process.once("SIGTERM", () => {
+    void stop().finally(() => process.exit(0));
+  });
+  process.once("exit", () => {
+    watcher?.close();
+  });
 }
 
 main().catch((error) => {

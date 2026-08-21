@@ -40,7 +40,12 @@ export interface Summary {
     [key: string]: unknown;
   };
   agents: ProviderSummary[];
-  burnRate: { costPerHour: number; tokensPerMinute?: number; tokensPerMinuteForIndicator?: number; [key: string]: unknown };
+  burnRate: {
+    costPerHour: number;
+    tokensPerMinute?: number;
+    tokensPerMinuteForIndicator?: number;
+    [key: string]: unknown;
+  };
   projection: { totalCost: number; totalTokens?: number; remainingMinutes?: number; [key: string]: unknown };
   budgetStatus: BudgetStatus;
   budget: {
@@ -122,11 +127,15 @@ function endpoint(path: string): string {
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const response = await fetch(endpoint(path), {
     ...init,
-    headers: { "Content-Type": "application/json", ...(init?.headers || {}) }
+    headers: { "Content-Type": "application/json", ...(init?.headers || {}) },
   });
   if (!response.ok) {
     let message = `${response.status} ${response.statusText}`;
-    try { message = ((await response.json()) as { error?: string }).error || message; } catch { /* keep status */ }
+    try {
+      message = ((await response.json()) as { error?: string }).error || message;
+    } catch {
+      /* keep status */
+    }
     throw new Error(message);
   }
   return response.json() as Promise<T>;
@@ -136,15 +145,20 @@ export const getSummary = () => request<Summary>("/api/summary");
 export const getReport = () => request<Report>("/api/report");
 export const getConfig = () => request<WidgetConfig>("/api/config");
 export const refresh = () => request<Summary>("/api/refresh", { method: "POST" });
-export const updateConfig = (patch: Partial<WidgetConfig>) => request<WidgetConfig>("/api/config", {
-  method: "PUT",
-  body: JSON.stringify(patch)
-});
+export const updateConfig = (patch: Partial<WidgetConfig>) =>
+  request<WidgetConfig>("/api/config", {
+    method: "PUT",
+    body: JSON.stringify(patch),
+  });
 
 export function subscribe(onSummary: (summary: Summary) => void, onError: () => void): () => void {
   const source = new EventSource(endpoint("/api/events"));
   source.addEventListener("summary", (event) => {
-    try { onSummary(JSON.parse((event as MessageEvent).data) as Summary); } catch { onError(); }
+    try {
+      onSummary(JSON.parse((event as MessageEvent).data) as Summary);
+    } catch {
+      onError();
+    }
   });
   source.onerror = onError;
   return () => source.close();

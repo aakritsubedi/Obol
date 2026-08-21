@@ -1,0 +1,64 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  javascript:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - uses: actions/setup-go@v5
+        with:
+          go-version: stable
+      - run: npm ci
+      - run: npm run lint
+      - run: npm run typecheck
+      - run: npm test
+      - run: ./scripts/check-version.sh --no-tag
+      - run: go install github.com/rhysd/actionlint/cmd/actionlint@v1.7.7
+      - run: "$HOME/go/bin/actionlint"
+
+  macos:
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - name: Install SwiftFormat
+        run: brew install swiftformat
+      - run: swiftformat --lint macos
+      - run: swift test --package-path macos
+      - run: npm ci
+      - run: npm run build
+      - run: ./scripts/check-version.sh --no-tag
+      - name: Build universal Release app
+        run: |
+          xcodebuild \
+            -project macos/Obol.xcodeproj \
+            -scheme Obol \
+            -configuration Release \
+            -destination 'generic/platform=macOS' \
+            -derivedDataPath .xcodebuild \
+            ARCHS='arm64 x86_64' \
+            ONLY_ACTIVE_ARCH=NO \
+            CODE_SIGNING_ALLOWED=NO \
+            clean build
+      - name: Verify universal app
+        run: |
+          lipo -info .xcodebuild/Build/Products/Release/Obol.app/Contents/MacOS/Obol | grep -q arm64
+          lipo -info .xcodebuild/Build/Products/Release/Obol.app/Contents/MacOS/Obol | grep -q x86_64
+          /usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' .xcodebuild/Build/Products/Release/Obol.app/Contents/Info.plist

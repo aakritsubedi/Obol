@@ -4,7 +4,11 @@ export function numberValue(value: unknown): number {
 }
 
 export function formatCurrency(value: unknown): string {
-  return new Intl.NumberFormat(undefined, { style: "currency", currency: "USD", maximumFractionDigits: 2 }).format(numberValue(value));
+  return new Intl.NumberFormat(undefined, {
+    style: "currency",
+    currency: "USD",
+    maximumFractionDigits: 2,
+  }).format(numberValue(value));
 }
 
 export function formatSignedCurrency(value: unknown): string {
@@ -17,7 +21,7 @@ export function formatPercent(value: unknown, digits = 2): string {
   const formatted = new Intl.NumberFormat(undefined, {
     style: "percent",
     minimumFractionDigits: digits,
-    maximumFractionDigits: digits
+    maximumFractionDigits: digits,
   }).format(Math.abs(number));
   return `${number < 0 ? "−" : "+"}${formatted}`;
 }
@@ -48,9 +52,7 @@ export function formatPeriod(period: string): string {
 export function displayName(value: unknown, fallback = "Unknown"): string {
   const name = String(value ?? "").trim();
   if (!name) return fallback;
-  return name
-    .replace(/[-_]/g, " ")
-    .replace(/\b\w/g, (letter) => letter.toUpperCase());
+  return name.replace(/[-_]/g, " ").replace(/\b\w/g, (letter) => letter.toUpperCase());
 }
 
 export function projectName(value: unknown): string {
@@ -88,6 +90,6 @@ export function formatUpdatedAt(iso: unknown): string {
     month: "short",
     day: "numeric",
     hour: "numeric",
-    minute: "2-digit"
+    minute: "2-digit",
   }).format(date);
 }

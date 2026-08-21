@@ -183,29 +183,29 @@ export function stringValue(value: unknown, fallback = ""): string {
 
 export function normalizeRow(value: unknown, index = 0): CcusageRow {
   const input = asRecord(value);
-  const agents = Array.isArray(input.agents)
-    ? input.agents.map((agent) => asRecord(agent))
-    : [];
+  const agents = Array.isArray(input.agents) ? input.agents.map((agent) => asRecord(agent)) : [];
   const modelBreakdowns = Array.isArray(input.modelBreakdowns)
     ? input.modelBreakdowns.map((model) => {
-      const breakdown = asRecord(model);
-      const totalTokens = numberValue(
-        breakdown.totalTokens,
-        numberValue(breakdown.inputTokens) + numberValue(breakdown.outputTokens) +
-          numberValue(breakdown.cacheCreationTokens) + numberValue(breakdown.cacheReadTokens)
-      );
-      const totalCost = numberValue(breakdown.totalCost, numberValue(breakdown.cost));
-      return {
-        ...breakdown,
-        totalCost,
-        cost: numberValue(breakdown.cost, totalCost),
-        totalTokens,
-        inputTokens: numberValue(breakdown.inputTokens),
-        outputTokens: numberValue(breakdown.outputTokens),
-        cacheCreationTokens: numberValue(breakdown.cacheCreationTokens),
-        cacheReadTokens: numberValue(breakdown.cacheReadTokens)
-      };
-    })
+        const breakdown = asRecord(model);
+        const totalTokens = numberValue(
+          breakdown.totalTokens,
+          numberValue(breakdown.inputTokens) +
+            numberValue(breakdown.outputTokens) +
+            numberValue(breakdown.cacheCreationTokens) +
+            numberValue(breakdown.cacheReadTokens),
+        );
+        const totalCost = numberValue(breakdown.totalCost, numberValue(breakdown.cost));
+        return {
+          ...breakdown,
+          totalCost,
+          cost: numberValue(breakdown.cost, totalCost),
+          totalTokens,
+          inputTokens: numberValue(breakdown.inputTokens),
+          outputTokens: numberValue(breakdown.outputTokens),
+          cacheCreationTokens: numberValue(breakdown.cacheCreationTokens),
+          cacheReadTokens: numberValue(breakdown.cacheReadTokens),
+        };
+      })
     : [];
 
   return {
@@ -220,7 +220,7 @@ export function normalizeRow(value: unknown, index = 0): CcusageRow {
     cacheReadTokens: numberValue(input.cacheReadTokens),
     totalCost: numberValue(input.totalCost),
     totalTokens: numberValue(input.totalTokens),
-    metadata: asRecord(input.metadata)
+    metadata: asRecord(input.metadata),
   };
 }
 
@@ -246,7 +246,14 @@ export function normalizeReport(value: unknown): CcusageReport {
   const session = normalizeRows("session").sort((left, right) => right.totalCost - left.totalCost);
   const projects = normalizeProjectRows(input.projects);
 
-  if (!(Array.isArray(input.daily) || Array.isArray(input.weekly) || Array.isArray(input.monthly) || Array.isArray(input.session))) {
+  if (
+    !(
+      Array.isArray(input.daily) ||
+      Array.isArray(input.weekly) ||
+      Array.isArray(input.monthly) ||
+      Array.isArray(input.session)
+    )
+  ) {
     throw new Error("ccusage report did not contain daily, weekly, monthly, or session arrays");
   }
 
@@ -257,7 +264,7 @@ export function normalizeReport(value: unknown): CcusageReport {
     monthly: sortRowsAscending(monthly),
     session,
     projects,
-    totals: asRecord(input.totals)
+    totals: asRecord(input.totals),
   };
 }
 
@@ -267,31 +274,35 @@ function sortRowsAscending(rows: CcusageRow[]): CcusageRow[] {
 
 function normalizeProjectRows(value: unknown): ProjectUsageRow[] {
   if (!Array.isArray(value)) return [];
-  return value.map((item, index) => {
-    const row = asRecord(item);
-    const project = stringValue(row.project, "unknown-project");
-    const period = stringValue(row.period ?? row.date, `unknown-${index}`);
-    return {
-      ...normalizeRow({ ...row, period, agent: stringValue(row.agent, "claude") }, index),
-      project
-    };
-  }).sort((left, right) => left.period.localeCompare(right.period) || right.totalCost - left.totalCost);
+  return value
+    .map((item, index) => {
+      const row = asRecord(item);
+      const project = stringValue(row.project, "unknown-project");
+      const period = stringValue(row.period ?? row.date, `unknown-${index}`);
+      return {
+        ...normalizeRow({ ...row, period, agent: stringValue(row.agent, "claude") }, index),
+        project,
+      };
+    })
+    .sort((left, right) => left.period.localeCompare(right.period) || right.totalCost - left.totalCost);
 }
 
 export function normalizeProjects(value: unknown): ProjectUsageRow[] {
   const input = asRecord(value);
   const projects = asRecord(input.projects);
-  return Object.entries(projects).flatMap(([project, rows]) => {
-    if (!Array.isArray(rows)) return [];
-    return rows.map((item, index) => {
-      const row = asRecord(item);
-      const period = stringValue(row.period ?? row.date, `unknown-${index}`);
-      return {
-        ...normalizeRow({ ...row, period, agent: stringValue(row.agent, "claude") }, index),
-        project: stringValue(row.project, project)
-      };
-    });
-  }).sort((left, right) => left.period.localeCompare(right.period) || right.totalCost - left.totalCost);
+  return Object.entries(projects)
+    .flatMap(([project, rows]) => {
+      if (!Array.isArray(rows)) return [];
+      return rows.map((item, index) => {
+        const row = asRecord(item);
+        const period = stringValue(row.period ?? row.date, `unknown-${index}`);
+        return {
+          ...normalizeRow({ ...row, period, agent: stringValue(row.agent, "claude") }, index),
+          project: stringValue(row.project, project),
+        };
+      });
+    })
+    .sort((left, right) => left.period.localeCompare(right.period) || right.totalCost - left.totalCost);
 }
 
 export function normalizeBlocks(value: unknown): BlocksReport {
@@ -300,67 +311,80 @@ export function normalizeBlocks(value: unknown): BlocksReport {
     throw new Error("ccusage blocks did not contain a blocks array");
   }
   const blocks = input.blocks.map((value, index) => normalizeBlock(value, index));
-  const activeBlock = blocks.find((block) => block.isActive && !block.isGap) ?? blocks.find((block) => !block.isGap) ?? blocks[0];
-  const burnRate = { ...activeBlock?.burnRate, ...asRecord(input.burnRate) };
-  const projection = { ...activeBlock?.projection, ...asRecord(input.projection) };
+  const activeBlock =
+    blocks.find((block) => block.isActive && !block.isGap) ??
+    blocks.find((block) => !block.isGap) ??
+    blocks[0];
+  const burnRate = normalizeBurnRate({ ...asRecord(activeBlock?.burnRate), ...asRecord(input.burnRate) });
+  const projection = normalizeProjection({
+    ...asRecord(activeBlock?.projection),
+    ...asRecord(input.projection),
+  });
   const tokenLimitStatus = normalizeTokenLimitStatus(activeBlock?.tokenLimitStatus ?? input.tokenLimitStatus);
 
   return {
     blocks,
-    burnRate: {
-      ...burnRate,
-      costPerHour: numberValue(burnRate.costPerHour),
-      ...(burnRate.tokensPerMinute !== undefined ? { tokensPerMinute: numberValue(burnRate.tokensPerMinute) } : {}),
-      ...(burnRate.tokensPerMinuteForIndicator !== undefined ? { tokensPerMinuteForIndicator: numberValue(burnRate.tokensPerMinuteForIndicator) } : {})
-    },
-    projection: {
-      ...projection,
-      totalCost: numberValue(projection.totalCost),
-      ...(projection.totalTokens !== undefined ? { totalTokens: numberValue(projection.totalTokens) } : {}),
-      ...(projection.remainingMinutes !== undefined ? { remainingMinutes: numberValue(projection.remainingMinutes) } : {})
-    },
+    burnRate,
+    projection,
     tokenLimitStatus,
-    raw: input
+    raw: input,
   };
 }
 
 function normalizeBlock(value: unknown, index: number): UsageBlock {
   const input = asRecord(value);
-  const burnRate = asRecord(input.burnRate);
-  const projection = asRecord(input.projection);
   const tokenCounts = asRecord(input.tokenCounts);
   return {
     ...input,
     id: stringValue(input.id, `block-${index}`),
     startTime: stringValue(input.startTime),
     endTime: stringValue(input.endTime),
-    actualEndTime: input.actualEndTime === null || input.actualEndTime === undefined ? null : stringValue(input.actualEndTime),
+    actualEndTime:
+      input.actualEndTime === null || input.actualEndTime === undefined
+        ? null
+        : stringValue(input.actualEndTime),
     isActive: input.isActive === true,
     isGap: input.isGap === true,
     entries: numberValue(input.entries),
     models: Array.isArray(input.models) ? input.models.map(String) : [],
     costUSD: numberValue(input.costUSD ?? input.totalCost ?? input.cost),
     totalTokens: numberValue(input.totalTokens),
-    burnRate: {
-      ...burnRate,
-      costPerHour: numberValue(burnRate.costPerHour),
-      ...(burnRate.tokensPerMinute !== undefined ? { tokensPerMinute: numberValue(burnRate.tokensPerMinute) } : {}),
-      ...(burnRate.tokensPerMinuteForIndicator !== undefined ? { tokensPerMinuteForIndicator: numberValue(burnRate.tokensPerMinuteForIndicator) } : {})
-    },
-    projection: {
-      ...projection,
-      totalCost: numberValue(projection.totalCost),
-      ...(projection.totalTokens !== undefined ? { totalTokens: numberValue(projection.totalTokens) } : {}),
-      ...(projection.remainingMinutes !== undefined ? { remainingMinutes: numberValue(projection.remainingMinutes) } : {})
-    },
+    burnRate: normalizeBurnRate(input.burnRate),
+    projection: normalizeProjection(input.projection),
     tokenCounts: {
       ...tokenCounts,
       inputTokens: numberValue(tokenCounts.inputTokens),
       outputTokens: numberValue(tokenCounts.outputTokens),
-      cacheCreationTokens: numberValue(tokenCounts.cacheCreationTokens ?? tokenCounts.cacheCreationInputTokens),
-      cacheReadTokens: numberValue(tokenCounts.cacheReadTokens ?? tokenCounts.cacheReadInputTokens)
+      cacheCreationTokens: numberValue(
+        tokenCounts.cacheCreationTokens ?? tokenCounts.cacheCreationInputTokens,
+      ),
+      cacheReadTokens: numberValue(tokenCounts.cacheReadTokens ?? tokenCounts.cacheReadInputTokens),
     },
-    tokenLimitStatus: normalizeTokenLimitStatus(input.tokenLimitStatus)
+    tokenLimitStatus: normalizeTokenLimitStatus(input.tokenLimitStatus),
+  };
+}
+
+export function normalizeBurnRate(value: unknown): BurnRate {
+  const input = asRecord(value);
+  return {
+    ...input,
+    costPerHour: numberValue(input.costPerHour),
+    ...(input.tokensPerMinute !== undefined ? { tokensPerMinute: numberValue(input.tokensPerMinute) } : {}),
+    ...(input.tokensPerMinuteForIndicator !== undefined
+      ? { tokensPerMinuteForIndicator: numberValue(input.tokensPerMinuteForIndicator) }
+      : {}),
+  };
+}
+
+export function normalizeProjection(value: unknown): Projection {
+  const input = asRecord(value);
+  return {
+    ...input,
+    totalCost: numberValue(input.totalCost),
+    ...(input.totalTokens !== undefined ? { totalTokens: numberValue(input.totalTokens) } : {}),
+    ...(input.remainingMinutes !== undefined
+      ? { remainingMinutes: numberValue(input.remainingMinutes) }
+      : {}),
   };
 }
 
@@ -369,10 +393,13 @@ function normalizeTokenLimitStatus(value: unknown): TokenLimitStatus | null {
   const input = asRecord(value);
   return {
     ...input,
-    limit: input.limit === null || input.limit === undefined || input.limit === "max" ? null : numberValue(input.limit),
+    limit:
+      input.limit === null || input.limit === undefined || input.limit === "max"
+        ? null
+        : numberValue(input.limit),
     percentUsed: numberValue(input.percentUsed),
     projectedUsage: numberValue(input.projectedUsage),
-    status: input.status === null || input.status === undefined ? null : stringValue(input.status)
+    status: input.status === null || input.status === undefined ? null : stringValue(input.status),
   };
 }
 
@@ -386,6 +413,6 @@ export function emptyBlocks(): BlocksReport {
     burnRate: { costPerHour: 0 },
     projection: { totalCost: 0 },
     tokenLimitStatus: null,
-    raw: {}
+    raw: {},
   };
 }

@@ -1,0 +1,50 @@
+{
+  "url": "https://api.github.com/repos/aakritsubedi/obol/releases/2",
+  "html_url": "https://github.com/aakritsubedi/obol/releases/tag/v0.2.0",
+  "id": 2,
+  "tag_name": "v0.2.0",
+  "name": "Obol 0.2.0",
+  "body": "First public release.",
+  "draft": false,
+  "prerelease": false,
+  "created_at": "2026-08-01T12:00:00Z",
+  "published_at": "2026-08-01T12:00:00Z",
+  "assets": [
+    {
+      "url": "https://api.github.com/repos/aakritsubedi/obol/releases/assets/10",
+      "id": 10,
+      "name": "Obol-0.2.0.zip",
+      "label": null,
+      "uploader": { "login": "aakritsubedi" },
+      "content_type": "application/zip",
+      "state": "uploaded",
+      "size": 120,
+      "digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "browser_download_url": "https://objects.githubusercontent.com/obol/Obol-0.2.0.zip"
+    },
+    {
+      "url": "https://api.github.com/repos/aakritsubedi/obol/releases/assets/11",
+      "id": 11,
+      "name": "SHA256SUMS",
+      "label": null,
+      "uploader": { "login": "aakritsubedi" },
+      "content_type": "text/plain",
+      "state": "uploaded",
+      "size": 160,
+      "digest": null,
+      "browser_download_url": "https://objects.githubusercontent.com/obol/SHA256SUMS"
+    },
+    {
+      "url": "https://api.github.com/repos/aakritsubedi/obol/releases/assets/12",
+      "id": 12,
+      "name": "Obol-0.2.0.dmg",
+      "label": null,
+      "uploader": { "login": "aakritsubedi" },
+      "content_type": "application/x-apple-diskimage",
+      "state": "uploaded",
+      "size": 200,
+      "digest": null,
+      "browser_download_url": "https://objects.githubusercontent.com/obol/Obol-0.2.0.dmg"
+    }
+  ]
+}

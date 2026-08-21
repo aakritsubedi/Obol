@@ -3,10 +3,11 @@ import SwiftUI
 @main
 struct ObolApp: App {
     @StateObject private var controller = DaemonController()
+    @StateObject private var updates = UpdateController()
 
     var body: some Scene {
         MenuBarExtra {
-            PopoverView(controller: controller)
+            PopoverView(controller: controller, updates: updates)
         } label: {
             HStack(spacing: 5) {
                 Circle()

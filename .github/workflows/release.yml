@@ -1,0 +1,123 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Version to stamp for a workflow dry run
+        required: true
+        default: 0.2.0
+        type: string
+      dry_run:
+        description: Build and upload artifacts without creating a GitHub Release
+        required: true
+        default: true
+        type: boolean
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  release:
+    runs-on: macos-15
+    env:
+      MACOS_CERTIFICATE: ${{ secrets.MACOS_CERTIFICATE }}
+      MACOS_CERTIFICATE_PASSWORD: ${{ secrets.MACOS_CERTIFICATE_PASSWORD }}
+      MACOS_SIGN_IDENTITY: ${{ secrets.MACOS_SIGN_IDENTITY }}
+      AC_API_KEY_ID: ${{ secrets.AC_API_KEY_ID }}
+      AC_API_ISSUER: ${{ secrets.AC_API_ISSUER }}
+      AC_API_KEY: ${{ secrets.AC_API_KEY }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - name: Resolve release version
+        run: |
+          if [ "$GITHUB_REF_TYPE" = "tag" ]; then
+            TAG_VERSION="$(printf '%s' "$GITHUB_REF_NAME" | sed 's/^v//')"
+            echo "OBOL_VERSION=$TAG_VERSION" >> "$GITHUB_ENV"
+          else
+            ./scripts/set-version.sh "${{ inputs.version }}"
+            echo "OBOL_VERSION=$(node -p 'require("./package.json").version')" >> "$GITHUB_ENV"
+          fi
+          echo "CURRENT_PROJECT_VERSION=$(git rev-list --count HEAD)" >> "$GITHUB_ENV"
+      - name: Check version before building
+        run: |
+          if [ "$GITHUB_REF_TYPE" = "tag" ]; then
+            ./scripts/check-version.sh
+          else
+            ./scripts/check-version.sh --no-tag
+          fi
+      - run: npm ci
+      - name: Add both Darwin ccusage runtimes
+        run: |
+          npm install --no-save --force \
+            @ccusage/ccusage-darwin-arm64@20.0.20 \
+            @ccusage/ccusage-darwin-x64@20.0.20 \
+            --os=darwin --cpu=arm64
+          test -d node_modules/@ccusage/ccusage-darwin-arm64
+          test -d node_modules/@ccusage/ccusage-darwin-x64
+      - name: Import Developer ID certificate (untested)
+        if: env.MACOS_CERTIFICATE != ''
+        run: |
+          CERT_PATH="$RUNNER_TEMP/obol-signing.p12"
+          KEYCHAIN_PATH="$RUNNER_TEMP/obol-signing.keychain-db"
+          echo "$MACOS_CERTIFICATE" | base64 --decode > "$CERT_PATH"
+          security create-keychain -p "$MACOS_CERTIFICATE_PASSWORD" "$KEYCHAIN_PATH"
+          security default-keychain -s "$KEYCHAIN_PATH"
+          security unlock-keychain -p "$MACOS_CERTIFICATE_PASSWORD" "$KEYCHAIN_PATH"
+          security import "$CERT_PATH" -P "$MACOS_CERTIFICATE_PASSWORD" -A -t cert -f pkcs12 -k "$KEYCHAIN_PATH"
+          security set-key-partition-list -S apple-tool:,apple: -s -k "$MACOS_CERTIFICATE_PASSWORD" "$KEYCHAIN_PATH"
+      - name: Build and package
+        env:
+          SIGN_IDENTITY: ${{ secrets.MACOS_SIGN_IDENTITY }}
+        run: |
+          npm run build
+          OBOL_VERSION="$OBOL_VERSION" CURRENT_PROJECT_VERSION="$CURRENT_PROJECT_VERSION" npm run package:dmg
+      - name: Verify release artifacts
+        run: |
+          test -f "dist/Obol-$OBOL_VERSION.dmg"
+          test -f "dist/Obol-$OBOL_VERSION.zip"
+          test -f dist/SHA256SUMS
+          lipo -info ".xcodebuild/Build/Products/Release/Obol.app/Contents/MacOS/Obol" | grep -q arm64
+          lipo -info ".xcodebuild/Build/Products/Release/Obol.app/Contents/MacOS/Obol" | grep -q x86_64
+          unzip -l "dist/Obol-$OBOL_VERSION.zip" | grep -q ccusage-darwin-x64
+          (cd dist && shasum -c SHA256SUMS)
+      - uses: actions/upload-artifact@v4
+        if: inputs.dry_run == true
+        with:
+          name: Obol-${{ env.OBOL_VERSION }}
+          path: |
+            dist/Obol-*.dmg
+            dist/Obol-*.zip
+            dist/SHA256SUMS
+      - name: Create GitHub Release
+        if: github.ref_type == 'tag' && inputs.dry_run != true
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            dist/Obol-*.dmg
+            dist/Obol-*.zip
+            dist/SHA256SUMS
+          generate_release_notes: true
+          prerelease: ${{ contains(github.ref_name, '-') }}
+          append_body: true
+          body: |
+
+            ---
+            The app needs Node at /opt/homebrew/bin/node, /usr/local/bin/node, or /usr/bin/node. The first launch of the ad-hoc-signed DMG on another Mac needs right-click -> Open; in-app updates download the ZIP and skip that quarantine prompt after their integrity checks. Verify a download with:
+
+                cd dist && shasum -c SHA256SUMS
+
+            Users on 0.1.0 should reinstall the v0.2.0 DMG manually. The first genuine in-app update is v0.2.0 -> v0.2.1.

@@ -25,6 +25,16 @@ enum WidgetStyle {
         light: NSColor(srgbRed: 0.11, green: 0.52, blue: 0.37, alpha: 1)
     )
 
+    static let warning = adaptive(
+        dark: NSColor(srgbRed: 1.0, green: 0.66, blue: 0.18, alpha: 1),
+        light: NSColor(srgbRed: 0.72, green: 0.35, blue: 0.03, alpha: 1)
+    )
+
+    static let danger = adaptive(
+        dark: NSColor(srgbRed: 1.0, green: 0.36, blue: 0.34, alpha: 1),
+        light: NSColor(srgbRed: 0.78, green: 0.10, blue: 0.10, alpha: 1)
+    )
+
     static let hairline = Color.primary.opacity(0.09)
 
     private static func adaptive(dark: NSColor, light: NSColor) -> Color {

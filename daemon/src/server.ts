@@ -1,8 +1,8 @@
-import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
 import { readFile, stat } from "node:fs/promises";
-import { extname, join, normalize, resolve } from "node:path";
+import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
 import type { AddressInfo } from "node:net";
-import type { CcusageReport, BlocksReport, Summary, WidgetConfig } from "./types.js";
+import { extname, join, normalize, resolve } from "node:path";
+import type { BlocksReport, CcusageReport, Summary, WidgetConfig } from "./types.js";
 
 export interface ServerHandlers {
   getSummary: () => Summary;
@@ -31,7 +31,7 @@ const mimeTypes: Record<string, string> = {
   ".ico": "image/x-icon",
   ".webp": "image/webp",
   ".woff": "font/woff",
-  ".woff2": "font/woff2"
+  ".woff2": "font/woff2",
 };
 
 function json(res: ServerResponse, status: number, value: unknown): void {
@@ -39,7 +39,7 @@ function json(res: ServerResponse, status: number, value: unknown): void {
   res.writeHead(status, {
     "Content-Type": "application/json; charset=utf-8",
     "Cache-Control": "no-store",
-    "Content-Length": Buffer.byteLength(body)
+    "Content-Length": Buffer.byteLength(body),
   });
   res.end(body);
 }
@@ -47,8 +47,13 @@ function json(res: ServerResponse, status: number, value: unknown): void {
 function isLoopbackOrigin(origin: string): boolean {
   try {
     const parsed = new URL(origin);
-    return parsed.protocol === "http:" &&
-      (parsed.hostname === "localhost" || parsed.hostname === "127.0.0.1" || parsed.hostname === "[::1]" || parsed.hostname === "::1");
+    return (
+      parsed.protocol === "http:" &&
+      (parsed.hostname === "localhost" ||
+        parsed.hostname === "127.0.0.1" ||
+        parsed.hostname === "[::1]" ||
+        parsed.hostname === "::1")
+    );
   } catch {
     return false;
   }
@@ -122,7 +127,11 @@ export class DaemonServer {
   broadcast(summary: Summary): void {
     const payload = `event: summary\ndata: ${JSON.stringify(summary)}\n\n`;
     for (const client of this.clients) {
-      try { client.write(payload); } catch { this.clients.delete(client); }
+      try {
+        client.write(payload);
+      } catch {
+        this.clients.delete(client);
+      }
     }
   }
 
@@ -136,7 +145,9 @@ export class DaemonServer {
       res.setHeader("Access-Control-Allow-Origin", origin);
       res.setHeader("Vary", "Origin");
     }
-    const supplied = url.searchParams.get("t") || req.headers["x-token"] ||
+    const supplied =
+      url.searchParams.get("t") ||
+      req.headers["x-token"] ||
       (typeof req.headers.authorization === "string" && req.headers.authorization.startsWith("Bearer ")
         ? req.headers.authorization.slice("Bearer ".length)
         : "");
@@ -154,7 +165,7 @@ export class DaemonServer {
         if (!this.authenticated(req, url, res)) return;
         res.writeHead(204, {
           "Access-Control-Allow-Headers": "Authorization, Content-Type, X-Token",
-          "Access-Control-Allow-Methods": "GET, PUT, POST, OPTIONS"
+          "Access-Control-Allow-Methods": "GET, PUT, POST, OPTIONS",
         });
         res.end();
         return;
@@ -198,7 +209,7 @@ export class DaemonServer {
         res.writeHead(200, {
           "Content-Type": "text/event-stream; charset=utf-8",
           "Cache-Control": "no-cache, no-store",
-          Connection: "keep-alive"
+          Connection: "keep-alive",
         });
         res.write(`event: summary\ndata: ${JSON.stringify(this.options.handlers.getSummary())}\n\n`);
         this.clients.add(res);
@@ -246,7 +257,7 @@ export class DaemonServer {
       res.writeHead(200, {
         "Content-Type": mimeTypes[extname(filePath).toLowerCase()] || "application/octet-stream",
         "Cache-Control": extname(filePath) === ".html" ? "no-store" : "public, max-age=31536000, immutable",
-        "Content-Length": body.byteLength
+        "Content-Length": body.byteLength,
       });
       if (req.method === "HEAD") res.end();
       else res.end(body);

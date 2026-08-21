@@ -13,6 +13,12 @@
 		A10000010000000000000004 /* PopoverView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000010000000000000004 /* PopoverView.swift */; };
 		A10000010000000000000009 /* WidgetStyle.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000010000000000000009 /* WidgetStyle.swift */; };
 		A10000010000000000000005 /* Notifier.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000010000000000000005 /* Notifier.swift */; };
+		A10000010000000000000011 /* UpdateController.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000010000000000000011 /* UpdateController.swift */; };
+		A10000010000000000000012 /* UpdateInstaller.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000010000000000000012 /* UpdateInstaller.swift */; };
+		A10000010000000000000013 /* SemanticVersion.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000010000000000000013 /* SemanticVersion.swift */; };
+		A10000010000000000000014 /* ReleaseFeed.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000010000000000000014 /* ReleaseFeed.swift */; };
+		A10000010000000000000015 /* ReleaseClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000010000000000000015 /* ReleaseClient.swift */; };
+		A10000010000000000000016 /* UpdateDefaults.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000010000000000000016 /* UpdateDefaults.swift */; };
 		A10000010000000000000010 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = A20000010000000000000010 /* Assets.xcassets */; };
 /* End PBXBuildFile section */
 
@@ -26,6 +32,12 @@
 		A20000010000000000000005 /* Notifier.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Notifier.swift; sourceTree = "<group>"; };
 		A20000010000000000000006 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		A20000010000000000000010 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		A20000010000000000000011 /* UpdateController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UpdateController.swift; sourceTree = "<group>"; };
+		A20000010000000000000012 /* UpdateInstaller.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UpdateInstaller.swift; sourceTree = "<group>"; };
+		A20000010000000000000013 /* SemanticVersion.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SemanticVersion.swift; sourceTree = "<group>"; };
+		A20000010000000000000014 /* ReleaseFeed.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReleaseFeed.swift; sourceTree = "<group>"; };
+		A20000010000000000000015 /* ReleaseClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReleaseClient.swift; sourceTree = "<group>"; };
+		A20000010000000000000016 /* UpdateDefaults.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UpdateDefaults.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -57,8 +69,22 @@
 				A20000010000000000000004 /* PopoverView.swift */,
 				A20000010000000000000009 /* WidgetStyle.swift */,
 				A20000010000000000000005 /* Notifier.swift */,
+				A20000010000000000000011 /* UpdateController.swift */,
+				A20000010000000000000012 /* UpdateInstaller.swift */,
+				A40000010000000000000004 /* Update */,
 			);
 			path = Obol/Sources;
+			sourceTree = "<group>";
+		};
+		A40000010000000000000004 /* Update */ = {
+			isa = PBXGroup;
+			children = (
+				A20000010000000000000013 /* SemanticVersion.swift */,
+				A20000010000000000000014 /* ReleaseFeed.swift */,
+				A20000010000000000000015 /* ReleaseClient.swift */,
+				A20000010000000000000016 /* UpdateDefaults.swift */,
+			);
+			path = Update;
 			sourceTree = "<group>";
 		};
 		A40000010000000000000002 /* Resources */ = {
@@ -144,10 +170,16 @@
 			buildActionMask = 2147483647;
 			files = (
 			);
-			inputFileListPaths = (
+			inputPaths = (
+				"$(SRCROOT)/scripts/bundle-daemon.sh",
+				"$(SRCROOT)/../daemon/dist/index.bundle.js",
+				"$(SRCROOT)/../daemon/package.json",
+				"$(SRCROOT)/../dashboard/dist/index.html",
 			);
 			name = "Bundle daemon";
-			outputFileListPaths = (
+			outputPaths = (
+				"$(TARGET_BUILD_DIR)/$(UNLOCALIZED_RESOURCES_FOLDER_PATH)/daemon/dist/index.js",
+				"$(TARGET_BUILD_DIR)/$(UNLOCALIZED_RESOURCES_FOLDER_PATH)/dashboard/dist/index.html",
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
@@ -166,6 +198,12 @@
 				A10000010000000000000004 /* PopoverView.swift in Sources */,
 				A10000010000000000000009 /* WidgetStyle.swift in Sources */,
 				A10000010000000000000005 /* Notifier.swift in Sources */,
+				A10000010000000000000011 /* UpdateController.swift in Sources */,
+				A10000010000000000000012 /* UpdateInstaller.swift in Sources */,
+				A10000010000000000000013 /* SemanticVersion.swift in Sources */,
+				A10000010000000000000014 /* ReleaseFeed.swift in Sources */,
+				A10000010000000000000015 /* ReleaseClient.swift in Sources */,
+				A10000010000000000000016 /* UpdateDefaults.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -184,7 +222,11 @@
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = Obol/Resources/Info.plist;
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
-				MACOSX_DEPLOYMENT_TARGET = 15.0;
+				ARCHS = "$(ARCHS_STANDARD)";
+				CURRENT_PROJECT_VERSION = 1;
+				ONLY_ACTIVE_ARCH = NO;
+				MACOSX_DEPLOYMENT_TARGET = 13.0;
+				MARKETING_VERSION = 0.1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.aakritsubedi.obol;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = macosx;
@@ -206,7 +248,11 @@
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = Obol/Resources/Info.plist;
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
-				MACOSX_DEPLOYMENT_TARGET = 15.0;
+				ARCHS = "$(ARCHS_STANDARD)";
+				CURRENT_PROJECT_VERSION = 1;
+				ONLY_ACTIVE_ARCH = NO;
+				MACOSX_DEPLOYMENT_TARGET = 13.0;
+				MARKETING_VERSION = 0.1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.aakritsubedi.obol;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = macosx;

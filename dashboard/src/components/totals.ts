@@ -31,7 +31,7 @@ const zeroTotals: ReportTotals = {
   cacheCreationTokens: 0,
   cacheReadTokens: 0,
   totalCost: 0,
-  totalTokens: 0
+  totalTokens: 0,
 };
 
 export function modelName(model: ModelBreakdown): string {
@@ -43,8 +43,10 @@ function metric(model: ModelBreakdown, key: keyof AggregatedModel): number {
   if (key === "totalTokens") {
     const explicit = Number(model.totalTokens);
     if (Number.isFinite(explicit)) return explicit;
-    return ["inputTokens", "outputTokens", "cacheCreationTokens", "cacheReadTokens"]
-      .reduce((sum, tokenKey) => sum + numberValue(model[tokenKey]), 0);
+    return ["inputTokens", "outputTokens", "cacheCreationTokens", "cacheReadTokens"].reduce(
+      (sum, tokenKey) => sum + numberValue(model[tokenKey]),
+      0,
+    );
   }
   return numberValue(model[key]);
 }
@@ -58,7 +60,7 @@ function emptyModel(name: string, agent?: string): AggregatedModel {
     inputTokens: 0,
     outputTokens: 0,
     cacheCreationTokens: 0,
-    cacheReadTokens: 0
+    cacheReadTokens: 0,
   };
 }
 
@@ -78,23 +80,30 @@ export function modelRowsFor(report: Report, period: ReportPeriod): UsageRow[] {
 
 function rowsFor(report: Report, period?: ReportPeriod): UsageRow[] {
   if (period) return modelRowsFor(report, period);
-  return report.daily.length ? report.daily : (report.weekly.length ? report.weekly : report.monthly);
+  return report.daily.length ? report.daily : report.weekly.length ? report.weekly : report.monthly;
 }
 
 export function periodHasModelData(report: Report, period: ReportPeriod): boolean {
-  return modelRowsFor(report, period).some((row) => row.modelBreakdowns.length > 0 || row.agents.some((agent) => Array.isArray(agent.modelBreakdowns) && agent.modelBreakdowns.length > 0));
+  return modelRowsFor(report, period).some(
+    (row) =>
+      row.modelBreakdowns.length > 0 ||
+      row.agents.some((agent) => Array.isArray(agent.modelBreakdowns) && agent.modelBreakdowns.length > 0),
+  );
 }
 
 function reduceRows(report: Report): ReportTotals {
-  return report.daily.reduce<ReportTotals>((totals, row) => {
-    totals.inputTokens += numberValue(row.inputTokens);
-    totals.outputTokens += numberValue(row.outputTokens);
-    totals.cacheCreationTokens += numberValue(row.cacheCreationTokens);
-    totals.cacheReadTokens += numberValue(row.cacheReadTokens);
-    totals.totalCost += numberValue(row.totalCost);
-    totals.totalTokens += numberValue(row.totalTokens);
-    return totals;
-  }, { ...zeroTotals });
+  return report.daily.reduce<ReportTotals>(
+    (totals, row) => {
+      totals.inputTokens += numberValue(row.inputTokens);
+      totals.outputTokens += numberValue(row.outputTokens);
+      totals.cacheCreationTokens += numberValue(row.cacheCreationTokens);
+      totals.cacheReadTokens += numberValue(row.cacheReadTokens);
+      totals.totalCost += numberValue(row.totalCost);
+      totals.totalTokens += numberValue(row.totalTokens);
+      return totals;
+    },
+    { ...zeroTotals },
+  );
 }
 
 export function totalsFrom(report: Report | null): ReportTotals {
@@ -103,12 +112,22 @@ export function totalsFrom(report: Report | null): ReportTotals {
   const totals = report.totals;
   if (!totals) return reduced;
   return {
-    inputTokens: Number.isFinite(Number(totals.inputTokens)) ? numberValue(totals.inputTokens) : reduced.inputTokens,
-    outputTokens: Number.isFinite(Number(totals.outputTokens)) ? numberValue(totals.outputTokens) : reduced.outputTokens,
-    cacheCreationTokens: Number.isFinite(Number(totals.cacheCreationTokens)) ? numberValue(totals.cacheCreationTokens) : reduced.cacheCreationTokens,
-    cacheReadTokens: Number.isFinite(Number(totals.cacheReadTokens)) ? numberValue(totals.cacheReadTokens) : reduced.cacheReadTokens,
+    inputTokens: Number.isFinite(Number(totals.inputTokens))
+      ? numberValue(totals.inputTokens)
+      : reduced.inputTokens,
+    outputTokens: Number.isFinite(Number(totals.outputTokens))
+      ? numberValue(totals.outputTokens)
+      : reduced.outputTokens,
+    cacheCreationTokens: Number.isFinite(Number(totals.cacheCreationTokens))
+      ? numberValue(totals.cacheCreationTokens)
+      : reduced.cacheCreationTokens,
+    cacheReadTokens: Number.isFinite(Number(totals.cacheReadTokens))
+      ? numberValue(totals.cacheReadTokens)
+      : reduced.cacheReadTokens,
     totalCost: Number.isFinite(Number(totals.totalCost)) ? numberValue(totals.totalCost) : reduced.totalCost,
-    totalTokens: Number.isFinite(Number(totals.totalTokens)) ? numberValue(totals.totalTokens) : reduced.totalTokens
+    totalTokens: Number.isFinite(Number(totals.totalTokens))
+      ? numberValue(totals.totalTokens)
+      : reduced.totalTokens,
   };
 }
 
@@ -143,7 +162,7 @@ export function aggregateByProvider(report: Report, period?: ReportPeriod): Prov
         outputTokens: 0,
         cacheCreationTokens: 0,
         cacheReadTokens: 0,
-        models: []
+        models: [],
       };
       for (const value of breakdowns) {
         const name = modelName(value);
