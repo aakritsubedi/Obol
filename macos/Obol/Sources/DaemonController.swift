@@ -13,6 +13,7 @@ final class DaemonController: ObservableObject {
     @Published private(set) var connected = false
     @Published private(set) var statusMessage: String?
     @Published private(set) var isPopoverPresented = false
+    @Published private(set) var notificationsDenied = false
 
     private let client = UsageClient()
     private let notifier = Notifier()
@@ -26,6 +27,9 @@ final class DaemonController: ObservableObject {
 
     init() {
         Self.shared = self
+        notifier.onAuthorizationChange = { [weak self] denied in
+            self?.notificationsDenied = denied
+        }
         notifier.requestPermission()
         start()
     }

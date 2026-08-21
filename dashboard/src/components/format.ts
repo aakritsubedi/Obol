@@ -3,22 +3,25 @@ export function numberValue(value: unknown): number {
   return Number.isFinite(parsed) ? parsed : 0;
 }
 
-export function formatCurrency(value: unknown): string {
-  return new Intl.NumberFormat(undefined, {
+// Formatting functions accept an optional locale so tests can pin output;
+// at runtime they default to the user's locale, as before.
+
+export function formatCurrency(value: unknown, locale?: string): string {
+  return new Intl.NumberFormat(locale, {
     style: "currency",
     currency: "USD",
     maximumFractionDigits: 2,
   }).format(numberValue(value));
 }
 
-export function formatSignedCurrency(value: unknown): string {
+export function formatSignedCurrency(value: unknown, locale?: string): string {
   const number = numberValue(value);
-  return `${number < 0 ? "−" : "+"}${formatCurrency(Math.abs(number))}`;
+  return `${number < 0 ? "−" : "+"}${formatCurrency(Math.abs(number), locale)}`;
 }
 
-export function formatPercent(value: unknown, digits = 2): string {
+export function formatPercent(value: unknown, digits = 2, locale?: string): string {
   const number = numberValue(value);
-  const formatted = new Intl.NumberFormat(undefined, {
+  const formatted = new Intl.NumberFormat(locale, {
     style: "percent",
     minimumFractionDigits: digits,
     maximumFractionDigits: digits,
@@ -26,12 +29,12 @@ export function formatPercent(value: unknown, digits = 2): string {
   return `${number < 0 ? "−" : "+"}${formatted}`;
 }
 
-export function formatTokens(value: unknown): string {
+export function formatTokens(value: unknown, locale?: string): string {
   const number = numberValue(value);
   if (number >= 1_000_000_000) return `${(number / 1_000_000_000).toFixed(1)}B`;
   if (number >= 1_000_000) return `${(number / 1_000_000).toFixed(1)}M`;
   if (number >= 1_000) return `${(number / 1_000).toFixed(1)}K`;
-  return new Intl.NumberFormat().format(number);
+  return new Intl.NumberFormat(locale).format(number);
 }
 
 export function formatDuration(value: unknown): string {
@@ -42,11 +45,11 @@ export function formatDuration(value: unknown): string {
   return remaining ? `${hours}h ${remaining}m` : `${hours}h`;
 }
 
-export function formatPeriod(period: string): string {
+export function formatPeriod(period: string, locale?: string): string {
   if (!period) return "—";
   const date = new Date(`${period.length === 7 ? `${period}-01` : period.slice(0, 10)}T12:00:00`);
   if (Number.isNaN(date.valueOf())) return period;
-  return new Intl.DateTimeFormat(undefined, { month: "short", day: "numeric" }).format(date);
+  return new Intl.DateTimeFormat(locale, { month: "short", day: "numeric" }).format(date);
 }
 
 export function displayName(value: unknown, fallback = "Unknown"): string {
@@ -82,11 +85,11 @@ export function formatRelativeTime(value: unknown): string {
   return future ? `in ${days}d` : `${days}d ago`;
 }
 
-export function formatUpdatedAt(iso: unknown): string {
+export function formatUpdatedAt(iso: unknown, locale?: string): string {
   if (!iso) return "Waiting for usage";
   const date = new Date(String(iso));
   if (Number.isNaN(date.valueOf())) return "Waiting for usage";
-  return new Intl.DateTimeFormat(undefined, {
+  return new Intl.DateTimeFormat(locale, {
     month: "short",
     day: "numeric",
     hour: "numeric",

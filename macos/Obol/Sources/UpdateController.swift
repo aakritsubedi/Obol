@@ -5,6 +5,7 @@ import Foundation
 #if canImport(FoundationNetworking)
 import FoundationNetworking
 #endif
+import ObolUpdateCore
 
 enum UpdateState: Equatable {
     case idle

@@ -37,27 +37,34 @@ Code's own status bar), per-source namespaces like `ccusage claude daily` (`--by
 
 ## 2. Priority 0 — Threshold notifications
 
-This is the explicit ask, and the current implementation is thinner than it looks.
+The client-side notifier was rewritten to fix its launch and dedup defects (see §2.1); the deeper
+design work below — moving detection into the daemon — is still open.
 
-### 2.1 What's broken today
+### 2.1 What's fixed and what remains
 
-`macos/Obol/Sources/Notifier.swift` is 23 lines and has five real defects:
+Fixed in `macos/Obol/Sources/Notifier.swift`:
 
-1. **The first crossing never fires.** `guard let previousStatus` (line 13) bails when `previousStatus`
-   is `nil`. Worse, `DaemonController.loadSnapshot()` (line 119) calls `observe()` with the disk
-   snapshot *before* any network fetch — so if you launch the app already over budget, that first call
-   silently seeds `previousStatus = .over` and you are never told.
-2. **Alerts overwrite each other.** The request identifier is the constant
-   `"obol-budget"` (line 20). A monthly alert replaces a daily one in Notification Center.
-3. **Alerts die with the UI.** Detection lives in the Swift app, not in the daemon that actually owns
-   state. Nothing survives an app restart, so a quit/relaunch re-arms and re-fires the same alert.
-4. **No cooldown.** A ratio oscillating around the threshold (80.1% → 79.8% → 80.2%) re-notifies on
-   every crossing.
-5. **Only two thresholds exist**, both in dollars, both after the fact. Nothing warns you *before* you
-   overspend — no burn-rate alert, no projection alert, no 5-hour block/token-limit alert.
+1. **Launching already over budget now alerts once.** The notifier compares a `status:period` key
+   against the previous observation instead of requiring a previous non-nil status, so the first
+   observation fires like any other transition, and a day that rolls over while still over budget
+   gets a fresh alert for the new period.
+2. **Alerts no longer overwrite each other.** The request identifier is unique per status+period
+   (`obol-budget.over:2026-08-21`), so simultaneous daily and monthly alerts both persist in
+   Notification Center.
+3. **Quit/relaunch no longer re-fires.** The last fired key and timestamp persist in UserDefaults;
+   recovery (`ok`) clears the record so the next crossing notifies again.
+4. **Flapping is suppressed.** A 30-minute cooldown guards against a ratio oscillating around a
+   threshold (80.1% → 79.8% → 80.2%) re-notifying on every crossing.
+5. **Denied permission is visible.** `requestPermission` reports its result through
+   `DaemonController.notificationsDenied`, and the popover settings panel shows an inline row that
+   deep-links to the notification pane of System Settings.
 
-Also: permission is requested in `DaemonController.init()` (line 29) with the result discarded
-(`{ _, _ in }`), and there is no UI anywhere showing that notifications were denied.
+Still open:
+
+1. **Detection lives in the Swift app, not in the daemon that owns state.** Nothing survives an app
+   restart beyond the single dedup record, and the dashboard has no alert surface at all.
+2. **Only two thresholds exist**, both in dollars, both after the fact. Nothing warns you *before*
+   you overspend — no burn-rate alert, no projection alert, no 5-hour block/token-limit alert.
 
 ### 2.2 Design: move detection into the daemon
 
@@ -160,24 +167,23 @@ Add `session` to `--sections`. New `dashboard/src/components/SessionTable.tsx`: 
 (ccusage's default order), showing session id, project, models, tokens, cost, last activity, with an
 expandable per-model breakdown. Add a "Top 5 sessions today" strip to the Today card.
 
-### 3.2 Projects view
+### 3.2 Projects view *(shipped)*
 
-Second ccusage call: `daily --instances --json --offline -z <TZ>`. Gives cost per project per day.
-New view with a project leaderboard and a stacked "cost by project over time" chart — `CostChart` can be
-generalized to take a `groupBy: "agent" | "project"` prop rather than hard-coding `row.agents`.
+Shipped: the daemon runs `daily --instances --json --offline -z <TZ>` as a second ccusage call, and
+the dashboard renders a project leaderboard (`ProjectTable.tsx`) plus a "cost by project over time"
+chart. Still open from this item: generalizing `CostChart`'s `groupBy` prop beyond `"agent" |
+"project"` if more groupings arrive.
 
 ### 3.3 Active block card
 
-We already *fetch* `blocks --active` but `normalizeBlocks` (`daemon/src/types.ts:214`) throws away
-everything except `burnRate.costPerHour` and `projection.totalCost`. Preserve `startTime`, `endTime`,
-`tokenCounts`, `entries`, and the projection's remaining-time fields, then build a proper card:
+The data layer is ready: `normalizeBlocks` (`daemon/src/types.ts:308`) preserves `startTime`,
+`endTime`, `tokenCounts`, `entries`, and the projection's remaining-time fields, and exposes
+`tokenLimitStatus`. What's missing is only presentation:
 
 - Ring showing elapsed / remaining in the 5-hour window
 - Tokens used vs `--token-limit`, with the warn threshold marked
 - Projected block total vs actual, side by side
-- Sparkline of the last blocks (`blocks --recent`)
-
-This replaces the current `BurnRate.tsx`, which is two numbers and an arrow.
+- Sparkline of recent blocks (`blocks --recent`)
 
 ### 3.4 Alerts view
 
@@ -188,18 +194,19 @@ and snooze controls. Makes the notification system inspectable instead of magic.
 
 ## 4. Priority 2 — Dashboard polish
 
-1. **Date range control** — `--since` / `--until` / `--last` wired to a range picker; right now History
-   dumps everything and `CostChart` just `.slice(-31)`s it (`CostChart.tsx:30`).
-2. **Dark mode** — every colour is a hard-coded light hex (`#f4f4f6`, `#111114`, …). Lift them into CSS
-   custom properties and add a `prefers-color-scheme` block. The menu bar app is already system-themed;
-   the dashboard is the odd one out.
+1. **Date range control** — `--since` / `--until` / `--last` wired to a range picker; the History
+   view currently bounds client-side to 7/30/90 days (`rangeRows` in `App.tsx`), which is fine, but
+   the daemon still re-parses the full configured window on every refresh.
+2. **Dark mode** *(shipped)* — `index.css` defines light and dark palettes as CSS custom properties
+   behind `prefers-color-scheme`; components reference tokens only.
 3. **Richer chart interaction** — the bars use `<title>` tooltips only. Add a hover crosshair with a
    real tooltip, click-to-filter on the legend, and a cost/tokens toggle instead of two stacked charts.
-4. **Comparison deltas** — "today vs your 7-day average", "this month vs last month". Trivial from data
-   already in the report, and it's the number people actually want.
+4. **Comparison deltas** *(shipped)* — "today vs your 7-day average" and "this month vs last month"
+   render in `TotalsCard` (`todayComparison` / `monthComparison` in `App.tsx`).
 5. **Budget pace line** — overlay expected-spend-by-now against actual on the daily chart.
 6. **Cost mode + week start selectors** in settings, feeding `--mode` and `--start-of-week`.
-7. **Export** — CSV / JSON download of the current view.
+7. **Export** *(shipped)* — CSV / JSON download of the current history view (builders in
+   `dashboard/src/export.ts`, covered by vitest).
 8. **Empty and error states** — several components render bare text; give them the same card treatment.
 
 ---
@@ -213,45 +220,44 @@ and snooze controls. Makes the notification system inspectable instead of magic.
   `refreshNow` (`daemon/src/index.ts:55`) — it's the right design.
 - **Surface ccusage's version** in the summary so the UI can warn when the pinned version drifts.
 - **Emit a `blocks` SSE frame** — block state changes far faster than daily totals.
-- **Tests.** There are none. `budget.ts`, the new `alerts.ts`, `normalizeReport`/`normalizeBlocks`, and
-  `periodMatchesToday` are all pure functions with sharp edges; they should have a vitest suite before
-  the alert engine lands on top of them.
+- **Tests.** The pure core is covered: the daemon has vitest suites for `budget.ts`, `cache.ts`
+  (`buildSummary`), `time.ts`, and the `types.ts` normalizers, and the dashboard covers `format.ts`,
+  `totals.ts`, and the export builders. Still untested: the daemon's server/watcher/ccusage glue
+  (integration-shaped; needs fixture processes or injected transports) and every React component.
 
 ---
 
 ## 6. Bugs found while reading
 
-**B1 — Monthly budget can be evaluated against the wrong month.**
-`buildSummary` (`daemon/src/cache.ts:80`) takes `report.monthly[report.monthly.length - 1]` as "this
-month". If there's no usage yet in the current month, that's *last* month's row, and the monthly budget
-ratio — and therefore the monthly notification — is computed from the wrong number. Fix: match the row
-by the current `YYYY-MM` key in the user's timezone, exactly as `periodMatchesToday` does for daily,
-and fall back to zero rather than to a stale row.
+**B1 — Monthly budget evaluated against the wrong month.** *(fixed)* `buildSummary`
+(`daemon/src/cache.ts:78`) now matches the monthly row against the current `YYYY-MM` key in the
+user's timezone via `periodMatchesMonth`, and falls back to zero rather than to a stale row.
 
-**B2 — First-run notification suppression.** Covered in §2.1(1); calling it out separately because it
-is a correctness bug, not just a design gap.
+**B2 — First-run notification suppression.** *(fixed)* Covered in §2.1; the notifier now alerts on
+the first observation instead of silently seeding state.
 
-**B3 — Ordering is assumed, not requested.** `modelRowsFor` (`dashboard/src/components/totals.ts:76`)
-and the monthly lookup above both assume ascending order from ccusage. Pass `--order asc` explicitly
-so a ccusage default change can't silently invert the dashboard.
+**B3 — Ordering is assumed, not requested.** The daemon sorts rows itself after normalization
+(`sortRowsAscending` in `daemon/src/types.ts`), but ccusage's own ordering is still relied on for
+`modelRowsFor` (`dashboard/src/components/totals.ts:76`) and the monthly lookup. Passing
+`--order asc` explicitly would make a ccusage default change unable to silently invert the dashboard.
 
-**B4 — Notification permission result discarded** (`DaemonController.swift:29`). A denied permission is
-indistinguishable from a working one, from the user's perspective.
+**B4 — Notification permission result discarded.** *(fixed)* The authorization result now flows
+through `DaemonController.notificationsDenied` into the popover settings panel (§2.1).
 
 ---
 
 ## 7. Suggested sequencing
 
-| Step | Work | Rough size |
-|---|---|---|
-| 1 | Fix B1 + B3, add vitest coverage for `budget.ts` and the normalizers | S |
-| 2 | `alerts.ts` + `alert-ledger.ts` + config fields + API endpoints | M |
-| 3 | Rewrite `Notifier.swift`: per-alert ids, ack, actions, permission state | M |
-| 4 | Alert settings in both UIs (`BudgetSettings.tsx`, popover `settingsPanel`) | S |
-| 5 | Preserve block fields in `normalizeBlocks`; ship the active-block card | M |
-| 6 | Sessions view (`--sections session`) | M |
-| 7 | Projects view (`daily --instances`) | M |
-| 8 | Date-range control, dark mode, chart interaction | M |
-| 9 | Cost mode / week start / export / deltas | S |
+| Step | Work | Rough size | Status |
+|---|---|---|---|
+| 1 | Fix B1 + B3, add vitest coverage for `budget.ts` and the normalizers | S | B1 + tests done; B3 open |
+| 2 | `alerts.ts` + `alert-ledger.ts` + config fields + API endpoints | M | open |
+| 3 | Rewrite `Notifier.swift`: per-alert ids, ack, actions, permission state | M | client-side fixes shipped (§2.1); daemon-driven alerts remain step 2+ |
+| 4 | Alert settings in both UIs (`BudgetSettings.tsx`, popover `settingsPanel`) | S | denied-permission row shipped; full alert settings open |
+| 5 | Preserve block fields in `normalizeBlocks`; ship the active-block card | M | data layer done; card open |
+| 6 | Sessions view (`--sections session`) | M | open |
+| 7 | Projects view (`daily --instances`) | M | shipped |
+| 8 | Date-range control, dark mode, chart interaction | M | dark mode shipped; rest open |
+| 9 | Cost mode / week start / export / deltas | S | export + deltas shipped; cost mode + week start open |
 
-Steps 1–4 deliver the notification ask end to end. Everything after is dashboard depth.
+Steps 2–4 deliver the notification ask end to end. Everything after is dashboard depth.

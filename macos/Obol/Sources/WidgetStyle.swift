@@ -51,12 +51,14 @@ enum WidgetStyle {
         /// Today's total. Display-size numerals need tightening; SF Pro's
         /// default tracking is set for text, not for 38pt figures.
         static let hero = Font.system(size: 38, weight: .bold)
-        static let heroTracking: CGFloat = -1
+        static let heroTracking: CGFloat = -1.2
 
         /// Card title — "Today", "Settings".
         static let title = Font.system(size: 13)
-        /// Subsection label — "By provider".
-        static let sectionLabel = Font.system(size: 12)
+        /// Subsection label — "By provider". Small size plus positive
+        /// tracking reads as a quiet overline above the rows it names.
+        static let sectionLabel = Font.system(size: 11)
+        static let sectionLabelTracking: CGFloat = 0.4
         /// Provider names, amounts, the settings toggle.
         static let row = Font.system(size: 13)
         static let status = Font.system(size: 13, weight: .medium)

@@ -19,10 +19,11 @@ import ProviderTable from "./components/ProviderTable";
 import Ticker from "./components/Ticker";
 import TodayCard, { type WeekSummary } from "./components/TodayCard";
 import TotalsCard from "./components/TotalsCard";
+import { type ExportMetric, exportCsv, exportJson } from "./export";
 
 type HistoryPeriod = "daily" | "weekly" | "monthly";
 type HistoryRange = 7 | 30 | 90;
-type ChartMetric = "cost" | "tokens";
+type ChartMetric = ExportMetric;
 
 function loadingSummary(): Summary {
   return {
@@ -100,11 +101,6 @@ function comparison(delta: number, baseline: number) {
   return { delta, ratio: baseline > 0 ? delta / baseline : null, baseline };
 }
 
-function exportValue(value: unknown): string {
-  if (value === null || value === undefined) return "";
-  return String(value).replace(/"/g, '""');
-}
-
 function download(name: string, body: string, type: string): void {
   const url = URL.createObjectURL(new Blob([body], { type }));
   const link = document.createElement("a");
@@ -112,47 +108,6 @@ function download(name: string, body: string, type: string): void {
   link.download = name;
   link.click();
   URL.revokeObjectURL(url);
-}
-
-function exportCsv(rows: UsageRow[], metric: ChartMetric): string {
-  const header = [
-    "metric",
-    "period",
-    "group",
-    "costUSD",
-    "totalTokens",
-    "inputTokens",
-    "outputTokens",
-    "cacheReadTokens",
-  ];
-  const values = rows.flatMap((row) => {
-    const groups = row.agents.length
-      ? row.agents.map((agent) => ({
-          group: agent.agent,
-          cost: agent.totalCost,
-          tokens: agent.totalTokens,
-          input: agent.inputTokens,
-          output: agent.outputTokens,
-          cache: agent.cacheReadTokens,
-        }))
-      : [
-          {
-            group: String((row as UsageRow & { project?: string }).project || row.agent || "All"),
-            cost: row.totalCost,
-            tokens: row.totalTokens,
-            input: row.inputTokens,
-            output: row.outputTokens,
-            cache: row.cacheReadTokens,
-          },
-        ];
-    return groups.map((group) =>
-      [metric, row.period, group.group, group.cost, group.tokens, group.input, group.output, group.cache]
-        .map(exportValue)
-        .map((value) => `"${value}"`)
-        .join(","),
-    );
-  });
-  return `${header.join(",")}\n${values.join("\n")}\n`;
 }
 
 export default function App() {
@@ -271,7 +226,7 @@ export default function App() {
   function downloadCurrentJson() {
     download(
       `obol-${period}-${activeRange}d.json`,
-      JSON.stringify({ period, rangeDays: activeRange, metric, rows }, null, 2),
+      exportJson({ period, rangeDays: activeRange, metric, rows }),
       "application/json",
     );
   }

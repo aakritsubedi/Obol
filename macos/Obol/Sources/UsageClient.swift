@@ -145,10 +145,12 @@ struct RuntimeState: Decodable {
 }
 
 struct UsageClient {
-    private func url(path: String, baseURL: URL, token: String) -> URL {
-        var components = URLComponents(url: baseURL.appendingPathComponent(path), resolvingAgainstBaseURL: false)!
-        components.queryItems = [URLQueryItem(name: "t", value: token)]
-        return components.url!
+    /// The daemon accepts the token as a header or query parameter; the header
+    /// is preferred so the token never appears in a URL.
+    private func request(path: String, baseURL: URL, token: String) -> URLRequest {
+        var request = URLRequest(url: baseURL.appendingPathComponent(path))
+        request.setValue(token, forHTTPHeaderField: "x-token")
+        return request
     }
 
     func summary(baseURL: URL, token: String) async throws -> UsageSummary {
@@ -160,14 +162,14 @@ struct UsageClient {
     }
 
     func refresh(baseURL: URL, token: String) async throws -> UsageSummary {
-        var request = URLRequest(url: url(path: "api/refresh", baseURL: baseURL, token: token))
+        var request = self.request(path: "api/refresh", baseURL: baseURL, token: token)
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         return try await perform(request)
     }
 
     func update(config: WidgetConfig, baseURL: URL, token: String) async throws -> WidgetConfig {
-        var request = URLRequest(url: url(path: "api/config", baseURL: baseURL, token: token))
+        var request = self.request(path: "api/config", baseURL: baseURL, token: token)
         request.httpMethod = "PUT"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.httpBody = try JSONEncoder().encode(config)
@@ -175,7 +177,7 @@ struct UsageClient {
     }
 
     private func get<T: Decodable>(path: String, baseURL: URL, token: String) async throws -> T {
-        try await perform(URLRequest(url: url(path: path, baseURL: baseURL, token: token)))
+        try await perform(request(path: path, baseURL: baseURL, token: token))
     }
 
     private func perform<T: Decodable>(_ request: URLRequest) async throws -> T {
@@ -201,6 +203,27 @@ struct UsageClient {
         formatter.minimumFractionDigits = 2
         formatter.maximumFractionDigits = 2
         return formatter.string(from: NSNumber(value: value)) ?? "0.00"
+    }
+
+    /// Compact token count, e.g. `1.2M`.
+    ///
+    /// Tokens are context next to the dollar figure, so they collapse to one
+    /// decimal in K/M/B instead of printing full digits.
+    static func compactTokens(_ value: Double) -> String {
+        let formatter = NumberFormatter()
+        formatter.numberStyle = .decimal
+        formatter.minimumFractionDigits = 0
+        formatter.maximumFractionDigits = 1
+        switch value {
+        case 1_000_000_000...:
+            return (formatter.string(from: NSNumber(value: value / 1_000_000_000)) ?? "0") + "B"
+        case 1_000_000...:
+            return (formatter.string(from: NSNumber(value: value / 1_000_000)) ?? "0") + "M"
+        case 1_000...:
+            return (formatter.string(from: NSNumber(value: value / 1_000)) ?? "0") + "K"
+        default:
+            return formatter.string(from: NSNumber(value: value.rounded())) ?? "0"
+        }
     }
 }
 

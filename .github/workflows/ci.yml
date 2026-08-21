@@ -19,16 +19,14 @@ jobs:
         with:
           node-version: 20
           cache: npm
-      - uses: actions/setup-go@v5
-        with:
-          go-version: stable
       - run: npm ci
       - run: npm run lint
       - run: npm run typecheck
       - run: npm test
       - run: ./scripts/check-version.sh --no-tag
-      - run: go install github.com/rhysd/actionlint/cmd/actionlint@v1.7.7
-      - run: "$HOME/go/bin/actionlint"
+      - uses: rhysd/actionlint@v1
+        with:
+          version: 1.7.7
 
   macos:
     runs-on: macos-15

@@ -26,13 +26,11 @@ The ETag is persisted and sent as If-None-Match. A 304 is a successful no-change
 
 ## Trust model
 
-What protects the user: TLS to api.github.com / objects.githubusercontent.com against the system trust store. That is the real boundary. Plus the SHA-256 digest carried over that same channel, which makes the download tamper-evident at the CDN edge — it adds no trust beyond the API response, but it catches corruption and edge tampering. Plus bundle-ID and version assertions before the swap.
-
-What codesign --verify --deep --strict buys: proof the bundle's internal seal is intact. It proves nothing about who signed it — an ad-hoc signature has no identity, and anyone can produce an ad-hoc-signed Obol.app. Run it as an integrity check; never describe it to users as authenticity verification.
-
-What is unavailable without a Developer ID: Team ID pinning (SUExpectedBundleTeamIdentifier, SecStaticCodeCheckValidityWithErrors with an certificate leaf[subject.OU] requirement). Leave a // TODO(dev-id): pin SecRequirement at the exact call site so it's a five-line change later.
-
-Because the ZIP arrives via URLSession and not a browser, it carries no com.apple.quarantine xattr, so the replaced app launches without the right-click-Open dance. That is a genuine win over "download the DMG again" — and precisely why the checks above must be done properly, since you are stepping around the prompt that would otherwise be the user's last warning.
+The canonical statement of the updater trust model lives in [SECURITY.md](../SECURITY.md). In short:
+TLS to GitHub is the real boundary, the SHA-256 digest makes the download tamper-evident, and
+`codesign --verify --deep --strict` is an integrity check only — an ad-hoc signature proves nothing
+about identity. Because the ZIP arrives without a quarantine xattr, those checks are what stand in
+for the right-click-Open prompt the user never sees.
 
 ## Local fixture server
 

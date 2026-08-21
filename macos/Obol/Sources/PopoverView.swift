@@ -1,3 +1,4 @@
+import AppKit
 import SwiftUI
 
 struct PopoverView: View {
@@ -96,6 +97,10 @@ struct PopoverView: View {
         .font(WidgetStyle.TypeScale.hero)
         .lineLimit(1)
         .minimumScaleFactor(0.6)
+        // Roll the digits when a refresh lands rather than snapping to the
+        // new total; the bar below eases with the same curve.
+        .contentTransition(.numericText())
+        .animation(.easeOut(duration: 0.35), value: value)
         .accessibilityElement(children: .ignore)
         .accessibilityLabel("Spent today")
         .accessibilityValue("\(value) US dollars")
@@ -106,6 +111,7 @@ struct PopoverView: View {
             Circle()
                 .fill(controller.liveColor)
                 .frame(width: 6, height: 6)
+                .modifier(PulsingDot(active: !controller.summary.stale))
             Text(controller.liveLabel)
                 .font(WidgetStyle.TypeScale.status)
         }
@@ -119,6 +125,7 @@ struct PopoverView: View {
         VStack(alignment: .leading, spacing: 10) {
             Text("By provider")
                 .font(WidgetStyle.TypeScale.sectionLabel)
+                .tracking(WidgetStyle.TypeScale.sectionLabelTracking)
                 .foregroundStyle(.secondary)
 
             if controller.summary.agents.isEmpty {
@@ -136,10 +143,23 @@ struct PopoverView: View {
                                 .frame(width: 7, height: 7)
                             Text(provider.agent.capitalized)
                             Spacer(minLength: 8)
+                            // Tokens are secondary context beside the money:
+                            // smaller, muted, and pinned to a fixed-width
+                            // column so the price stays the aligned anchor.
+                            Text(UsageClient.compactTokens(provider.totalTokens))
+                                .monospacedDigit()
+                                .font(WidgetStyle.TypeScale.caption)
+                                .foregroundStyle(.secondary)
+                                .frame(minWidth: 36, alignment: .trailing)
                             Text(UsageClient.currencySymbol + UsageClient.amount(provider.totalCost))
                                 .monospacedDigit()
                         }
                         .font(WidgetStyle.TypeScale.row)
+                        .accessibilityElement(children: .ignore)
+                        .accessibilityLabel(
+                            "\(provider.agent) \(UsageClient.compactTokens(provider.totalTokens)) tokens, "
+                                + "\(UsageClient.amount(provider.totalCost)) US dollars"
+                        )
                     }
                 }
             }
@@ -150,6 +170,7 @@ struct PopoverView: View {
         GeometryReader { geometry in
             let providers = controller.summary.agents.filter { $0.totalCost > 0 }
             let total = providers.reduce(0) { $0 + $1.totalCost }
+            let weights = providers.map(\.totalCost)
 
             HStack(spacing: 0) {
                 if total > 0 {
@@ -165,6 +186,7 @@ struct PopoverView: View {
                 }
             }
             .clipShape(Capsule())
+            .animation(.easeOut(duration: 0.35), value: weights)
         }
         .frame(height: 5)
         .accessibilityElement(children: .ignore)
@@ -217,6 +239,22 @@ struct PopoverView: View {
             }
             .font(WidgetStyle.TypeScale.row)
             .padding(.vertical, 14)
+
+            if controller.notificationsDenied {
+                hairline
+
+                HStack(spacing: 8) {
+                    Text("Budget alerts are disabled in System Settings.")
+                        .fixedSize(horizontal: false, vertical: true)
+                    Spacer(minLength: 8)
+                    Button("Open") { Self.openNotificationSettings() }
+                        .buttonStyle(.link)
+                }
+                .font(WidgetStyle.TypeScale.caption)
+                .foregroundStyle(.secondary)
+                .padding(.vertical, 14)
+                .accessibilityElement(children: .combine)
+            }
 
             hairline
 
@@ -324,6 +362,11 @@ struct PopoverView: View {
         return "\(short) (\(build))"
     }
 
+    private static func openNotificationSettings() {
+        guard let url = URL(string: "x-apple.systempreferences:com.apple.preference.notifications") else { return }
+        NSWorkspace.shared.open(url)
+    }
+
     // MARK: - Building blocks
 
     private var hairline: some View {
@@ -338,24 +381,7 @@ struct PopoverView: View {
         badge: Bool = false,
         action: @escaping () -> Void
     ) -> some View {
-        Button(action: action) {
-            Image(systemName: systemName)
-                .font(WidgetStyle.TypeScale.icon)
-                .frame(width: 22, height: 22)
-                .contentShape(Rectangle())
-                .overlay(alignment: .topTrailing) {
-                    if badge {
-                        Circle()
-                            .fill(Color.accentColor)
-                            .frame(width: 5, height: 5)
-                            .offset(x: 1, y: -1)
-                    }
-                }
-        }
-        .buttonStyle(.plain)
-        .foregroundStyle(.secondary)
-        .help(help)
-        .accessibilityLabel(badge ? "\(help), update available" : help)
+        IconButton(systemName: systemName, help: help, badge: badge, action: action)
     }
 
     private func providerColor(for name: String) -> Color {
@@ -366,6 +392,77 @@ struct PopoverView: View {
             return WidgetStyle.codex
         default:
             return .secondary
+        }
+    }
+}
+
+/// Toolbar-style glyph button. Hierarchical rendering softens the symbol;
+/// hovering lifts it to primary color over a faint rounded fill so the
+/// hit target is discoverable without adding chrome at rest.
+private struct IconButton: View {
+    let systemName: String
+    let help: String
+    var badge = false
+    let action: () -> Void
+
+    @State private var hovering = false
+
+    var body: some View {
+        Button(action: action) {
+            Image(systemName: systemName)
+                .font(WidgetStyle.TypeScale.icon)
+                .symbolRenderingMode(.hierarchical)
+                .frame(width: 24, height: 24)
+                .background(
+                    RoundedRectangle(cornerRadius: 6, style: .continuous)
+                        .fill(Color.primary.opacity(hovering ? 0.07 : 0))
+                )
+                .overlay(alignment: .topTrailing) {
+                    if badge {
+                        Circle()
+                            .fill(Color.accentColor)
+                            .frame(width: 5, height: 5)
+                            .offset(x: 1, y: -1)
+                    }
+                }
+                .foregroundStyle(hovering ? Color.primary : Color.secondary)
+                .animation(.easeOut(duration: 0.12), value: hovering)
+                .contentShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
+        }
+        .buttonStyle(.plain)
+        .onHover { hovering = $0 }
+        .help(help)
+        .accessibilityLabel(badge ? "\(help), update available" : help)
+    }
+}
+
+/// Breathing opacity for the live indicator; stays static when the popover
+/// is only showing cached data.
+private struct PulsingDot: ViewModifier {
+    let active: Bool
+    @State private var pulsing = false
+
+    func body(content: Content) -> some View {
+        content
+            .opacity(pulsing ? 0.45 : 1)
+            .onAppear {
+                guard active else { return }
+                start()
+            }
+            .onChange(of: active) { isLive in
+                if isLive {
+                    start()
+                } else {
+                    var transaction = Transaction()
+                    transaction.disablesAnimations = true
+                    withTransaction(transaction) { pulsing = false }
+                }
+            }
+    }
+
+    private func start() {
+        withAnimation(.easeInOut(duration: 1.5).repeatForever(autoreverses: true)) {
+            pulsing = true
         }
     }
 }

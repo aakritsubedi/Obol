@@ -7,7 +7,12 @@
 #   OBOL_VERSION   expected marketing version; defaults to root package.json.
 #   OUTPUT_DIR     where artifacts are written (default: <repo>/dist)
 #   SKIP_BUILD     set to 1 to reuse daemon/dashboard bundles already on disk
-#   AC_API_KEY_ID, AC_API_ISSUER, AC_API_KEY enable the untested notarization path.
+#   OBOL_VOLUME_NAME      mounted volume name; defaults to "Obol Installer",
+#                         which also becomes the installer window title
+#   OBOL_SKIP_DMG_LAYOUT  set to 1 to skip the drag-to-Applications window styling
+#   OBOL_DMG_BACKGROUND   path to a custom installer background PNG (@2x)
+#   AC_API_KEY_ID, AC_API_ISSUER, AC_API_KEY (App Store Connect API key .p8 body)
+#     enable the untested notarization path.
 set -eo pipefail
 export LANG=C
 export LC_ALL=C
@@ -20,8 +25,10 @@ OBOL_VERSION="$(printenv OBOL_VERSION 2>/dev/null || true)"
 CURRENT_PROJECT_VERSION="$(printenv CURRENT_PROJECT_VERSION 2>/dev/null || true)"
 SKIP_BUILD_VALUE="$(printenv SKIP_BUILD 2>/dev/null || true)"
 APP_NAME="Obol"
-VOLUME_NAME="Obol"
+VOLUME_NAME="$(printenv OBOL_VOLUME_NAME 2>/dev/null || true)"
 DERIVED_DATA="$ROOT/.xcodebuild"
+
+if [ -z "$VOLUME_NAME" ]; then VOLUME_NAME="$APP_NAME Installer"; fi
 
 if [ -z "$SIGN_IDENTITY" ]; then SIGN_IDENTITY="-"; fi
 if [ -z "$OUTPUT_DIR" ]; then OUTPUT_DIR="$ROOT/dist"; fi
@@ -119,47 +126,143 @@ fi
 AC_API_KEY_ID_VALUE="$(printenv AC_API_KEY_ID 2>/dev/null || true)"
 AC_API_ISSUER_VALUE="$(printenv AC_API_ISSUER 2>/dev/null || true)"
 AC_API_KEY_VALUE="$(printenv AC_API_KEY 2>/dev/null || true)"
+NOTARIZE_ENABLED=0
 if [ "$SIGN_IDENTITY" != "-" ] &&
    [ -n "$AC_API_KEY_ID_VALUE" ] &&
    [ -n "$AC_API_ISSUER_VALUE" ] &&
    [ -n "$AC_API_KEY_VALUE" ]; then
   # Intentionally env-gated and untested without a Developer ID account.
+  # notarytool authenticates with an App Store Connect API key (--key/--key-id/--issuer);
+  # the --key flag needs the .p8 in a file, so the key body from AC_API_KEY is staged
+  # outside STAGING (which becomes the DMG source folder) and cleaned up on exit.
+  NOTARIZE_ENABLED=1
+  AC_KEY_FILE="$(mktemp "/tmp/$APP_NAME-authkey.XXXXXX")"
+  trap 'rm -rf "$STAGING" "$AC_KEY_FILE"' EXIT
+  printf '%s\n' "$AC_API_KEY_VALUE" > "$AC_KEY_FILE"
+  NOTARIZE_ARGS=(--key "$AC_KEY_FILE" --key-id "$AC_API_KEY_ID_VALUE" --issuer "$AC_API_ISSUER_VALUE")
+fi
+
+if [ "$NOTARIZE_ENABLED" = "1" ]; then
   echo "==> Notarizing app"
-  xcrun notarytool submit "$STAGING/$APP_NAME.app" \
-    --apple-id "$AC_API_KEY_ID_VALUE" \
-    --issuer "$AC_API_ISSUER_VALUE" \
-    --key "$AC_API_KEY_VALUE" \
-    --wait
+  xcrun notarytool submit "$STAGING/$APP_NAME.app" "${NOTARIZE_ARGS[@]}" --wait
   xcrun stapler staple "$STAGING/$APP_NAME.app"
   rm -f "$ZIP_PATH"
   ditto -c -k --sequesterRsrc --keepParent "$STAGING/$APP_NAME.app" "$ZIP_PATH"
 fi
 
 echo "==> Creating disk image"
-hdiutil create \
-  -volname "$VOLUME_NAME" \
-  -srcfolder "$STAGING" \
-  -fs HFS+ \
-  -format UDZO \
-  -imagekey zlib-level=9 \
-  -quiet \
-  "$DMG_PATH"
+
+# Drag-to-Applications layout, Grok-installer style: a near-white background
+# scattered with cursor motifs, Obol.app on the left, the Applications folder
+# (with its native alias-arrow badge) on the right, 128px icons, no chrome.
+# Finder automation writes the icon positions into the volume's .DS_Store, so
+# this needs a read-write round trip before final UDZO conversion. If Finder
+# automation is unavailable (e.g. no Automation permission), fall back to a
+# plain but perfectly valid disk image.
+STYLE_DMG=1
+if [ "${OBOL_SKIP_DMG_LAYOUT:-}" = "1" ]; then STYLE_DMG=0; fi
+
+BG_PATH="$STAGING/.background/background.png"
+if [ "$STYLE_DMG" = "1" ]; then
+  mkdir -p "$STAGING/.background"
+  if [ -n "${OBOL_DMG_BACKGROUND:-}" ] && [ -f "${OBOL_DMG_BACKGROUND}" ]; then
+    cp "${OBOL_DMG_BACKGROUND}" "$BG_PATH"
+  elif ! osascript -l JavaScript "$SCRIPT_DIR/make-dmg-background.js" "$BG_PATH" 660 420 >/dev/null; then
+    echo "warning: could not generate installer background; using a plain disk image" >&2
+    STYLE_DMG=0
+  fi
+fi
+
+RW_DMG=""
+if [ "$STYLE_DMG" = "1" ]; then
+  echo "==> Laying out installer window"
+  RW_WORK="$(mktemp -d "/tmp/$APP_NAME-rw.XXXXXX")"
+  RW_DMG="$RW_WORK/installer.dmg"
+  trap 'rm -rf "$STAGING" "${AC_KEY_FILE:-}" "${RW_WORK:-}"' EXIT
+
+  hdiutil create \
+    -volname "$VOLUME_NAME" \
+    -srcfolder "$STAGING" \
+    -fs HFS+ \
+    -format UDRW \
+    -quiet \
+    "$RW_DMG"
+
+  if [ -d "/Volumes/$VOLUME_NAME" ]; then
+    echo "error: a disk named \"/Volumes/$VOLUME_NAME\" is already mounted; eject it and retry," >&2
+    echo "or pass a different name via OBOL_VOLUME_NAME" >&2
+    exit 1
+  fi
+
+  DEV="$(hdiutil attach "$RW_DMG" -nobrowse -noautoopen | awk '/^\/dev\//{print $1}' | head -1)"
+  MOUNT="/Volumes/$VOLUME_NAME"
+  if [ ! -d "$MOUNT" ] || [ -z "$DEV" ]; then
+    echo "warning: could not mount the read-write image; using a plain disk image" >&2
+    hdiutil detach "$DEV" -force >/dev/null 2>&1 || true
+    STYLE_DMG=0
+  fi
+fi
+
+if [ "$STYLE_DMG" = "1" ]; then
+  sleep 1
+  LAYOUT_OK=1
+  osascript <<OSA || LAYOUT_OK=0
+tell application "Finder"
+  tell disk "$VOLUME_NAME"
+    open
+    set current view of container window to icon view
+    set toolbar visible of container window to false
+    set statusbar visible of container window to false
+    set bounds of container window to {300, 150, 960, 570}
+    set vo to the icon view options of container window
+    set arrangement of vo to not arranged
+    set icon size of vo to 128
+    set text size of vo to 16
+    set background picture of vo to file ".background:background.png"
+    set position of item "$APP_NAME.app" to {165, 205}
+    set position of item "Applications" to {495, 205}
+    close
+    open
+    update without registering applications
+  end tell
+end tell
+OSA
+  if [ "$LAYOUT_OK" = "1" ]; then
+    sleep 2
+  else
+    echo "warning: Finder styling failed (Automation permission?); keeping default window layout" >&2
+  fi
+
+  DETACHED=0
+  for _ in 1 2 3; do
+    if hdiutil detach "$DEV" >/dev/null 2>&1; then DETACHED=1; break; fi
+    sleep 2
+  done
+  if [ "$DETACHED" != "1" ]; then
+    hdiutil detach "$DEV" -force >/dev/null 2>&1 || true
+  fi
+
+  hdiutil convert "$RW_DMG" -format UDZO -imagekey zlib-level=9 -quiet -o "$DMG_PATH"
+  rm -rf "$RW_WORK"
+else
+  hdiutil create \
+    -volname "$VOLUME_NAME" \
+    -srcfolder "$STAGING" \
+    -fs HFS+ \
+    -format UDZO \
+    -imagekey zlib-level=9 \
+    -quiet \
+    "$DMG_PATH"
+fi
 
 if [ "$SIGN_IDENTITY" != "-" ]; then
   codesign --force --timestamp --sign "$SIGN_IDENTITY" "$DMG_PATH"
 fi
 
-if [ "$SIGN_IDENTITY" != "-" ] &&
-   [ -n "$AC_API_KEY_ID_VALUE" ] &&
-   [ -n "$AC_API_ISSUER_VALUE" ] &&
-   [ -n "$AC_API_KEY_VALUE" ]; then
+if [ "$NOTARIZE_ENABLED" = "1" ]; then
   # Intentionally env-gated and untested without a Developer ID account.
   echo "==> Notarizing disk image"
-  xcrun notarytool submit "$DMG_PATH" \
-    --apple-id "$AC_API_KEY_ID_VALUE" \
-    --issuer "$AC_API_ISSUER_VALUE" \
-    --key "$AC_API_KEY_VALUE" \
-    --wait
+  xcrun notarytool submit "$DMG_PATH" "${NOTARIZE_ARGS[@]}" --wait
   xcrun stapler staple "$DMG_PATH"
 fi
 

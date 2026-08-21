@@ -44,8 +44,6 @@ The DMG remains the manual install path. Verify its paired artifacts with:
     cd dist
     shasum -c SHA256SUMS
 
-The first in-app update is v0.2.0 → v0.2.1; users on 0.1.0 should install the v0.2.0 DMG manually.
-
 ## Build from source
 
     npm ci

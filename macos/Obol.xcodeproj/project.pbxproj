@@ -15,11 +15,14 @@
 		A10000010000000000000005 /* Notifier.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000010000000000000005 /* Notifier.swift */; };
 		A10000010000000000000011 /* UpdateController.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000010000000000000011 /* UpdateController.swift */; };
 		A10000010000000000000012 /* UpdateInstaller.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000010000000000000012 /* UpdateInstaller.swift */; };
-		A10000010000000000000013 /* SemanticVersion.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000010000000000000013 /* SemanticVersion.swift */; };
-		A10000010000000000000014 /* ReleaseFeed.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000010000000000000014 /* ReleaseFeed.swift */; };
-		A10000010000000000000015 /* ReleaseClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000010000000000000015 /* ReleaseClient.swift */; };
-		A10000010000000000000016 /* UpdateDefaults.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000010000000000000016 /* UpdateDefaults.swift */; };
 		A10000010000000000000010 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = A20000010000000000000010 /* Assets.xcassets */; };
+		AB0000000000000000000001 /* ObolUpdateCore in Frameworks */ = {isa = PBXBuildFile; productRef = AA0000000000000000000002 /* ObolUpdateCore */; };
+		AB0000000000000000000002 /* ReleaseClientTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000010000000000000021 /* ReleaseClientTests.swift */; };
+		AB0000000000000000000003 /* ReleaseFeedTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000010000000000000022 /* ReleaseFeedTests.swift */; };
+		AB0000000000000000000004 /* SemanticVersionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000010000000000000023 /* SemanticVersionTests.swift */; };
+		AB0000000000000000000005 /* BundleModule.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000010000000000000025 /* BundleModule.swift */; };
+		AB0000000000000000000006 /* Fixtures in Resources */ = {isa = PBXBuildFile; fileRef = A20000010000000000000024 /* Fixtures */; };
+		AB0000000000000000000007 /* ObolUpdateCore in Frameworks */ = {isa = PBXBuildFile; productRef = AA0000000000000000000003 /* ObolUpdateCore */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -34,10 +37,12 @@
 		A20000010000000000000010 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		A20000010000000000000011 /* UpdateController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UpdateController.swift; sourceTree = "<group>"; };
 		A20000010000000000000012 /* UpdateInstaller.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UpdateInstaller.swift; sourceTree = "<group>"; };
-		A20000010000000000000013 /* SemanticVersion.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SemanticVersion.swift; sourceTree = "<group>"; };
-		A20000010000000000000014 /* ReleaseFeed.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReleaseFeed.swift; sourceTree = "<group>"; };
-		A20000010000000000000015 /* ReleaseClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReleaseClient.swift; sourceTree = "<group>"; };
-		A20000010000000000000016 /* UpdateDefaults.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UpdateDefaults.swift; sourceTree = "<group>"; };
+		A20000010000000000000020 /* ObolUpdateCoreTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = ObolUpdateCoreTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		A20000010000000000000021 /* ReleaseClientTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReleaseClientTests.swift; sourceTree = "<group>"; };
+		A20000010000000000000022 /* ReleaseFeedTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReleaseFeedTests.swift; sourceTree = "<group>"; };
+		A20000010000000000000023 /* SemanticVersionTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SemanticVersionTests.swift; sourceTree = "<group>"; };
+		A20000010000000000000024 /* Fixtures */ = {isa = PBXFileReference; lastKnownFileType = folder; path = Fixtures; sourceTree = "<group>"; };
+		A20000010000000000000025 /* BundleModule.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BundleModule.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -45,6 +50,15 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				AB0000000000000000000001 /* ObolUpdateCore in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		A30000010000000000000006 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				AB0000000000000000000007 /* ObolUpdateCore in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -56,6 +70,7 @@
 			children = (
 				A40000010000000000000001 /* Sources */,
 				A40000010000000000000002 /* Resources */,
+				A40000010000000000000005 /* Tests */,
 				A40000010000000000000003 /* Products */,
 			);
 			sourceTree = "<group>";
@@ -71,20 +86,8 @@
 				A20000010000000000000005 /* Notifier.swift */,
 				A20000010000000000000011 /* UpdateController.swift */,
 				A20000010000000000000012 /* UpdateInstaller.swift */,
-				A40000010000000000000004 /* Update */,
 			);
 			path = Obol/Sources;
-			sourceTree = "<group>";
-		};
-		A40000010000000000000004 /* Update */ = {
-			isa = PBXGroup;
-			children = (
-				A20000010000000000000013 /* SemanticVersion.swift */,
-				A20000010000000000000014 /* ReleaseFeed.swift */,
-				A20000010000000000000015 /* ReleaseClient.swift */,
-				A20000010000000000000016 /* UpdateDefaults.swift */,
-			);
-			path = Update;
 			sourceTree = "<group>";
 		};
 		A40000010000000000000002 /* Resources */ = {
@@ -100,11 +103,42 @@
 			isa = PBXGroup;
 			children = (
 				A20000010000000000000000 /* Obol.app */,
+				A20000010000000000000020 /* ObolUpdateCoreTests.xctest */,
 			);
 			name = Products;
 			sourceTree = "<group>";
 		};
+		A40000010000000000000005 /* ObolUpdateCoreTests */ = {
+			isa = PBXGroup;
+			children = (
+				A20000010000000000000021 /* ReleaseClientTests.swift */,
+				A20000010000000000000022 /* ReleaseFeedTests.swift */,
+				A20000010000000000000023 /* SemanticVersionTests.swift */,
+				A20000010000000000000025 /* BundleModule.swift */,
+				A20000010000000000000024 /* Fixtures */,
+			);
+			path = Tests/ObolUpdateCoreTests;
+			sourceTree = "<group>";
+		};
 /* End PBXGroup section */
+
+/* Begin XCLocalSwiftPackageReference section */
+		AA0000000000000000000001 /* XCLocalSwiftPackageReference "." */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = ".";
+		};
+/* End XCLocalSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		AA0000000000000000000002 /* ObolUpdateCore */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = ObolUpdateCore;
+		};
+		AA0000000000000000000003 /* ObolUpdateCore */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = ObolUpdateCore;
+		};
+/* End XCSwiftPackageProductDependency section */
 
 /* Begin PBXNativeTarget section */
 		A50000010000000000000001 /* Obol */ = {
@@ -124,6 +158,29 @@
 			productName = Obol;
 			productReference = A20000010000000000000000 /* Obol.app */;
 			productType = "com.apple.product-type.application";
+			packageProductDependencies = (
+				AA0000000000000000000002 /* ObolUpdateCore */,
+			);
+		};
+		A50000010000000000000002 /* ObolUpdateCoreTests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = A70000010000000000000003 /* Build configuration list for PBXNativeTarget "ObolUpdateCoreTests" */;
+			buildPhases = (
+				A30000010000000000000005 /* Sources */,
+				A30000010000000000000006 /* Frameworks */,
+				A30000010000000000000007 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = ObolUpdateCoreTests;
+			productName = ObolUpdateCoreTests;
+			productReference = A20000010000000000000020 /* ObolUpdateCoreTests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
+			packageProductDependencies = (
+				AA0000000000000000000003 /* ObolUpdateCore */,
+			);
 		};
 /* End PBXNativeTarget section */
 
@@ -144,11 +201,15 @@
 				Base,
 			);
 			mainGroup = A40000010000000000000000;
+			packageReferences = (
+				AA0000000000000000000001 /* XCLocalSwiftPackageReference "." */,
+			);
 			productRefGroup = A40000010000000000000003 /* Products */;
 			projectDirPath = "";
 			projectRoot = "";
 			targets = (
 				A50000010000000000000001 /* Obol */,
+				A50000010000000000000002 /* ObolUpdateCoreTests */,
 			);
 		};
 /* End PBXProject section */
@@ -159,6 +220,14 @@
 			buildActionMask = 2147483647;
 			files = (
 				A10000010000000000000010 /* Assets.xcassets in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		A30000010000000000000007 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				AB0000000000000000000006 /* Fixtures in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -200,10 +269,17 @@
 				A10000010000000000000005 /* Notifier.swift in Sources */,
 				A10000010000000000000011 /* UpdateController.swift in Sources */,
 				A10000010000000000000012 /* UpdateInstaller.swift in Sources */,
-				A10000010000000000000013 /* SemanticVersion.swift in Sources */,
-				A10000010000000000000014 /* ReleaseFeed.swift in Sources */,
-				A10000010000000000000015 /* ReleaseClient.swift in Sources */,
-				A10000010000000000000016 /* UpdateDefaults.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		A30000010000000000000005 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				AB0000000000000000000002 /* ReleaseClientTests.swift in Sources */,
+				AB0000000000000000000003 /* ReleaseFeedTests.swift in Sources */,
+				AB0000000000000000000004 /* SemanticVersionTests.swift in Sources */,
+				AB0000000000000000000005 /* BundleModule.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -224,7 +300,7 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ARCHS = "$(ARCHS_STANDARD)";
 				CURRENT_PROJECT_VERSION = 1;
-				ONLY_ACTIVE_ARCH = NO;
+				ONLY_ACTIVE_ARCH = YES;
 				MACOSX_DEPLOYMENT_TARGET = 13.0;
 				MARKETING_VERSION = 0.1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.aakritsubedi.obol;
@@ -282,6 +358,52 @@
 			};
 			name = Release;
 		};
+		A80000010000000000000005 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ENABLE_MODULES = YES;
+				CODE_SIGNING_ALLOWED = NO;
+				CODE_SIGNING_REQUIRED = NO;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				GCC_C_LANGUAGE_STANDARD = gnu17;
+				GENERATE_INFOPLIST_FILE = YES;
+				ARCHS = "$(ARCHS_STANDARD)";
+				ONLY_ACTIVE_ARCH = YES;
+				MACOSX_DEPLOYMENT_TARGET = 13.0;
+				MARKETING_VERSION = 0.1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.aakritsubedi.obol.tests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = macosx;
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 1;
+			};
+			name = Debug;
+		};
+		A80000010000000000000006 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ENABLE_MODULES = YES;
+				CODE_SIGNING_ALLOWED = NO;
+				CODE_SIGNING_REQUIRED = NO;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				GCC_C_LANGUAGE_STANDARD = gnu17;
+				GENERATE_INFOPLIST_FILE = YES;
+				ARCHS = "$(ARCHS_STANDARD)";
+				ONLY_ACTIVE_ARCH = NO;
+				MACOSX_DEPLOYMENT_TARGET = 13.0;
+				MARKETING_VERSION = 0.1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.aakritsubedi.obol.tests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = macosx;
+				SWIFT_OPTIMIZATION_LEVEL = "-O";
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 1;
+			};
+			name = Release;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
@@ -299,6 +421,15 @@
 			buildConfigurations = (
 				A80000010000000000000001 /* Debug */,
 				A80000010000000000000002 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		A70000010000000000000003 /* Build configuration list for PBXNativeTarget "ObolUpdateCoreTests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				A80000010000000000000005 /* Debug */,
+				A80000010000000000000006 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;

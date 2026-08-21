@@ -9,7 +9,7 @@ on:
       version:
         description: Version to stamp for a workflow dry run
         required: true
-        default: 0.2.0
+        default: 0.1.0
         type: string
       dry_run:
         description: Build and upload artifacts without creating a GitHub Release
@@ -119,5 +119,3 @@ jobs:
             The app needs Node at /opt/homebrew/bin/node, /usr/local/bin/node, or /usr/bin/node. The first launch of the ad-hoc-signed DMG on another Mac needs right-click -> Open; in-app updates download the ZIP and skip that quarantine prompt after their integrity checks. Verify a download with:
 
                 cd dist && shasum -c SHA256SUMS
-
-            Users on 0.1.0 should reinstall the v0.2.0 DMG manually. The first genuine in-app update is v0.2.0 -> v0.2.1.

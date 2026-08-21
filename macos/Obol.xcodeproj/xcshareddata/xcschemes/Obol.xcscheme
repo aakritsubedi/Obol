@@ -20,6 +20,20 @@
                ReferencedContainer = "container:Obol.xcodeproj">
             </BuildableReference>
          </BuildActionEntry>
+         <BuildActionEntry
+            buildForTesting = "YES"
+            buildForRunning = "NO"
+            buildForProfiling = "NO"
+            buildForArchiving = "NO"
+            buildForAnalyzing = "NO">
+            <BuildableReference
+               BuildableIdentifier = "primary"
+               BlueprintIdentifier = "A50000010000000000000002"
+               BuildableName = "ObolUpdateCoreTests.xctest"
+               BlueprintName = "ObolUpdateCoreTests"
+               ReferencedContainer = "container:Obol.xcodeproj">
+            </BuildableReference>
+         </BuildActionEntry>
       </BuildActionEntries>
    </BuildAction>
    <TestAction
@@ -28,6 +42,16 @@
       selectedLauncherIdentifier = "Xcode.DebuggerFoundation.Launcher.LLDB"
       shouldUseLaunchSchemeArgsEnv = "YES">
       <Testables>
+         <TestableReference
+            skipped = "NO">
+            <BuildableReference
+               BuildableIdentifier = "primary"
+               BlueprintIdentifier = "A50000010000000000000002"
+               BuildableName = "ObolUpdateCoreTests.xctest"
+               BlueprintName = "ObolUpdateCoreTests"
+               ReferencedContainer = "container:Obol.xcodeproj">
+            </BuildableReference>
+         </TestableReference>
       </Testables>
    </TestAction>
    <LaunchAction

@@ -2,7 +2,7 @@
 
 ## Local daemon boundary
 
-The daemon binds to 127.0.0.1, not a network interface. It writes a per-process 32-byte hexadecimal token to ~/.obol/runtime.json; the native app and dashboard include that token on API requests. server.ts checks both the token and the request origin, accepting only loopback HTTP origins. Costs are ccusage estimates, and ccusage runs with --offline.
+The daemon binds to 127.0.0.1, not a network interface. It writes a per-process 32-byte hexadecimal token to ~/.obol/runtime.json; the native app sends it in an x-token header, and the dashboard receives it once via ?t=, keeps it in localStorage, and then sends it in headers too (Server-Sent Events cannot carry headers, so the event stream is the one request that still uses the query parameter). server.ts checks both the token and the request origin, accepting only loopback HTTP origins. Costs are ccusage estimates, and ccusage runs with --offline.
 
 ## Update trust model
 

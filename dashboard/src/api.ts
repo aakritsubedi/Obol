@@ -108,27 +108,28 @@ export interface WidgetConfig {
 }
 
 function token(): string {
-  return new URLSearchParams(window.location.search).get("t") || localStorage.getItem("obol-token") || "";
+  return localStorage.getItem("obol-token") || "";
 }
 
 export function rememberToken(): void {
   const value = new URLSearchParams(window.location.search).get("t");
-  if (value) localStorage.setItem("obol-token", value);
-}
-
-function endpoint(path: string): string {
-  const value = token();
-  if (!value) return path;
-  const url = new URL(path, window.location.origin);
-  url.searchParams.set("t", value);
-  return `${url.pathname}${url.search}`;
+  if (!value) return;
+  localStorage.setItem("obol-token", value);
+  // The native app hands the token over via ?t= once; drop it from the address
+  // bar and this history entry so it does not linger in browser history.
+  const url = new URL(window.location.href);
+  url.searchParams.delete("t");
+  window.history.replaceState(null, "", url);
 }
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
-  const response = await fetch(endpoint(path), {
-    ...init,
-    headers: { "Content-Type": "application/json", ...(init?.headers || {}) },
-  });
+  const headers: Record<string, string> = {
+    "Content-Type": "application/json",
+    ...(init?.headers as Record<string, string> | undefined),
+  };
+  const value = token();
+  if (value) headers["x-token"] = value;
+  const response = await fetch(path, { ...init, headers });
   if (!response.ok) {
     let message = `${response.status} ${response.statusText}`;
     try {
@@ -152,7 +153,16 @@ export const updateConfig = (patch: Partial<WidgetConfig>) =>
   });
 
 export function subscribe(onSummary: (summary: Summary) => void, onError: () => void): () => void {
-  const source = new EventSource(endpoint("/api/events"));
+  // EventSource cannot send headers, so the SSE stream is the one request that
+  // still authenticates with the token as a query parameter.
+  const value = token();
+  let url = "/api/events";
+  if (value) {
+    const target = new URL(url, window.location.origin);
+    target.searchParams.set("t", value);
+    url = `${target.pathname}${target.search}`;
+  }
+  const source = new EventSource(url);
   source.addEventListener("summary", (event) => {
     try {
       onSummary(JSON.parse((event as MessageEvent).data) as Summary);
