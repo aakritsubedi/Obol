@@ -41,3 +41,6 @@ xcuserdata/
 *.tmp
 *.swp
 *.swo
+
+# Cache
+.cache/

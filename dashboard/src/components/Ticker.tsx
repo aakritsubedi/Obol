@@ -1,6 +1,6 @@
 import type { Summary } from "../api";
-import { providerColor } from "./CostChart";
-import { displayName, formatCurrency } from "./format";
+import { ProviderLogo, providerName } from "../providers";
+import { formatCurrency } from "./format";
 
 interface Props {
   summary: Summary;
@@ -26,11 +26,8 @@ export default function Ticker({ summary }: Props) {
               className="flex shrink-0 items-center gap-1.5 text-[10px] text-surface/70"
               key={provider.agent}
             >
-              <i
-                className="h-1.5 w-1.5 shrink-0 rounded-full"
-                style={{ backgroundColor: providerColor(provider.agent) }}
-              />
-              <strong className="font-semibold text-surface">{displayName(provider.agent)}</strong>
+              <ProviderLogo agent={provider.agent} size={14} />
+              <strong className="font-semibold text-surface">{providerName(provider.agent)}</strong>
               <span>{formatCurrency(provider.totalCost)}</span>
               <em className={`not-italic tabular-nums ${active ? "text-ok" : "text-over"}`}>
                 {active ? "↗" : "↘"} {Math.round(share * 100)}%

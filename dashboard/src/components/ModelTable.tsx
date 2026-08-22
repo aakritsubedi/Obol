@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import type { Report } from "../api";
-import { providerColor } from "./CostChart";
+import { ProviderLogo, providerColor, providerName } from "../providers";
 import { displayName, formatCurrency, formatTokens } from "./format";
 import {
   type AggregatedModel,
@@ -207,10 +207,11 @@ function ProviderGroupRows({
             <span className="w-[15px] text-center text-lg leading-none text-muted" aria-hidden="true">
               {expanded ? "⌄" : "›"}
             </span>
-            <span className="flex min-w-0 items-baseline gap-2.5">
-              <strong className="text-xs font-semibold">{displayName(group.agent)}</strong>
-              <small className="text-[10px] text-muted">{models.length} models</small>
+            <span className="flex min-w-0 items-center gap-2">
+              <ProviderLogo agent={group.agent} size={16} />
+              <strong className="text-xs font-semibold">{providerName(group.agent)}</strong>
             </span>
+            <small className="text-[10px] text-muted">{models.length} models</small>
             <span className="ml-auto flex items-baseline gap-2.5 text-right">
               <strong className="text-xs font-semibold tabular-nums">{formatCurrency(cost)}</strong>
               <small className="text-[10px] text-muted">{formatTokens(tokens)} tokens</small>
@@ -236,7 +237,7 @@ function ModelRow({ model, totalCost }: { model: AggregatedModel; totalCost: num
         <div className="grid min-w-[150px] gap-1">
           <strong className="text-xs font-semibold">{displayName(modelName(model))}</strong>
           <span className="text-[10px]" style={{ color: providerColor(agent) }}>
-            {displayName(agent)}
+            {providerName(agent)}
           </span>
         </div>
       </td>

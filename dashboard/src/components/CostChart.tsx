@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import type { ProjectUsageRow, UsageRow } from "../api";
-import { displayName, formatCurrency, formatPeriod, formatTokens, numberValue, projectName } from "./format";
+import { ProviderLogo, providerColor, providerName } from "../providers";
+import { formatCurrency, formatPeriod, formatTokens, numberValue, projectName } from "./format";
 
 interface Props {
   rows: UsageRow[];
@@ -17,25 +18,6 @@ interface ChartGroup {
 interface ChartPoint {
   period: string;
   groups: ChartGroup[];
-}
-
-const knownProviderColors: Record<string, string> = {
-  claude: "#BF4724",
-  codex: "#1C855E",
-  gemini: "#2F6FD0",
-  cursor: "#6B4FA8",
-  copilot: "#8A6D3B",
-  openai: "#8B8F98",
-};
-
-const fallbackProviderColors = ["#2F6FD0", "#6B4FA8", "#8A6D3B", "#8B8F98"];
-
-export function providerColor(agent: string): string {
-  const normalized = agent.trim().toLowerCase();
-  if (knownProviderColors[normalized]) return knownProviderColors[normalized];
-  let hash = 0;
-  for (const character of normalized) hash = (hash * 31 + character.charCodeAt(0)) >>> 0;
-  return fallbackProviderColors[hash % fallbackProviderColors.length];
 }
 
 function groupValue(row: UsageRow, metric: Props["metric"]): number {
@@ -68,7 +50,7 @@ function chartPoints(rows: UsageRow[], metric: Props["metric"], groupBy: Props["
     groups: row.agents
       .map((agent) => ({
         key: agent.agent,
-        label: displayName(agent.agent),
+        label: providerName(agent.agent),
         value: numberValue(metric === "cost" ? agent.totalCost : agent.totalTokens),
       }))
       .sort((left, right) => right.value - left.value),
@@ -223,10 +205,7 @@ export default function CostChart({ rows, metric, groupBy = "agent" }: Props) {
                   hoveredGroups.map((group) => (
                     <div className="flex items-center justify-between gap-3" key={group.key}>
                       <span className="flex min-w-0 items-center gap-1.5 truncate">
-                        <i
-                          className="h-1.5 w-1.5 shrink-0 rounded-full"
-                          style={{ backgroundColor: providerColor(group.key) }}
-                        />
+                        <ProviderLogo agent={group.key} size={14} />
                         {group.label}
                       </span>
                       <strong className="tabular-nums">
@@ -245,7 +224,7 @@ export default function CostChart({ rows, metric, groupBy = "agent" }: Props) {
             {groupKeys.map((key) => {
               const label =
                 points.flatMap((point) => point.groups).find((group) => group.key === key)?.label ||
-                displayName(key);
+                providerName(key);
               const hidden = hiddenGroups.has(key);
               return (
                 <button
@@ -255,7 +234,7 @@ export default function CostChart({ rows, metric, groupBy = "agent" }: Props) {
                   aria-pressed={!hidden}
                   onClick={() => toggleGroup(key)}
                 >
-                  <i className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: providerColor(key) }} />
+                  <ProviderLogo agent={key} size={14} />
                   {label}
                 </button>
               );

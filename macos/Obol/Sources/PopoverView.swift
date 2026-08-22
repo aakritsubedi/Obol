@@ -143,11 +143,9 @@ struct PopoverView: View {
                     .padding(.bottom, 2)
                 VStack(alignment: .leading, spacing: 7) {
                     ForEach(controller.summary.agents) { provider in
-                        HStack(spacing: 9) {
-                            Circle()
-                                .fill(providerColor(for: provider.agent))
-                                .frame(width: 7, height: 7)
-                            Text(provider.agent.capitalized)
+                        HStack(spacing: 10) {
+                            ProviderBadge(agent: provider.agent, size: 20)
+                            Text(ProviderCatalog.name(for: provider.agent))
                             Spacer(minLength: 8)
                             // Tokens are secondary context beside the money:
                             // smaller, muted, and pinned to a fixed-width
@@ -163,7 +161,8 @@ struct PopoverView: View {
                         .font(WidgetStyle.TypeScale.row)
                         .accessibilityElement(children: .ignore)
                         .accessibilityLabel(
-                            "\(provider.agent) \(UsageClient.compactTokens(provider.totalTokens)) tokens, "
+                            "\(ProviderCatalog.name(for: provider.agent)) "
+                                + "\(UsageClient.compactTokens(provider.totalTokens)) tokens, "
                                 + "\(UsageClient.amount(provider.totalCost)) US dollars"
                         )
                     }
@@ -182,7 +181,7 @@ struct PopoverView: View {
                 if total > 0 {
                     ForEach(providers) { provider in
                         Rectangle()
-                            .fill(providerColor(for: provider.agent))
+                            .fill(ProviderCatalog.color(for: provider.agent))
                             .frame(width: max(2, geometry.size.width * provider.totalCost / total))
                     }
                 } else {
@@ -388,17 +387,6 @@ struct PopoverView: View {
         action: @escaping () -> Void
     ) -> some View {
         IconButton(systemName: systemName, help: help, badge: badge, action: action)
-    }
-
-    private func providerColor(for name: String) -> Color {
-        switch name.lowercased() {
-        case "claude":
-            return WidgetStyle.claude
-        case "codex":
-            return WidgetStyle.codex
-        default:
-            return .secondary
-        }
     }
 }
 

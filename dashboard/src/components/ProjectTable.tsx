@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import type { ProjectUsageRow } from "../api";
-import { providerColor } from "./CostChart";
+import { providerColor } from "../providers";
 import { formatCurrency, formatTokens, projectName } from "./format";
 
 interface Props {

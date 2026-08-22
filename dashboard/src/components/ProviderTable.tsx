@@ -1,6 +1,6 @@
 import type { ProviderSummary } from "../api";
-import { providerColor } from "./CostChart";
-import { displayName, formatCurrency, formatTokens } from "./format";
+import { ProviderLogo, providerColor, providerName } from "../providers";
+import { formatCurrency, formatTokens } from "./format";
 
 interface Props {
   providers: ProviderSummary[];
@@ -39,15 +39,10 @@ export default function ProviderTable({ providers, total }: Props) {
                 className="grid grid-cols-[30px_minmax(0,1fr)_auto] items-center gap-[11px]"
                 key={provider.agent}
               >
-                <div
-                  className="grid h-[30px] w-[30px] place-items-center rounded-[9px] bg-wash text-xs font-bold"
-                  style={{ color }}
-                >
-                  {displayName(provider.agent).slice(0, 1)}
-                </div>
+                <ProviderLogo agent={provider.agent} size={30} />
                 <div className="min-w-0">
                   <div className="flex items-center justify-between gap-3.5 text-xs">
-                    <strong className="font-semibold">{displayName(provider.agent)}</strong>
+                    <strong className="font-semibold">{providerName(provider.agent)}</strong>
                     <span className="text-[11px] tabular-nums text-muted">{share.toFixed(0)}%</span>
                   </div>
                   <div className="my-2 h-1 overflow-hidden rounded-full bg-track">

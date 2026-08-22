@@ -13,12 +13,8 @@ enum WidgetStyle {
     /// Provider hues are tuned per appearance. The dark-mode values are chosen
     /// to glow slightly against a near-black card; the same values over a white
     /// popover fall below a comfortable contrast ratio, so light mode gets
-    /// deeper, more saturated variants.
-    static let claude = adaptive(
-        dark: NSColor(srgbRed: 0.85, green: 0.38, blue: 0.24, alpha: 1),
-        light: NSColor(srgbRed: 0.75, green: 0.28, blue: 0.14, alpha: 1)
-    )
-
+    /// deeper, more saturated variants. The full set lives in
+    /// ProviderCatalog, which mirrors the dashboard's provider config.
     static let codex = adaptive(
         dark: NSColor(srgbRed: 0.31, green: 0.75, blue: 0.57, alpha: 1),
         light: NSColor(srgbRed: 0.11, green: 0.52, blue: 0.37, alpha: 1)
@@ -36,7 +32,7 @@ enum WidgetStyle {
 
     static let hairline = Color.primary.opacity(0.09)
 
-    private static func adaptive(dark: NSColor, light: NSColor) -> Color {
+    static func adaptive(dark: NSColor, light: NSColor) -> Color {
         Color(nsColor: NSColor(name: nil) { appearance in
             appearance.bestMatch(from: [.aqua, .darkAqua]) == .darkAqua ? dark : light
         })
