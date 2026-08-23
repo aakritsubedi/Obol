@@ -16,6 +16,7 @@ import { formatCurrency, formatRelativeTime, formatUpdatedAt } from "./component
 import ModelTable from "./components/ModelTable";
 import ProjectTable from "./components/ProjectTable";
 import ProviderTable from "./components/ProviderTable";
+import ShareDialog from "./components/ShareDialog";
 import Ticker from "./components/Ticker";
 import TodayCard, { type Last7Summary } from "./components/TodayCard";
 import TotalsCard from "./components/TotalsCard";
@@ -142,6 +143,7 @@ export default function App() {
   const [error, setError] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
   const [exportOpen, setExportOpen] = useState(false);
+  const [shareOpen, setShareOpen] = useState(false);
 
   useEffect(() => {
     rememberToken();
@@ -296,6 +298,13 @@ export default function App() {
             aria-label="Refresh usage"
           >
             ↻ <span className="max-[440px]:hidden">{refreshing ? "Refreshing" : "Refresh"}</span>
+          </button>
+          <button
+            className="inline-flex items-center gap-1.5 rounded-full border border-ink bg-ink px-3 py-2 text-[11px] font-semibold text-surface transition hover:opacity-90 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink max-[520px]:px-2"
+            onClick={() => setShareOpen(true)}
+            aria-label="Share usage"
+          >
+            <span aria-hidden="true">↗</span><span className="max-[520px]:hidden">Share</span>
           </button>
           </div>
         </div>
@@ -534,6 +543,7 @@ export default function App() {
           </div>
         </div>
       )}
+      {shareOpen && <ShareDialog report={report} summary={summary} onClose={() => setShareOpen(false)} />}
     </div>
   );
 }
