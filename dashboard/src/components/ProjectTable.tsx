@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import type { ProjectUsageRow } from "../api";
-import { providerColor } from "../providers";
+import { projectColor } from "../providers";
 import { formatCurrency, formatTokens, projectName } from "./format";
 
 interface Props {
@@ -59,7 +59,7 @@ export default function ProjectTable({ projects }: Props) {
           </div>
           <h2 className="mt-1.5 text-[17px] font-bold tracking-[-0.025em]">Claude projects</h2>
           <p className="mt-1 text-[11px] text-muted">
-            Project grouping is Claude-scoped on ccusage ·{" "}
+            Claude-scoped · of {formatCurrency(total)} Claude spend ·{" "}
             {filtered.length > 5 && !showAll
               ? `showing top 5 of ${filtered.length}`
               : `${filtered.length} shown`}
@@ -115,7 +115,7 @@ export default function ProjectTable({ projects }: Props) {
                         <div className="flex min-w-0 items-center gap-2">
                           <i
                             className="h-2 w-2 shrink-0 rounded-full"
-                            style={{ backgroundColor: providerColor(project.key) }}
+                            style={{ backgroundColor: projectColor(project.key) }}
                           />
                           <span className="truncate font-medium" title={project.project}>
                             {project.project}
@@ -123,7 +123,7 @@ export default function ProjectTable({ projects }: Props) {
                           <span className="text-[10px] text-muted">{project.periods.size} days</span>
                         </div>
                       </td>
-                      <td className="px-3 py-3 text-right tabular-nums text-muted">{share.toFixed(1)}%</td>
+                      <td className="px-3 py-3 text-right tabular-nums text-muted">{share.toFixed(2)}%</td>
                       <td className="px-3 py-3 text-right tabular-nums text-muted">
                         {formatTokens(project.totalTokens)}
                       </td>

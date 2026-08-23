@@ -12,13 +12,14 @@ import {
 } from "./api";
 import BudgetSettings from "./components/BudgetSettings";
 import CostChart from "./components/CostChart";
-import { formatRelativeTime, formatUpdatedAt } from "./components/format";
+import { formatCurrency, formatRelativeTime, formatUpdatedAt } from "./components/format";
 import ModelTable from "./components/ModelTable";
 import ProjectTable from "./components/ProjectTable";
 import ProviderTable from "./components/ProviderTable";
 import Ticker from "./components/Ticker";
-import TodayCard, { type WeekSummary } from "./components/TodayCard";
+import TodayCard, { type Last7Summary } from "./components/TodayCard";
 import TotalsCard from "./components/TotalsCard";
+import WeeklyLeaders from "./components/WeeklyLeaders";
 import { type ExportMetric, exportCsv, exportJson } from "./export";
 
 type HistoryPeriod = "daily" | "weekly" | "monthly";
@@ -69,24 +70,26 @@ function dateKey(date: Date): string {
   return `${date.getFullYear()}-${month}-${day}`;
 }
 
-function weekSummaryFor(report: Report | null, todayPeriod: string): WeekSummary {
-  const empty: WeekSummary = { totalCost: 0, totalTokens: 0, activeDays: 0, averageDaily: 0 };
+// The hero card summarizes a trailing 7-day window ending today. It is
+// deliberately not the calendar week: the leaders section owns Sun–Sat and
+// says so, so the two windows never share one ambiguous "this week" label.
+function weekSummaryFor(report: Report | null, todayPeriod: string): Last7Summary {
+  const empty: Last7Summary = { totalCost: 0, totalTokens: 0, activeDays: 0, averageDaily: 0 };
   if (!report || !todayPeriod || periodDate(todayPeriod) === null) return empty;
 
   const todayKey = todayPeriod.slice(0, 10);
   const today = new Date(`${todayKey}T12:00:00`);
   if (!Number.isFinite(today.valueOf())) return empty;
 
-  const monday = new Date(today);
-  monday.setDate(monday.getDate() - ((monday.getDay() + 6) % 7));
-  const weekStart = dateKey(monday);
+  const start = new Date(today);
+  start.setDate(start.getDate() - 6);
+  const weekStart = dateKey(start);
   const dailyRows = report.daily.filter((row) => {
     const key = row.period.slice(0, 10);
     return key >= weekStart && key <= todayKey;
   });
-  const weeklyRow = report.weekly.find((row) => row.period.slice(0, 10) === weekStart);
-  const totalCost = weeklyRow?.totalCost ?? dailyRows.reduce((sum, row) => sum + row.totalCost, 0);
-  const totalTokens = weeklyRow?.totalTokens ?? dailyRows.reduce((sum, row) => sum + row.totalTokens, 0);
+  const totalCost = dailyRows.reduce((sum, row) => sum + row.totalCost, 0);
+  const totalTokens = dailyRows.reduce((sum, row) => sum + row.totalTokens, 0);
   const activeDays = dailyRows.filter((row) => row.totalCost > 0).length;
 
   return {
@@ -99,6 +102,23 @@ function weekSummaryFor(report: Report | null, todayPeriod: string): WeekSummary
 
 function comparison(delta: number, baseline: number) {
   return { delta, ratio: baseline > 0 ? delta / baseline : null, baseline };
+}
+
+function trailingDailyTrend(report: Report | null, todayPeriod: string) {
+  if (!report || !todayPeriod) return { points: [], averageDaily: 0, comparison: null };
+  const todayKey = todayPeriod.slice(0, 10);
+  const points = report.daily
+    .filter((row) => row.period.slice(0, 10) <= todayKey)
+    .slice(-30)
+    .map((row) => ({ period: row.period, value: row.totalCost }));
+  const prior = points.filter((point) => point.period.slice(0, 10) < todayKey);
+  const averageDaily = prior.length ? prior.reduce((sum, point) => sum + point.value, 0) / prior.length : 0;
+  const today = points.at(-1)?.value || 0;
+  return {
+    points,
+    averageDaily,
+    comparison: averageDaily > 0 ? comparison(today - averageDaily, averageDaily) : null,
+  };
 }
 
 function download(name: string, body: string, type: string): void {
@@ -121,6 +141,7 @@ export default function App() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
+  const [exportOpen, setExportOpen] = useState(false);
 
   useEffect(() => {
     rememberToken();
@@ -201,8 +222,13 @@ export default function App() {
   const activeRange = availableRanges.includes(range)
     ? range
     : availableRanges[availableRanges.length - 1] || 7;
+  useEffect(() => {
+    if (activeRange <= 7 && period !== "daily") setPeriod("daily");
+    else if (activeRange <= 30 && period === "monthly") setPeriod("daily");
+  }, [activeRange, period]);
   const rows = useMemo(() => rangeRows(report?.[period] || [], activeRange), [activeRange, period, report]);
   const projects = report?.projects || [];
+  const projectTotal = projects.reduce((sum, row) => sum + row.totalCost, 0);
   const weekSummary = useMemo(
     () => weekSummaryFor(report, summary.today.period),
     [report, summary.today.period],
@@ -222,6 +248,10 @@ export default function App() {
     if (!current || !previous) return null;
     return comparison(current.totalCost - previous.totalCost, previous.totalCost);
   }, [report, summary.today.period]);
+  const dailyTrend = useMemo(
+    () => trailingDailyTrend(report, summary.today.period),
+    [report, summary.today.period],
+  );
 
   function downloadCurrentJson() {
     download(
@@ -237,14 +267,15 @@ export default function App() {
 
   return (
     <div className="min-h-screen overflow-x-hidden bg-surface text-ink">
-      <header className="sticky top-0 z-20 mx-auto flex max-w-[1244px] items-center justify-between gap-5 border-b border-hairline bg-surface/90 px-8 py-3.5 backdrop-blur-xl max-[760px]:px-[18px]">
-        <div className="flex min-w-0 items-center gap-3">
+      <header className="sticky top-0 z-20 mx-auto flex max-w-[1244px] flex-col gap-2 border-b border-hairline bg-surface/90 px-8 py-3.5 backdrop-blur-xl max-[760px]:px-[18px]">
+        <div className="flex w-full items-center justify-between gap-5">
+          <div className="flex min-w-0 items-center gap-3">
           <span className="whitespace-nowrap text-sm font-bold tracking-[-0.02em]">Obol</span>
           <span className="inline-flex min-h-7 items-center gap-1.5 whitespace-nowrap rounded-full bg-wash px-2.5 py-1.5 text-[11px] text-subtle max-[760px]:hidden">
-            ◷ Local data · {summary.agents.length} providers
+            ◷ Local data · {summary.agents.length} active today
           </span>
-        </div>
-        <div className="flex items-center gap-2.5 max-[440px]:gap-1.5">
+          </div>
+          <div className="flex items-center gap-2.5 max-[440px]:gap-1.5">
           <div
             className={`inline-flex min-h-7 items-center gap-1.5 rounded-full px-2.5 py-1.5 text-[11px] ${summary.stale ? "bg-warn-soft text-warn-strong" : "bg-ok-soft text-ok-strong"}`}
           >
@@ -259,27 +290,41 @@ export default function App() {
             ⚙ <span className="max-[520px]:hidden">Settings</span>
           </button>
           <button
-            className="rounded-full bg-ink px-3.5 py-2 text-[11px] font-semibold text-surface transition hover:opacity-85 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink disabled:cursor-default disabled:opacity-50 max-[440px]:px-2.5"
+            className="rounded-full border border-hairline bg-transparent px-3 py-2 text-[11px] font-semibold text-muted transition hover:bg-wash hover:text-ink focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink disabled:cursor-default disabled:opacity-50 max-[440px]:px-2.5"
             onClick={() => void doRefresh()}
             disabled={refreshing}
             aria-label="Refresh usage"
           >
             ↻ <span className="max-[440px]:hidden">{refreshing ? "Refreshing" : "Refresh"}</span>
           </button>
+          </div>
         </div>
+        <nav className="flex w-full items-center gap-1 overflow-x-auto border-t border-hairline pt-2" aria-label="Dashboard sections">
+          {[
+            ["Week", "#week-leaders"],
+            ["History", "#history"],
+            ["Providers", "#providers"],
+            ["Models", "#models"],
+            ["Projects", "#projects"],
+          ].map(([label, href]) => (
+            <a className="shrink-0 rounded-full px-3 py-1 text-[11px] text-muted transition hover:bg-wash hover:text-ink" href={href} key={href}>
+              {label}
+            </a>
+          ))}
+        </nav>
       </header>
       <main
-        className="mx-auto max-w-[1180px] px-8 pb-28 pt-12 max-[760px]:px-[18px] max-[760px]:pt-[34px]"
+        className="mx-auto max-w-[1180px] px-8 pb-28 pt-8 max-[760px]:px-[18px] max-[760px]:pt-[26px]"
         aria-busy={loading}
       >
-        <div className="mb-7">
+        <div className="mb-5">
           <h1 className="text-[44px] font-bold leading-none tracking-[-0.05em] max-[760px]:text-[38px] max-[440px]:text-[34px]">
             Token cost
           </h1>
           <p className="mt-2.5 text-xs text-muted">
             ◷{" "}
             {summary.updatedAt
-              ? `Usage updated ${formatUpdatedAt(summary.updatedAt)}`
+              ? `Usage updated ${formatUpdatedAt(summary.updatedAt)} · ${Intl.DateTimeFormat().resolvedOptions().timeZone}`
               : "Usage waiting for first refresh"}
           </p>
         </div>
@@ -290,17 +335,21 @@ export default function App() {
           </div>
         )}
 
-        <div className="grid grid-cols-[minmax(0,1.35fr)_minmax(280px,.65fr)] gap-10 max-[760px]:grid-cols-1 max-[760px]:gap-0 pb-8">
-          <TodayCard summary={summary} week={weekSummary} />
+        <div className="grid grid-cols-[minmax(0,1.35fr)_minmax(280px,.65fr)] gap-8 pb-5 max-[760px]:grid-cols-1 max-[760px]:gap-0">
+          <TodayCard summary={summary} week={weekSummary} trend={dailyTrend} />
           <TotalsCard
             report={report}
             summary={summary}
+            config={config}
             todayComparison={todayComparison}
             monthComparison={monthComparison}
           />
         </div>
 
-        <section className="border-t border-dashed py-12" aria-labelledby="history-heading">
+        <Ticker summary={summary} />
+        <WeeklyLeaders report={report} />
+
+        <section className="border-t border-dashed py-12" id="history" aria-labelledby="history-heading">
           <div className="mb-[22px] flex items-start justify-between gap-[18px] max-[760px]:flex-wrap">
             <div>
               <div
@@ -319,17 +368,22 @@ export default function App() {
                 className="flex gap-0.5 rounded-full border border-hairline bg-panel p-[3px]"
                 aria-label="History period"
               >
-                {(["daily", "weekly", "monthly"] as HistoryPeriod[]).map((value) => (
-                  <button
-                    className={`rounded-full border-0 px-2.5 py-1.5 text-[11px] ${period === value ? "bg-card font-semibold text-ink shadow-[0_1px_3px_rgba(0,0,0,.08)]" : "bg-transparent text-muted"}`}
-                    key={value}
-                    type="button"
-                    onClick={() => setPeriod(value)}
-                    aria-pressed={period === value}
-                  >
-                    {value}
-                  </button>
-                ))}
+                {(["daily", "weekly", "monthly"] as HistoryPeriod[]).map((value) => {
+                  const disabled =
+                    value === "weekly" ? activeRange <= 7 : value === "monthly" ? activeRange <= 30 : false;
+                  return (
+                    <button
+                      className={`rounded-full border-0 px-2.5 py-1.5 text-[11px] ${disabled ? "cursor-not-allowed text-muted opacity-35" : period === value ? "bg-card font-semibold text-ink shadow-[0_1px_3px_rgba(0,0,0,.08)]" : "bg-transparent text-muted"}`}
+                      key={value}
+                      type="button"
+                      onClick={() => setPeriod(value)}
+                      aria-pressed={period === value}
+                      disabled={disabled}
+                    >
+                      {value}
+                    </button>
+                  );
+                })}
               </div>
               <div
                 className="flex gap-0.5 rounded-full border border-hairline bg-panel p-[3px]"
@@ -363,34 +417,55 @@ export default function App() {
                   </button>
                 ))}
               </div>
-              <div className="flex gap-1">
+              <div className="relative">
                 <button
-                  className="rounded-full border border-hairline bg-transparent px-2.5 py-1.5 text-[11px] text-muted transition hover:bg-wash"
+                  className="inline-flex h-8 items-center gap-1.5 rounded-full border border-hairline bg-transparent px-3 text-[11px] font-medium text-muted transition hover:bg-wash hover:text-ink"
                   type="button"
-                  onClick={downloadCurrentCsv}
+                  aria-haspopup="menu"
+                  aria-expanded={exportOpen}
+                  onClick={() => setExportOpen((value) => !value)}
                 >
-                  CSV
+                  <span aria-hidden="true" className="text-sm leading-none">↓</span> Export <span aria-hidden="true" className="ml-0.5 text-[10px]">▾</span>
                 </button>
-                <button
-                  className="rounded-full border border-hairline bg-transparent px-2.5 py-1.5 text-[11px] text-muted transition hover:bg-wash"
-                  type="button"
-                  onClick={downloadCurrentJson}
-                >
-                  JSON
-                </button>
+                {exportOpen && (
+                  <div className="absolute right-0 top-[calc(100%+6px)] z-10 grid w-40 gap-0.5 overflow-hidden rounded-xl border border-hairline bg-card p-1.5 shadow-[0_12px_30px_rgba(0,0,0,.16)]" role="menu">
+                    <button
+                      className="flex w-full items-center rounded-lg px-3 py-2.5 text-left text-[11px] text-ink hover:bg-wash"
+                      type="button"
+                      role="menuitem"
+                      onClick={() => {
+                        downloadCurrentCsv();
+                        setExportOpen(false);
+                      }}
+                    >
+                      Download CSV
+                    </button>
+                    <button
+                      className="flex w-full items-center rounded-lg px-3 py-2.5 text-left text-[11px] text-ink hover:bg-wash"
+                      type="button"
+                      role="menuitem"
+                      onClick={() => {
+                        downloadCurrentJson();
+                        setExportOpen(false);
+                      }}
+                    >
+                      Download JSON
+                    </button>
+                  </div>
+                )}
               </div>
             </div>
           </div>
           <CostChart rows={rows} metric={metric} />
         </section>
 
-        <div className="border-y border-hairline">
+        <div className="border-y border-hairline" id="providers">
           <ProviderTable providers={summary.agents} total={summary.today.totalCost} />
         </div>
-        <ModelTable report={report} />
+        <ModelTable report={report} period={period} />
         {projects.length > 0 && (
           <>
-            <section className="border-t border-hairline py-8" aria-labelledby="project-chart-heading">
+            <section className="border-t border-hairline py-8" id="projects" aria-labelledby="project-chart-heading">
               <div className="mb-[22px]">
                 <div
                   className="text-[10px] font-semibold uppercase tracking-[0.13em] leading-tight text-muted"
@@ -398,7 +473,13 @@ export default function App() {
                 >
                   Project history
                 </div>
-                <h2 className="mt-1.5 text-[17px] font-bold tracking-[-0.025em]">Cost by Claude project</h2>
+                <h2 className="mt-1.5 flex flex-wrap items-center gap-2 text-[17px] font-bold tracking-[-0.025em]">
+                  Cost by Claude project
+                  <span className="rounded-full bg-wash px-2 py-0.5 text-[10px] font-semibold text-subtle">Claude only</span>
+                </h2>
+                <p className="mt-1 text-[11px] text-muted">
+                  Last {activeRange} days · of {formatCurrency(projectTotal)} Claude spend
+                </p>
               </div>
               <CostChart rows={rangeRows(projects, activeRange)} metric="cost" groupBy="project" />
             </section>
@@ -415,7 +496,6 @@ export default function App() {
           on this Mac. <span className="px-1.5">•</span> Last refresh {formatRelativeTime(summary.updatedAt)}
         </footer>
       </main>
-      <Ticker summary={summary} />
       {settingsOpen && config && (
         <div
           className="fixed inset-0 z-50 grid place-items-center overflow-y-auto bg-ink/30 px-4 py-8 backdrop-blur-sm max-[760px]:py-5"

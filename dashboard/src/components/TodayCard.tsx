@@ -1,7 +1,7 @@
 import type { Summary } from "../api";
 import { formatCurrency, formatTokens } from "./format";
 
-export interface WeekSummary {
+export interface Last7Summary {
   totalCost: number;
   totalTokens: number;
   activeDays: number;
@@ -10,10 +10,39 @@ export interface WeekSummary {
 
 interface Props {
   summary: Summary;
-  week: WeekSummary;
+  week: Last7Summary;
+  trend: {
+    points: { period: string; value: number }[];
+    comparison: { ratio: number | null } | null;
+  };
 }
 
-export default function TodayCard({ summary, week }: Props) {
+function Sparkline({ points }: { points: { period: string; value: number }[] }) {
+  if (points.length < 2) return null;
+  const max = Math.max(...points.map((point) => point.value), 1);
+  const coordinates = points
+    .map((point, index) => `${(index / (points.length - 1)) * 100},${28 - (point.value / max) * 24}`)
+    .join(" ");
+  return (
+    <svg
+      className="mt-3 h-8 w-full overflow-visible"
+      viewBox="0 0 100 28"
+      preserveAspectRatio="none"
+      role="img"
+      aria-label="30-day spend trend"
+    >
+      <polyline
+        points={coordinates}
+        fill="none"
+        className="stroke-ink"
+        strokeWidth="1.5"
+        vectorEffect="non-scaling-stroke"
+      />
+    </svg>
+  );
+}
+
+export default function TodayCard({ summary, week, trend }: Props) {
   const modelCount = summary.today.modelsUsed?.length || 0;
 
   return (
@@ -31,32 +60,33 @@ export default function TodayCard({ summary, week }: Props) {
           </div>
           <p className="mt-1 text-xs text-muted">Current day spend</p>
         </div>
-        <div
-          className={`inline-flex items-center gap-1.5 text-[11px] font-semibold ${summary.stale ? "text-warn-strong" : "text-ok-strong"}`}
-        >
-          <span className={`h-1.5 w-1.5 rounded-full ${summary.stale ? "bg-warn" : "bg-ok"}`} />
-          {summary.stale ? "Cached" : "Live"}
-        </div>
       </div>
 
-      <div className="mt-5 text-[clamp(58px,7vw,92px)] font-bold tabular-nums leading-[0.92] tracking-[-0.055em]">
+      <div className="mt-4 text-[clamp(58px,7vw,84px)] font-bold tabular-nums leading-[0.92] tracking-[-0.055em]">
         {formatCurrency(summary.today.totalCost)}
       </div>
-      <p className="mt-3 text-xs text-muted">
-        {summary.agents.length} providers · {modelCount} models
-      </p>
+      <div className="mt-2.5 flex flex-wrap items-center gap-2 text-xs text-muted">
+        <span>
+          {summary.agents.length} {summary.agents.length === 1 ? "provider" : "providers"} active today ·{" "}
+          {modelCount} {modelCount === 1 ? "model" : "models"}
+        </span>
+        {trend.comparison && trend.comparison.ratio !== null && (
+          <span
+            className={`rounded-full px-2 py-1 text-[10px] font-semibold ${trend.comparison.ratio < 0 ? "bg-ok-soft text-ok-strong" : "bg-warn-soft text-warn-strong"}`}
+          >
+            {trend.comparison.ratio < 0 ? "−" : "+"}
+            {Math.abs(trend.comparison.ratio * 100).toFixed(0)}% vs 30d avg
+          </span>
+        )}
+      </div>
+      <Sparkline points={trend.points} />
 
-      <div className="mt-8 border-t border-hairline pt-5">
+      <div className="mt-5 border-t border-hairline pt-4">
         <div className="flex items-baseline justify-between gap-4">
           <div>
-            <div className="text-sm font-semibold tracking-[-0.015em]">This week</div>
-            <p className="mt-1 text-xs text-muted">A quick view of the current week</p>
+            <div className="text-sm font-semibold tracking-[-0.015em]">Last 7 days</div>
+            <p className="mt-1 text-xs text-muted">Trailing window ending today</p>
           </div>
-          <span className="whitespace-nowrap text-[11px] font-semibold tabular-nums text-subtle">
-            {week.activeDays
-              ? `${week.activeDays} active ${week.activeDays === 1 ? "day" : "days"}`
-              : "No activity yet"}
-          </span>
         </div>
         <div className="mt-5 grid grid-cols-2 gap-x-5 gap-y-5 min-[540px]:grid-cols-4">
           <div className="min-w-0">

@@ -1,7 +1,7 @@
 import { access } from "node:fs/promises";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
-import { PROVIDER_CONFIGS, providerConfig, providerColor, providerName } from "./providers";
+import { PROVIDER_CONFIGS, projectColor, providerColor, providerConfig, providerName } from "./providers";
 
 describe("provider catalog", () => {
   it("has unique ids, names, hex colors, and website urls", () => {
@@ -66,5 +66,25 @@ describe("provider catalog", () => {
   it("handles empty or missing agents", () => {
     expect(providerName("")).toBe("Unknown");
     expect(providerConfig("").color).toMatch(/^#[0-9a-fA-F]{6}$/);
+  });
+});
+
+describe("project palette", () => {
+  it("is deterministic per project key", () => {
+    expect(projectColor("voicepal")).toBe(projectColor("voicepal"));
+    expect(projectColor("Voicepal")).toBe(projectColor("voicepal"));
+    expect(projectColor("voicepal")).toMatch(/^hsl\(\d+(\.\d+)? 55% 52%\)$/);
+    expect(projectColor("voicepal")).not.toBe(projectColor("meroshare"));
+  });
+
+  it("does not reuse the four-slot provider fallback for distinct projects", () => {
+    const keys = ["ai", "meroshare", "api", "web", "voicepal", "experiments", "aakrit"];
+    const colors = new Set(keys.map((key) => projectColor(key)));
+    // Golden-angle spacing should give every project a unique hue here.
+    expect(colors.size).toBe(keys.length);
+    const providerFallback = new Set(["#2F6FD0", "#6B4FA8", "#8A6D3B", "#8B8F98"]);
+    for (const color of colors) {
+      expect(providerFallback.has(color)).toBe(false);
+    }
   });
 });

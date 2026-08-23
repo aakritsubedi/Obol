@@ -24,7 +24,6 @@
     --color-over: #dc2626;
     --color-over-strong: #b91c1c;
   }
-
   @media (prefers-color-scheme: dark) {
     :root {
       --color-surface: #101114;
@@ -67,5 +66,28 @@
   }
   button {
     cursor: pointer;
+  }
+}
+
+/* Seamless ticker loop: content is rendered twice and scrolled by half. */
+@keyframes obol-marquee {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(-50%);
+  }
+}
+
+.obol-marquee {
+  animation: obol-marquee var(--marquee-duration, 24s) linear infinite;
+}
+.obol-marquee:hover {
+  animation-play-state: paused;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .obol-marquee {
+    animation: none;
   }
 }

@@ -69,11 +69,36 @@ export function providerColor(agent: string): string {
   return providerConfig(agent).color;
 }
 
+// Projects need their own palette: reusing the provider fallbacks collapses
+// every project into four near-identical chart colors. Spacing hues by the
+// golden angle keeps any two project colors visibly apart while staying
+// deterministic, so a project keeps its color across refreshes.
+export function projectColor(project: string): string {
+  const normalized = normalizeAgent(project);
+  const seed = normalized || project.toLowerCase();
+  let hash = 0;
+  for (let index = 0; index < seed.length; index++) {
+    hash = (hash * 31 + seed.charCodeAt(index)) >>> 0;
+  }
+  const hue = (hash * 137.508) % 360;
+  return `hsl(${hue.toFixed(1)} 55% 52%)`;
+}
+
 // Rounded badge carrying the provider's favicon on a neutral tile; agents
 // outside the catalog fall back to a brand-tinted monogram so untracked
 // providers stay visually distinct from misconfigured ones.
-export function ProviderLogo({ agent, size = 20 }: { agent: string; size?: number }) {
+export function ProviderLogo({
+  agent,
+  size = 20,
+  color,
+}: {
+  agent: string;
+  size?: number;
+  /** Overrides the monogram tile color, e.g. to match a project's chart color. */
+  color?: string;
+}) {
   const config = providerConfig(agent);
+  const tileColor = color ?? config.color;
   if (!config.website) {
     return (
       <span
@@ -83,7 +108,7 @@ export function ProviderLogo({ agent, size = 20 }: { agent: string; size?: numbe
           width: size,
           height: size,
           borderRadius: Math.max(4, Math.round(size * 0.31)),
-          backgroundColor: config.color,
+          backgroundColor: tileColor,
           fontSize: Math.max(8, Math.round(size * 0.46)),
         }}
       >
@@ -94,7 +119,7 @@ export function ProviderLogo({ agent, size = 20 }: { agent: string; size?: numbe
   return (
     <span
       aria-hidden="true"
-      className="inline-grid shrink-0 place-items-center overflow-hidden border border-hairline bg-card"
+      className="inline-grid shrink-0 place-items-center overflow-hidden bg-card"
       style={{
         width: size,
         height: size,

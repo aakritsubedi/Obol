@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import type { ProjectUsageRow, UsageRow } from "../api";
-import { ProviderLogo, providerColor, providerName } from "../providers";
+import { ProviderLogo, projectColor, providerColor, providerName } from "../providers";
 import { formatCurrency, formatPeriod, formatTokens, numberValue, projectName } from "./format";
 
 interface Props {
@@ -13,11 +13,28 @@ interface ChartGroup {
   key: string;
   label: string;
   value: number;
+  cost: number;
+  tokens: number;
 }
 
 interface ChartPoint {
   period: string;
   groups: ChartGroup[];
+}
+
+function niceScale(maxValue: number): { max: number; step: number } {
+  const roughStep = Math.max(maxValue / 4, 1);
+  const magnitude = 10 ** Math.floor(Math.log10(roughStep));
+  const normalized = roughStep / magnitude;
+  const factor = normalized <= 1 ? 1 : normalized <= 2 ? 2 : normalized <= 5 ? 5 : 10;
+  const step = factor * magnitude;
+  return { step, max: Math.ceil(maxValue / step) * step || step };
+}
+
+function labelIndexes(count: number): Set<number> {
+  if (count <= 1) return new Set([0]);
+  const step = Math.max(1, Math.ceil((count - 1) / 6));
+  return new Set([...Array(count).keys()].filter((index) => index % step === 0 || index === count - 1));
 }
 
 function groupValue(row: UsageRow, metric: Props["metric"]): number {
@@ -27,21 +44,45 @@ function groupValue(row: UsageRow, metric: Props["metric"]): number {
 function chartPoints(rows: UsageRow[], metric: Props["metric"], groupBy: Props["groupBy"]): ChartPoint[] {
   if (groupBy === "project") {
     const points = new Map<string, Map<string, ChartGroup>>();
+    const totals = new Map<string, number>();
     for (const row of rows) {
       const project = projectName(
         String((row as ProjectUsageRow).project || row.metadata?.project || "Unknown project"),
       );
       const groups = points.get(row.period) || new Map<string, ChartGroup>();
-      const current = groups.get(project) || { key: project, label: projectName(project), value: 0 };
+      const current = groups.get(project) || { key: project, label: projectName(project), value: 0, cost: 0, tokens: 0 };
       current.value += groupValue(row, metric);
+      current.cost += numberValue(row.totalCost);
+      current.tokens += numberValue(row.totalTokens);
       groups.set(project, current);
+      totals.set(project, (totals.get(project) || 0) + groupValue(row, metric));
       points.set(row.period, groups);
     }
+    const topProjects = [...totals.entries()]
+      .sort(([, left], [, right]) => right - left)
+      .slice(0, 6)
+      .map(([project]) => project);
     return [...points.entries()]
       .sort(([left], [right]) => left.localeCompare(right))
       .map(([period, groups]) => ({
         period,
-        groups: [...groups.values()].sort((left, right) => right.value - left.value),
+        groups: [...groups.values()]
+          .filter((group) => topProjects.includes(group.key))
+          .concat({
+            key: "__other__",
+            label: "Other",
+            value: [...groups.values()]
+              .filter((group) => !topProjects.includes(group.key))
+              .reduce((sum, group) => sum + group.value, 0),
+            cost: [...groups.values()]
+              .filter((group) => !topProjects.includes(group.key))
+              .reduce((sum, group) => sum + group.cost, 0),
+            tokens: [...groups.values()]
+              .filter((group) => !topProjects.includes(group.key))
+              .reduce((sum, group) => sum + group.tokens, 0),
+          })
+          .filter((group) => group.value > 0)
+          .sort((left, right) => right.value - left.value),
       }));
   }
 
@@ -52,6 +93,8 @@ function chartPoints(rows: UsageRow[], metric: Props["metric"], groupBy: Props["
         key: agent.agent,
         label: providerName(agent.agent),
         value: numberValue(metric === "cost" ? agent.totalCost : agent.totalTokens),
+        cost: numberValue(agent.totalCost),
+        tokens: numberValue(agent.totalTokens),
       }))
       .sort((left, right) => right.value - left.value),
   }));
@@ -59,8 +102,18 @@ function chartPoints(rows: UsageRow[], metric: Props["metric"], groupBy: Props["
 
 export default function CostChart({ rows, metric, groupBy = "agent" }: Props) {
   const points = useMemo(() => chartPoints(rows, metric, groupBy), [groupBy, metric, rows]);
+  const colorFor = (key: string): string =>
+    groupBy === "project"
+      ? key === "__other__"
+        ? "#8B8F98"
+        : projectColor(key)
+      : providerColor(key);
   const groupKeys = useMemo(
-    () => [...new Set(points.flatMap((point) => point.groups.map((group) => group.key)))],
+    () => [...new Set(points.flatMap((point) => point.groups.map((group) => group.key)))].sort((left, right) => {
+      const leftValue = points.reduce((sum, point) => sum + (point.groups.find((group) => group.key === left)?.value || 0), 0);
+      const rightValue = points.reduce((sum, point) => sum + (point.groups.find((group) => group.key === right)?.value || 0), 0);
+      return rightValue - leftValue;
+    }),
     [points],
   );
   const [hiddenGroups, setHiddenGroups] = useState<Set<string>>(() => new Set());
@@ -75,10 +128,17 @@ export default function CostChart({ rows, metric, groupBy = "agent" }: Props) {
     ...point,
     groups: point.groups.filter((group) => !hiddenGroups.has(group.key)),
   }));
-  const max = Math.max(
+  const rawMax = Math.max(
     1,
     ...visiblePoints.map((point) => point.groups.reduce((sum, group) => sum + group.value, 0)),
   );
+  const scale = niceScale(rawMax);
+  const average = visiblePoints.length
+    ? visiblePoints.reduce(
+        (sum, point) => sum + point.groups.reduce((total, group) => total + group.value, 0),
+        0,
+      ) / visiblePoints.length
+    : 0;
   const width = 720;
   const height = 250;
   const left = 48;
@@ -89,12 +149,18 @@ export default function CostChart({ rows, metric, groupBy = "agent" }: Props) {
   const chartHeight = height - top - bottom;
   const slotWidth = points.length ? chartWidth / points.length : chartWidth;
   const barWidth = points.length ? Math.max(5, Math.min(28, slotWidth - 5)) : 12;
+  const xLabels = labelIndexes(points.length);
   const hoveredPoint = hoveredIndex === null ? null : points[hoveredIndex];
   const hoveredGroups = hoveredPoint?.groups.filter((group) => !hiddenGroups.has(group.key)) || [];
   const hoveredX = hoveredIndex === null ? 0 : left + (hoveredIndex + 0.5) * slotWidth;
 
-  function toggleGroup(key: string) {
+  function toggleGroup(key: string, compare = false) {
     setHiddenGroups((current) => {
+      const visible = groupKeys.filter((group) => !current.has(group));
+      if (!compare) {
+        if (visible.length === 1 && visible[0] === key) return new Set();
+        return new Set(groupKeys.filter((group) => group !== key));
+      }
       const next = new Set(current);
       if (next.has(key)) next.delete(key);
       else next.add(key);
@@ -118,10 +184,11 @@ export default function CostChart({ rows, metric, groupBy = "agent" }: Props) {
               aria-label={`${metric} over time`}
               onMouseLeave={() => setHoveredIndex(null)}
             >
-              {[0, 0.5, 1].map((ratio) => {
+              {[0, 1, 2, 3, 4].map((tick) => {
+                const ratio = tick / 4;
                 const y = top + chartHeight * (1 - ratio);
                 return (
-                  <g key={ratio}>
+                  <g key={tick}>
                     <line
                       x1={left}
                       x2={width - right}
@@ -131,9 +198,27 @@ export default function CostChart({ rows, metric, groupBy = "agent" }: Props) {
                       strokeWidth="1"
                     />
                     <text x={left - 8} y={y + 4} textAnchor="end" className="fill-muted text-[10px]">
-                      {metric === "cost" ? formatCurrency(max * ratio) : formatTokens(max * ratio)}
+                      {metric === "cost"
+                        ? formatCurrency(scale.max * ratio)
+                        : formatTokens(scale.max * ratio)}
                     </text>
                   </g>
+                );
+              })}
+              {points.map((point, index) => {
+                const day = new Date(`${point.period.slice(0, 10)}T12:00:00`).getDay();
+                if (day !== 0 && day !== 6) return null;
+                return (
+                  <rect
+                    key={`weekend-${point.period}-${index}`}
+                    x={left + index * slotWidth}
+                    y={top}
+                    width={slotWidth}
+                    height={chartHeight}
+                    fill="currentColor"
+                    className="text-wash"
+                    opacity=".7"
+                  />
                 );
               })}
               {visiblePoints.map((point, index) => {
@@ -142,7 +227,7 @@ export default function CostChart({ rows, metric, groupBy = "agent" }: Props) {
                 return (
                   <g key={`${point.period}-${index}`}>
                     {point.groups.map((group) => {
-                      const h = (group.value / max) * chartHeight;
+                      const h = (group.value / scale.max) * chartHeight;
                       const y = top + chartHeight - accumulated - h;
                       accumulated += h;
                       return (
@@ -153,13 +238,11 @@ export default function CostChart({ rows, metric, groupBy = "agent" }: Props) {
                           width={barWidth}
                           height={Math.max(0, h)}
                           rx="4"
-                          fill={providerColor(group.key)}
+                          fill={colorFor(group.key)}
                         />
                       );
                     })}
-                    {(index === 0 ||
-                      index === points.length - 1 ||
-                      index === Math.floor(points.length / 2)) && (
+                    {xLabels.has(index) && (
                       <text
                         x={x + barWidth / 2}
                         y={height - 10}
@@ -180,6 +263,27 @@ export default function CostChart({ rows, metric, groupBy = "agent" }: Props) {
                   </g>
                 );
               })}
+              {average > 0 && (
+                <>
+                  <line
+                    x1={left}
+                    x2={width - right}
+                    y1={top + chartHeight - (average / scale.max) * chartHeight}
+                    y2={top + chartHeight - (average / scale.max) * chartHeight}
+                    className="stroke-muted"
+                    strokeDasharray="5 4"
+                    strokeWidth="1"
+                  />
+                  <text
+                    x={width - right}
+                    y={top + chartHeight - (average / scale.max) * chartHeight - 5}
+                    textAnchor="end"
+                    className="fill-muted text-[10px]"
+                  >
+                    avg {metric === "cost" ? formatCurrency(average) : formatTokens(average)}
+                  </text>
+                </>
+              )}
               {hoveredIndex !== null && (
                 <line
                   x1={hoveredX}
@@ -205,7 +309,7 @@ export default function CostChart({ rows, metric, groupBy = "agent" }: Props) {
                   hoveredGroups.map((group) => (
                     <div className="flex items-center justify-between gap-3" key={group.key}>
                       <span className="flex min-w-0 items-center gap-1.5 truncate">
-                        <ProviderLogo agent={group.key} size={14} />
+                        <ProviderLogo agent={group.key} size={14} color={colorFor(group.key)} />
                         {group.label}
                       </span>
                       <strong className="tabular-nums">
@@ -218,24 +322,37 @@ export default function CostChart({ rows, metric, groupBy = "agent" }: Props) {
             )}
           </div>
           <div
-            className="flex flex-wrap items-center gap-1.5 pl-12 pt-1 text-[10px] text-muted"
+            className="flex flex-wrap items-center gap-x-4 gap-y-2 pt-3 text-[10px] text-muted"
             aria-label="Chart legend"
           >
             {groupKeys.map((key) => {
               const label =
                 points.flatMap((point) => point.groups).find((group) => group.key === key)?.label ||
                 providerName(key);
+              const totalCost = points.reduce(
+                (sum, point) => sum + (point.groups.find((group) => group.key === key)?.cost || 0),
+                0,
+              );
+              const totalTokens = points.reduce(
+                (sum, point) => sum + (point.groups.find((group) => group.key === key)?.tokens || 0),
+                0,
+              );
               const hidden = hiddenGroups.has(key);
               return (
                 <button
-                  className={`inline-flex items-center gap-1.5 rounded-full border border-hairline px-2 py-1 transition ${hidden ? "bg-transparent opacity-45" : "bg-wash"}`}
+                  className={`inline-flex items-center gap-2 rounded-full border border-hairline px-2.5 py-1.5 transition ${hidden ? "bg-transparent opacity-45" : "bg-wash"}`}
                   key={key}
                   type="button"
                   aria-pressed={!hidden}
-                  onClick={() => toggleGroup(key)}
+                  onClick={(event) => toggleGroup(key, event.shiftKey)}
                 >
-                  <ProviderLogo agent={key} size={14} />
-                  {label}
+                  <ProviderLogo agent={key} size={14} color={colorFor(key)} />
+                  <span className="font-medium text-ink">{label}</span>
+                  <span className="tabular-nums text-muted">
+                    {formatCurrency(totalCost)} · {formatTokens(
+                      totalTokens,
+                    )} tokens
+                  </span>
                 </button>
               );
             })}

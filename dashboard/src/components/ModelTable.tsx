@@ -15,18 +15,52 @@ import {
 
 interface Props {
   report: Report | null;
+  period: ReportPeriod;
 }
 
 const periodOptions: Array<{ value: ReportPeriod; label: string }> = [
   { value: "daily", label: "Daily" },
-  { value: "weekly", label: "Week" },
-  { value: "monthly", label: "Month" },
+  { value: "weekly", label: "Weekly" },
+  { value: "monthly", label: "Monthly" },
 ];
 
-export default function ModelTable({ report }: Props) {
-  const [period, setPeriod] = useState<ReportPeriod>("daily");
+type SortKey = "name" | "totalCost" | "inputTokens" | "outputTokens" | "cacheReadTokens" | "totalTokens";
+type SortDirection = "asc" | "desc";
+
+function sortModels(models: AggregatedModel[], key: SortKey, direction: SortDirection): AggregatedModel[] {
+  return [...models].sort((left, right) => {
+    const compared = key === "name"
+      ? modelName(left).localeCompare(modelName(right))
+      : Number(left[key]) - Number(right[key]);
+    return (direction === "asc" ? compared : -compared) || modelName(left).localeCompare(modelName(right));
+  });
+}
+
+function SortButton({ label, sortKey, active, direction, onSort }: {
+  label: string;
+  sortKey: SortKey;
+  active: boolean;
+  direction: SortDirection;
+  onSort: (key: SortKey) => void;
+}) {
+  return (
+    <button
+      className="inline-flex items-center gap-1 text-[10px] font-semibold uppercase tracking-[0.07em] text-muted hover:text-ink"
+      type="button"
+      onClick={() => onSort(sortKey)}
+      aria-label={`Sort by ${label}`}
+      aria-sort={active ? (direction === "asc" ? "ascending" : "descending") : "none"}
+    >
+      {label}<span aria-hidden="true">{active ? (direction === "asc" ? "↑" : "↓") : "↕"}</span>
+    </button>
+  );
+}
+
+export default function ModelTable({ report, period }: Props) {
   const [query, setQuery] = useState("");
   const [expandedAgents, setExpandedAgents] = useState<Set<string>>(() => new Set());
+  const [sortKey, setSortKey] = useState<SortKey>("totalCost");
+  const [sortDirection, setSortDirection] = useState<SortDirection>("desc");
   const availablePeriods = useMemo(
     () => (report ? periodOptions.filter((option) => periodHasModelData(report, option.value)) : []),
     [report],
@@ -46,7 +80,11 @@ export default function ModelTable({ report }: Props) {
   const search = query.trim().toLowerCase();
   const hasGroups = groups.length > 0;
   const allModels = hasGroups ? groups.flatMap((group) => group.models) : flatModels;
-  const visibleModels = allModels.filter((model) => modelName(model).toLowerCase().includes(search));
+  const visibleModels = sortModels(
+    allModels.filter((model) => modelName(model).toLowerCase().includes(search)),
+    sortKey,
+    sortDirection,
+  );
   const periodCost = report
     ? modelRowsFor(report, activePeriod).reduce((sum, row) => sum + row.totalCost, 0)
     : 0;
@@ -63,41 +101,31 @@ export default function ModelTable({ report }: Props) {
     });
   }
 
+  function changeSort(nextKey: SortKey) {
+    if (nextKey === sortKey) setSortDirection((value) => (value === "desc" ? "asc" : "desc"));
+    else {
+      setSortKey(nextKey);
+      setSortDirection(nextKey === "name" ? "asc" : "desc");
+    }
+  }
+
   return (
-    <section className="border-t border-hairline py-8" aria-labelledby="models-heading">
+    <section className="border-t border-hairline py-8" id="models" aria-labelledby="models-heading">
       <div className="mb-5 flex items-start justify-between gap-4 max-[760px]:flex-wrap">
         <div>
           <div
             className="text-[10px] font-semibold uppercase tracking-[0.13em] leading-tight text-muted"
             id="models-heading"
           >
-            Models
+            Usage by provider & model
           </div>
           <h2 className="mt-1.5 text-[17px] font-bold tracking-[-0.025em]">
-            {visibleModels.length} of {allModels.length} models{" "}
+            {visibleModels.length} of {allModels.length} {visibleModels.length === 1 ? "model" : "models"}{" "}
             <span className="text-[11px] font-medium tracking-normal text-muted">{periodLabel}</span>
           </h2>
         </div>
         {allModels.length > 0 && (
           <div className="flex items-center gap-2.5 max-[760px]:w-full max-[760px]:justify-between">
-            {availablePeriods.length > 1 && (
-              <div
-                className="flex gap-0.5 rounded-full border border-hairline bg-panel p-[3px]"
-                aria-label="Model time range"
-              >
-                {availablePeriods.map((option) => (
-                  <button
-                    className={`rounded-full border-0 px-2.5 py-1.5 text-[11px] ${activePeriod === option.value ? "bg-card font-semibold text-ink shadow-[0_1px_3px_rgba(0,0,0,.08)]" : "bg-transparent text-muted"}`}
-                    key={option.value}
-                    type="button"
-                    onClick={() => setPeriod(option.value)}
-                    aria-pressed={activePeriod === option.value}
-                  >
-                    {option.label}
-                  </button>
-                ))}
-              </div>
-            )}
             <label className="block w-[190px] max-[440px]:w-[150px]">
               <span className="sr-only">Search models</span>
               <input
@@ -120,23 +148,23 @@ export default function ModelTable({ report }: Props) {
           <table className="w-full min-w-[860px] border-collapse text-xs text-ink">
             <thead>
               <tr>
-                <th className="pb-3 text-left text-[10px] font-semibold uppercase tracking-[0.07em] text-muted">
-                  Model
+                <th className="pb-3 text-left">
+                  <SortButton label="Model" sortKey="name" active={sortKey === "name"} direction={sortDirection} onSort={changeSort} />
                 </th>
-                <th className="px-3 pb-3 text-right text-[10px] font-semibold uppercase tracking-[0.07em] text-muted">
-                  Cost
+                <th className="px-3 pb-3 text-right">
+                  <SortButton label="Cost" sortKey="totalCost" active={sortKey === "totalCost"} direction={sortDirection} onSort={changeSort} />
                 </th>
-                <th className="px-3 pb-3 text-right text-[10px] font-semibold uppercase tracking-[0.07em] text-muted">
-                  Input
+                <th className="px-3 pb-3 text-right">
+                  <SortButton label="Input" sortKey="inputTokens" active={sortKey === "inputTokens"} direction={sortDirection} onSort={changeSort} />
                 </th>
-                <th className="px-3 pb-3 text-right text-[10px] font-semibold uppercase tracking-[0.07em] text-muted">
-                  Output
+                <th className="px-3 pb-3 text-right">
+                  <SortButton label="Output" sortKey="outputTokens" active={sortKey === "outputTokens"} direction={sortDirection} onSort={changeSort} />
                 </th>
-                <th className="px-3 pb-3 text-right text-[10px] font-semibold uppercase tracking-[0.07em] text-muted">
-                  Cache read
+                <th className="px-3 pb-3 text-right">
+                  <SortButton label="Cache read" sortKey="cacheReadTokens" active={sortKey === "cacheReadTokens"} direction={sortDirection} onSort={changeSort} />
                 </th>
-                <th className="px-3 pb-3 text-right text-[10px] font-semibold uppercase tracking-[0.07em] text-muted">
-                  Total tokens
+                <th className="px-3 pb-3 text-right">
+                  <SortButton label="Total tokens" sortKey="totalTokens" active={sortKey === "totalTokens"} direction={sortDirection} onSort={changeSort} />
                 </th>
                 <th className="pb-3 text-right text-[10px] font-semibold uppercase tracking-[0.07em] text-muted">
                   Share
@@ -154,7 +182,7 @@ export default function ModelTable({ report }: Props) {
                       <ProviderGroupRows
                         key={group.agent}
                         group={group}
-                        models={models}
+                        models={sortModels(models, sortKey, sortDirection)}
                         expanded={expandedAgents.has(group.agent)}
                         onToggle={() => toggleAgent(group.agent)}
                         totalCost={denominator}
@@ -194,12 +222,17 @@ function ProviderGroupRows({
 }) {
   const cost = models.reduce((sum, model) => sum + model.totalCost, 0);
   const tokens = models.reduce((sum, model) => sum + model.totalTokens, 0);
+  const inputTokens = models.reduce((sum, model) => sum + model.inputTokens, 0);
+  const outputTokens = models.reduce((sum, model) => sum + model.outputTokens, 0);
+  const cacheReadTokens = models.reduce((sum, model) => sum + model.cacheReadTokens, 0);
+  const share = totalCost > 0 ? (cost / totalCost) * 100 : 0;
+  const cell = "border-t border-hairline px-3 py-3 text-right tabular-nums";
   return (
     <>
       <tr>
-        <td colSpan={7} className="border-t border-hairline bg-panel p-0">
+        <td className="border-t border-hairline bg-panel py-3 text-left">
           <button
-            className="flex w-full items-center gap-2.5 border-0 bg-transparent px-3 py-3 text-left text-ink focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-ink"
+            className="flex w-full items-center gap-2.5 border-0 bg-transparent px-3 text-left text-ink focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-ink"
             type="button"
             onClick={onToggle}
             aria-expanded={expanded}
@@ -211,12 +244,19 @@ function ProviderGroupRows({
               <ProviderLogo agent={group.agent} size={16} />
               <strong className="text-xs font-semibold">{providerName(group.agent)}</strong>
             </span>
-            <small className="text-[10px] text-muted">{models.length} models</small>
-            <span className="ml-auto flex items-baseline gap-2.5 text-right">
-              <strong className="text-xs font-semibold tabular-nums">{formatCurrency(cost)}</strong>
-              <small className="text-[10px] text-muted">{formatTokens(tokens)} tokens</small>
-            </span>
+            <small className="text-[10px] text-muted">{models.length} {models.length === 1 ? "model" : "models"}</small>
           </button>
+        </td>
+        <td className={`${cell} bg-panel`}>{formatCurrency(cost)}</td>
+        <td className={`${cell} bg-panel`}>{formatTokens(inputTokens)}</td>
+        <td className={`${cell} bg-panel`}>{formatTokens(outputTokens)}</td>
+        <td className={`${cell} bg-panel`}>{formatTokens(cacheReadTokens)}</td>
+        <td className={`${cell} bg-panel`}>{formatTokens(tokens)}</td>
+        <td className="border-t border-hairline bg-panel py-3 pr-3 text-right tabular-nums">
+          <div className="ml-auto flex w-[74px] items-center justify-end gap-1.5">
+            <span className="h-1.5 w-10 overflow-hidden rounded-full bg-track"><span className="block h-full rounded-full bg-subtle" style={{ width: `${Math.min(100, share)}%` }} /></span>
+            <span className="w-8 text-right text-[10px]">{share.toFixed(share >= 10 ? 1 : 2)}%</span>
+          </div>
         </td>
       </tr>
       {expanded &&
@@ -246,8 +286,13 @@ function ModelRow({ model, totalCost }: { model: AggregatedModel; totalCost: num
       <td className={cell}>{formatTokens(model.outputTokens)}</td>
       <td className={cell}>{formatTokens(model.cacheReadTokens)}</td>
       <td className={cell}>{formatTokens(model.totalTokens)}</td>
-      <td className="border-t border-hairline py-3 text-right tabular-nums">
-        {share.toFixed(share >= 10 ? 1 : 2)}%
+      <td className="border-t border-hairline py-3 pr-3 text-right tabular-nums">
+        <div className="ml-auto flex w-[74px] items-center justify-end gap-1.5">
+          <span className="h-1.5 w-10 overflow-hidden rounded-full bg-track">
+            <span className="block h-full rounded-full bg-subtle" style={{ width: `${Math.min(100, share)}%` }} />
+          </span>
+          <span className="w-8 text-right text-[10px]">{share.toFixed(share >= 10 ? 1 : 2)}%</span>
+        </div>
       </td>
     </tr>
   );

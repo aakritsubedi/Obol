@@ -186,3 +186,53 @@ export function aggregateByProvider(report: Report, period?: ReportPeriod): Prov
     .map((group) => ({ ...group, models: group.models.sort((a, b) => b.totalCost - a.totalCost) }))
     .sort((a, b) => b.totalCost - a.totalCost);
 }
+
+// Cache reads bill at ~10% of the base input rate on every major provider, so
+// each cached token saves roughly 90% of its uncached price. Per-model input
+// prices are approximated by family; the estimate is labeled as such in the UI
+// and errs toward the common Sonnet-class rate for unknown models.
+const inputPricePerMillion: Array<[RegExp, number]> = [
+  [/opus/i, 15],
+  [/sonnet/i, 3],
+  [/haiku/i, 0.8],
+  [/gpt/i, 1.25],
+  [/gemini/i, 1.25],
+];
+
+const defaultInputPricePerMillion = 3;
+const cacheDiscount = 0.9;
+
+export function inputPriceForModel(model: string): number {
+  return inputPricePerMillion.find(([pattern]) => pattern.test(model))?.[1] ?? defaultInputPricePerMillion;
+}
+
+export interface CacheSavings {
+  saved: number;
+  cacheReadTokens: number;
+  /** Share of all tokens that were discounted cache reads, null when unknown. */
+  cacheShare: number | null;
+}
+
+export function estimateCacheSavings(report: Report | null): CacheSavings {
+  if (!report) return { saved: 0, cacheReadTokens: 0, cacheShare: null };
+  const daily = Array.isArray(report.daily) ? report.daily : [];
+  const perModel = new Map<string, number>();
+  let cacheReadTokens = 0;
+  for (const row of daily) {
+    for (const breakdown of row.modelBreakdowns || []) {
+      const tokens = Number(breakdown.cacheReadTokens);
+      if (!Number.isFinite(tokens) || tokens <= 0) continue;
+      const name = modelName(breakdown);
+      perModel.set(name, (perModel.get(name) || 0) + tokens);
+      cacheReadTokens += tokens;
+    }
+  }
+  let saved = 0;
+  for (const [name, tokens] of perModel) {
+    saved += tokens * (inputPriceForModel(name) / 1_000_000) * cacheDiscount;
+  }
+  const totals = daily.length ? totalsFrom(report) : null;
+  const cacheShare =
+    totals && totals.totalTokens > 0 && cacheReadTokens > 0 ? cacheReadTokens / totals.totalTokens : null;
+  return { saved, cacheReadTokens, cacheShare };
+}

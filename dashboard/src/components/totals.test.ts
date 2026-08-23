@@ -1,6 +1,14 @@
 import { describe, expect, it } from "vitest";
 import type { ProviderSummary, Report, UsageRow } from "../api";
-import { aggregateByProvider, aggregateModels, modelName, modelRowsFor, totalsFrom } from "./totals";
+import {
+  aggregateByProvider,
+  aggregateModels,
+  estimateCacheSavings,
+  inputPriceForModel,
+  modelName,
+  modelRowsFor,
+  totalsFrom,
+} from "./totals";
 
 function row(overrides: Partial<UsageRow> & Record<string, unknown>): UsageRow {
   return {
@@ -179,5 +187,70 @@ describe("aggregateByProvider", () => {
       projects: [],
     } as unknown as Report;
     expect(aggregateByProvider(noBreakdown)).toEqual([]);
+  });
+});
+
+describe("estimateCacheSavings", () => {
+  it("prices cached reads at ~10% of the model's input rate", () => {
+    const report = {
+      daily: [
+        row({
+          totalTokens: 2_000_000,
+          modelBreakdowns: [
+            { modelName: "claude-opus-4-1", cacheReadTokens: 1_000_000 },
+            { modelName: "claude-sonnet-5", cacheReadTokens: 2_000_000 },
+          ],
+        }),
+        row({
+          totalTokens: 500_000,
+          modelBreakdowns: [{ modelName: "claude-sonnet-5", cacheReadTokens: 500_000 }],
+        }),
+      ],
+      weekly: [],
+      monthly: [],
+      session: [],
+      projects: [],
+    } as unknown as Report;
+    // 1M opus × $15/M + 2.5M sonnet × $3/M, each discounted 90%.
+    expect(estimateCacheSavings(report).saved).toBeCloseTo((15 * 1 + 3 * 2.5) * 0.9, 6);
+    expect(estimateCacheSavings(report).cacheReadTokens).toBe(3_500_000);
+  });
+
+  it("reports cache share of the token total", () => {
+    const report = {
+      daily: [
+        row({
+          totalCost: 1,
+          totalTokens: 400,
+          inputTokens: 100,
+          outputTokens: 0,
+          cacheReadTokens: 300,
+          modelBreakdowns: [{ modelName: "m", cacheReadTokens: 300 }],
+        }),
+      ],
+      weekly: [],
+      monthly: [],
+      session: [],
+      projects: [],
+    } as unknown as Report;
+    const savings = estimateCacheSavings(report);
+    expect(savings.cacheShare).toBeCloseTo(0.75);
+  });
+
+  it("handles empty reports and rows without cached reads", () => {
+    expect(estimateCacheSavings(null)).toEqual({ saved: 0, cacheReadTokens: 0, cacheShare: null });
+    expect(estimateCacheSavings({ daily: [row({})] } as unknown as Report)).toEqual({
+      saved: 0,
+      cacheReadTokens: 0,
+      cacheShare: null,
+    });
+  });
+
+  it("maps model families to input prices with a sonnet-class default", () => {
+    expect(inputPriceForModel("claude-opus-4")).toBe(15);
+    expect(inputPriceForModel("claude-haiku-4-5")).toBe(0.8);
+    expect(inputPriceForModel("gpt-5-codex")).toBe(1.25);
+    expect(inputPriceForModel("gemini-3-pro")).toBe(1.25);
+    expect(inputPriceForModel("totally-unknown-model")).toBe(3);
   });
 });
