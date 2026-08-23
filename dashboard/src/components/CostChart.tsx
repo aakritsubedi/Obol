@@ -50,7 +50,13 @@ function chartPoints(rows: UsageRow[], metric: Props["metric"], groupBy: Props["
         String((row as ProjectUsageRow).project || row.metadata?.project || "Unknown project"),
       );
       const groups = points.get(row.period) || new Map<string, ChartGroup>();
-      const current = groups.get(project) || { key: project, label: projectName(project), value: 0, cost: 0, tokens: 0 };
+      const current = groups.get(project) || {
+        key: project,
+        label: projectName(project),
+        value: 0,
+        cost: 0,
+        tokens: 0,
+      };
       current.value += groupValue(row, metric);
       current.cost += numberValue(row.totalCost);
       current.tokens += numberValue(row.totalTokens);
@@ -103,17 +109,20 @@ function chartPoints(rows: UsageRow[], metric: Props["metric"], groupBy: Props["
 export default function CostChart({ rows, metric, groupBy = "agent" }: Props) {
   const points = useMemo(() => chartPoints(rows, metric, groupBy), [groupBy, metric, rows]);
   const colorFor = (key: string): string =>
-    groupBy === "project"
-      ? key === "__other__"
-        ? "#8B8F98"
-        : projectColor(key)
-      : providerColor(key);
+    groupBy === "project" ? (key === "__other__" ? "#8B8F98" : projectColor(key)) : providerColor(key);
   const groupKeys = useMemo(
-    () => [...new Set(points.flatMap((point) => point.groups.map((group) => group.key)))].sort((left, right) => {
-      const leftValue = points.reduce((sum, point) => sum + (point.groups.find((group) => group.key === left)?.value || 0), 0);
-      const rightValue = points.reduce((sum, point) => sum + (point.groups.find((group) => group.key === right)?.value || 0), 0);
-      return rightValue - leftValue;
-    }),
+    () =>
+      [...new Set(points.flatMap((point) => point.groups.map((group) => group.key)))].sort((left, right) => {
+        const leftValue = points.reduce(
+          (sum, point) => sum + (point.groups.find((group) => group.key === left)?.value || 0),
+          0,
+        );
+        const rightValue = points.reduce(
+          (sum, point) => sum + (point.groups.find((group) => group.key === right)?.value || 0),
+          0,
+        );
+        return rightValue - leftValue;
+      }),
     [points],
   );
   const [hiddenGroups, setHiddenGroups] = useState<Set<string>>(() => new Set());
@@ -349,9 +358,7 @@ export default function CostChart({ rows, metric, groupBy = "agent" }: Props) {
                   <ProviderLogo agent={key} size={14} color={colorFor(key)} />
                   <span className="font-medium text-ink">{label}</span>
                   <span className="tabular-nums text-muted">
-                    {formatCurrency(totalCost)} · {formatTokens(
-                      totalTokens,
-                    )} tokens
+                    {formatCurrency(totalCost)} · {formatTokens(totalTokens)} tokens
                   </span>
                 </button>
               );

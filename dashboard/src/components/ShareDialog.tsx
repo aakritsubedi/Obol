@@ -51,7 +51,10 @@ function rangeRows(report: Report | null, summary: Summary, range: ShareRange) {
   return rows.filter((row) => row.period.slice(0, 10) >= start && row.period.slice(0, 10) <= today);
 }
 
-function breakdownForRow(row: { modelBreakdowns?: ModelBreakdown[]; agents?: Array<{ agent?: string; modelBreakdowns?: ModelBreakdown[] }> }) {
+function breakdownForRow(row: {
+  modelBreakdowns?: ModelBreakdown[];
+  agents?: Array<{ agent?: string; modelBreakdowns?: ModelBreakdown[] }>;
+}) {
   const nested = (row.agents || []).flatMap((agent) =>
     (agent.modelBreakdowns || []).map((model) => ({ model, provider: String(agent.agent || "Unknown") })),
   );
@@ -71,13 +74,22 @@ function modelTokens(model: ModelBreakdown): number {
 function buildShareData(report: Report | null, summary: Summary, range: ShareRange): ShareData {
   const rows = rangeRows(report, summary, range);
   const fallback = range === "today" ? summary.today : null;
-  const cost = rows.length ? rows.reduce((sum, row) => sum + numberValue(row.totalCost), 0) : fallback?.totalCost || 0;
-  const tokens = rows.length ? rows.reduce((sum, row) => sum + numberValue(row.totalTokens), 0) : fallback?.totalTokens || 0;
+  const cost = rows.length
+    ? rows.reduce((sum, row) => sum + numberValue(row.totalCost), 0)
+    : fallback?.totalCost || 0;
+  const tokens = rows.length
+    ? rows.reduce((sum, row) => sum + numberValue(row.totalTokens), 0)
+    : fallback?.totalTokens || 0;
   const models = new Map<string, ShareModel>();
   for (const row of rows) {
     for (const entry of breakdownForRow(row)) {
       const key = `${entry.provider}\u0000${modelName(entry.model)}`;
-      const current = models.get(key) || { model: modelName(entry.model), provider: entry.provider, cost: 0, tokens: 0 };
+      const current = models.get(key) || {
+        model: modelName(entry.model),
+        provider: entry.provider,
+        cost: 0,
+        tokens: 0,
+      };
       current.cost += numberValue(entry.model.totalCost ?? entry.model.cost);
       current.tokens += modelTokens(entry.model);
       models.set(key, current);
@@ -95,7 +107,14 @@ function buildShareData(report: Report | null, summary: Summary, range: ShareRan
     }
   }
   const first = report?.daily[0]?.period || summary.today.period;
-  const dateLabel = range === "total" ? "All tracked usage" : range === "month" ? "Current month" : range === "week" ? "Trailing 7 days" : formatPeriod(summary.today.period);
+  const dateLabel =
+    range === "total"
+      ? "All tracked usage"
+      : range === "month"
+        ? "Current month"
+        : range === "week"
+          ? "Trailing 7 days"
+          : formatPeriod(summary.today.period);
   return {
     rangeLabel: ranges.find((item) => item.value === range)?.label || "Usage",
     dateLabel,
@@ -117,7 +136,14 @@ function downloadBlob(name: string, blob: Blob) {
   URL.revokeObjectURL(url);
 }
 
-function roundedRect(context: CanvasRenderingContext2D, x: number, y: number, width: number, height: number, radius: number) {
+function roundedRect(
+  context: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  width: number,
+  height: number,
+  radius: number,
+) {
   context.beginPath();
   context.roundRect(x, y, width, height, radius);
 }
@@ -237,7 +263,11 @@ function drawContributionGraph(
   }
   for (const [index, label] of ["", "Mon", "", "Wed", "", "Fri", ""].entries()) {
     if (!label) continue;
-    context.fillText(label, x + 22 - context.measureText(label).width, gridY + index * (layout.cellSize + layout.gap) + 8);
+    context.fillText(
+      label,
+      x + 22 - context.measureText(label).width,
+      gridY + index * (layout.cellSize + layout.gap) + 8,
+    );
   }
 
   for (const [weekIndex, week] of calendar.weeks.entries()) {
@@ -287,7 +317,11 @@ async function exportShareImage(data: ShareData) {
   context.lineWidth = 2;
   context.fillStyle = "#1d1f25";
   context.fillRect(25, 25, 1150, 64);
-  [["#f06b60", 55], ["#f1bd4a", 79], ["#59bf55", 103]].forEach(([color, x]) => {
+  [
+    ["#f06b60", 55],
+    ["#f1bd4a", 79],
+    ["#59bf55", 103],
+  ].forEach(([color, x]) => {
     context.fillStyle = String(color);
     context.beginPath();
     context.arc(Number(x), 57, 7, 0, Math.PI * 2);
@@ -316,7 +350,10 @@ async function exportShareImage(data: ShareData) {
   context.fillStyle = "#858b98";
   context.font = "500 13px ui-monospace, SFMono-Regular, Menlo, monospace";
   context.fillText("total_spend", 66, 237);
-  const metrics = [["Tokens", formatTokens(data.tokens)], ["Models", String(data.modelCount)]];
+  const metrics = [
+    ["Tokens", formatTokens(data.tokens)],
+    ["Models", String(data.modelCount)],
+  ];
   metrics.forEach(([label, value], index) => {
     const x = 62 + index * 142;
     context.fillStyle = "#1d2026";
@@ -365,13 +402,20 @@ async function exportShareImage(data: ShareData) {
   context.fillText("obol", 80, canvasHeight - 43);
   context.fillStyle = "#858b98";
   context.font = "500 12px ui-monospace, SFMono-Regular, Menlo, monospace";
-  context.fillText(data.rangeLabel === "Total" ? `tracked_since: ${data.trackedSince}` : "local · UTF-8 · usage snapshot", 888, canvasHeight - 43);
+  context.fillText(
+    data.rangeLabel === "Total" ? `tracked_since: ${data.trackedSince}` : "local · UTF-8 · usage snapshot",
+    888,
+    canvasHeight - 43,
+  );
   context.restore();
   context.strokeStyle = "#343840";
   context.lineWidth = 2;
   roundedRect(context, 24, 24, 1152, outerHeight, 18);
   context.stroke();
-  canvas.toBlob((blob) => blob && downloadBlob(`obol-${data.rangeLabel.toLowerCase().replace(/ /g, "-")}.png`, blob), "image/png");
+  canvas.toBlob(
+    (blob) => blob && downloadBlob(`obol-${data.rangeLabel.toLowerCase().replace(/ /g, "-")}.png`, blob),
+    "image/png",
+  );
 }
 
 async function exportContributionImage(rows: UsageRow[]) {
@@ -400,7 +444,11 @@ async function exportContributionImage(rows: UsageRow[]) {
   context.clip();
   context.fillStyle = "#1d1f25";
   context.fillRect(25, 25, canvasWidth - 50, 64);
-  [["#f06b60", 55], ["#f1bd4a", 79], ["#59bf55", 103]].forEach(([color, x]) => {
+  [
+    ["#f06b60", 55],
+    ["#f1bd4a", 79],
+    ["#59bf55", 103],
+  ].forEach(([color, x]) => {
     context.fillStyle = String(color);
     context.beginPath();
     context.arc(Number(x), 57, 7, 0, Math.PI * 2);
@@ -445,10 +493,7 @@ async function exportContributionImage(rows: UsageRow[]) {
   context.lineWidth = 2;
   roundedRect(context, 24, 24, canvasWidth - 48, outerHeight, 18);
   context.stroke();
-  canvas.toBlob(
-    (blob) => blob && downloadBlob(`obol-contribution-${calendar.year}.png`, blob),
-    "image/png",
-  );
+  canvas.toBlob((blob) => blob && downloadBlob(`obol-contribution-${calendar.year}.png`, blob), "image/png");
 }
 
 function ModelRow({ model }: { model: ShareModel }) {
@@ -458,8 +503,12 @@ function ModelRow({ model }: { model: ShareModel }) {
       <ProviderLogo agent={model.provider} size={26} color={color} />
       <div className="min-w-0 flex-1">
         <div className="flex items-center justify-between gap-3 text-xs">
-          <span className="truncate font-semibold">{model.model.split("/")[1] ? model.model.split("/")[1] : model.model}</span>
-          <span className="shrink-0 tabular-nums text-[#aeb4bf]">{formatCurrency(model.cost)} · {formatTokens(model.tokens)}</span>
+          <span className="truncate font-semibold">
+            {model.model.split("/")[1] ? model.model.split("/")[1] : model.model}
+          </span>
+          <span className="shrink-0 tabular-nums text-[#aeb4bf]">
+            {formatCurrency(model.cost)} · {formatTokens(model.tokens)}
+          </span>
         </div>
         <p className="mt-1 text-[9px] text-[#737987]">{providerName(model.provider).toLowerCase()}</p>
       </div>
@@ -472,60 +521,127 @@ export default function ShareDialog({ report, summary, onClose }: Props) {
   const data = useMemo(() => buildShareData(report, summary, range), [range, report, summary]);
 
   return (
-    <div className="fixed inset-0 z-50 grid place-items-center overflow-y-auto bg-ink/35 px-4 py-8 backdrop-blur-sm" role="presentation" onMouseDown={(event) => event.target === event.currentTarget && onClose()}>
-      <div className="w-full max-w-[920px] overflow-hidden rounded-[24px] border border-hairline bg-card text-ink shadow-[0_24px_80px_rgba(0,0,0,.24)]" role="dialog" aria-modal="true" aria-labelledby="share-dialog-title">
+    <div
+      className="fixed inset-0 z-50 grid place-items-center overflow-y-auto bg-ink/35 px-4 py-8 backdrop-blur-sm"
+      role="presentation"
+      onMouseDown={(event) => event.target === event.currentTarget && onClose()}
+    >
+      <div
+        className="w-full max-w-[920px] overflow-hidden rounded-[24px] border border-hairline bg-card text-ink shadow-[0_24px_80px_rgba(0,0,0,.24)]"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="share-dialog-title"
+      >
         <div className="flex items-center justify-between gap-4 border-b border-hairline px-6 py-4">
           <div>
             <p className="text-[10px] font-semibold uppercase tracking-[0.13em] text-muted">Share usage</p>
-            <h2 className="mt-1 text-lg font-bold tracking-[-0.03em]" id="share-dialog-title">Create a social card</h2>
+            <h2 className="mt-1 text-lg font-bold tracking-[-0.03em]" id="share-dialog-title">
+              Create a social card
+            </h2>
           </div>
           <div className="flex item-center gap-3">
-            <button className="inline-flex h-8 items-center justify-center gap-2 rounded-xl border border-hairline px-4 text-xs font-semibold text-ink transition hover:bg-wash" type="button" onClick={() => void exportContributionImage(data.dailyRows)}><span aria-hidden="true">↓</span> Download contribution graph</button>
-            <button className="grid h-8 w-8 place-items-center rounded-full border border-hairline text-muted transition hover:bg-wash hover:text-ink" type="button" onClick={onClose} aria-label="Close share dialog">×</button>
+            <button
+              className="inline-flex h-8 items-center justify-center gap-2 rounded-xl border border-hairline px-4 text-xs font-semibold text-ink transition hover:bg-wash"
+              type="button"
+              onClick={() => void exportContributionImage(data.dailyRows)}
+            >
+              <span aria-hidden="true">↓</span> Download contribution graph
+            </button>
+            <button
+              className="grid h-8 w-8 place-items-center rounded-full border border-hairline text-muted transition hover:bg-wash hover:text-ink"
+              type="button"
+              onClick={onClose}
+              aria-label="Close share dialog"
+            >
+              ×
+            </button>
           </div>
         </div>
         <div className="grid gap-10 p-6 lg:grid-cols-[minmax(0,1fr)_250px]">
           <div className="overflow-hidden rounded-[14px] border border-[#343840] bg-[#111216] font-mono text-[#f5f6f8] shadow-[0_18px_40px_rgba(0,0,0,.18)]">
             <div className="flex h-11 items-center gap-2 border-b border-[#343840] bg-[#1d1f25] px-4">
-              <span className="h-2.5 w-2.5 rounded-full bg-[#f06b60]" /><span className="h-2.5 w-2.5 rounded-full bg-[#f1bd4a]" /><span className="h-2.5 w-2.5 rounded-full bg-[#59bf55]" />
-              <span className="ml-3 rounded-md bg-[#2a2d35] px-3 py-1 text-[10px] font-semibold text-[#cdd1da]">usage/{data.rangeLabel.toLowerCase().replace(/ /g, "-")}.md</span>
+              <span className="h-2.5 w-2.5 rounded-full bg-[#f06b60]" />
+              <span className="h-2.5 w-2.5 rounded-full bg-[#f1bd4a]" />
+              <span className="h-2.5 w-2.5 rounded-full bg-[#59bf55]" />
+              <span className="ml-3 rounded-md bg-[#2a2d35] px-3 py-1 text-[10px] font-semibold text-[#cdd1da]">
+                usage/{data.rangeLabel.toLowerCase().replace(/ /g, "-")}.md
+              </span>
               <span className="ml-auto text-[9px] text-[#737987]">OBOL / USAGE</span>
             </div>
             <div className="grid grid-cols-[.85fr_1.15fr] max-[640px]:grid-cols-1 max-[640px]:divide-x-0">
               <div className="p-5 sm:p-6">
                 <div className="text-[12px] text-[#858b98]">// {data.dateLabel.toLowerCase()}</div>
-                <div className="mt-5 text-4xl font-bold tracking-[-0.07em] sm:text-5xl">{formatCurrency(data.cost)}</div>
+                <div className="mt-5 text-4xl font-bold tracking-[-0.07em] sm:text-5xl">
+                  {formatCurrency(data.cost)}
+                </div>
                 <div className="mt-1 text-[13px] text-[#858b98]">total spend</div>
-               <div className="flex flex-wrap gap-1 mt-7 ">
-                 <div className="text-[11px] text-[#858b98] block">// total usage</div>
+                <div className="flex flex-wrap gap-1 mt-7 ">
+                  <div className="text-[11px] text-[#858b98] block">// total usage</div>
                   <div className="flex flex-wrap gap-2">
-                    {[[formatTokens(data.tokens), "tokens", "🔥"], [String(data.modelCount), "models", "🤖"]].map(([value, label, unit]) => <div className="text-[11px] text-[#858b98] block">//&nbsp;
-                      <span className="text-green-300">{value}</span>&nbsp;
-                      {label} {unit}</div>)}
+                    {[
+                      [formatTokens(data.tokens), "tokens", "🔥"],
+                      [String(data.modelCount), "models", "🤖"],
+                    ].map(([value, label, unit]) => (
+                      <div className="text-[11px] text-[#858b98] block">
+                        //&nbsp;
+                        <span className="text-green-300">{value}</span>&nbsp;
+                        {label} {unit}
+                      </div>
+                    ))}
                   </div>
-               </div>
+                </div>
               </div>
               <div className="p-5 sm:p-6">
                 <div className="mb-5 text-[10px] font-semibold text-[#858b98]">// top_models</div>
                 <div className="space-y-4">
-                  {data.models.length ? data.models.map((model) => <ModelRow key={`${model.provider}-${model.model}`} model={model} />) : <div className="text-xs text-[#858b98]">No model detail available yet.</div>}
+                  {data.models.length ? (
+                    data.models.map((model) => (
+                      <ModelRow key={`${model.provider}-${model.model}`} model={model} />
+                    ))
+                  ) : (
+                    <div className="text-xs text-[#858b98]">No model detail available yet.</div>
+                  )}
                 </div>
               </div>
             </div>
             <div className="flex h-10 items-center justify-between gap-4 border-t border-[#343840] px-5 text-[10px] sm:px-6">
-              <span className="inline-flex items-center gap-2 font-semibold"><img src="/favicon-32.png" alt="" className="h-4 w-4 rounded-[4px]" /> obol</span><span className="text-[#858b98]">{data.rangeLabel === "Total" ? `tracked_since: ${data.trackedSince}` : "local · usage snapshot"}</span>
+              <span className="inline-flex items-center gap-2 font-semibold">
+                <img src="/favicon-32.png" alt="" className="h-4 w-4 rounded-[4px]" /> obol
+              </span>
+              <span className="text-[#858b98]">
+                {data.rangeLabel === "Total"
+                  ? `tracked_since: ${data.trackedSince}`
+                  : "local · usage snapshot"}
+              </span>
             </div>
           </div>
           <aside className="flex flex-col gap-4">
             <div>
               <p className="text-xs font-semibold">Choose a window</p>
-              <p className="mt-1 text-[11px] leading-5 text-muted">Pick the story you want to share. The image stays local until you download it.</p>
+              <p className="mt-1 text-[11px] leading-5 text-muted">
+                Pick the story you want to share. The image stays local until you download it.
+              </p>
             </div>
             <div className="grid grid-cols-2 gap-2 lg:grid-cols-1">
-              {ranges.map((item) => <button className={`rounded-xl border px-3 py-2.5 text-left text-xs transition ${range === item.value ? "border-ink bg-ink font-semibold text-surface" : "border-hairline text-muted hover:bg-wash hover:text-ink"}`} type="button" key={item.value} onClick={() => setRange(item.value)}>{item.label}</button>)}
+              {ranges.map((item) => (
+                <button
+                  className={`rounded-xl border px-3 py-2.5 text-left text-xs transition ${range === item.value ? "border-ink bg-ink font-semibold text-surface" : "border-hairline text-muted hover:bg-wash hover:text-ink"}`}
+                  type="button"
+                  key={item.value}
+                  onClick={() => setRange(item.value)}
+                >
+                  {item.label}
+                </button>
+              ))}
             </div>
             <div className="mt-4 grid gap-2">
-              <button className="inline-flex h-10 items-center justify-center gap-2 rounded-xl bg-ink px-4 text-xs font-semibold text-surface transition hover:opacity-90" type="button" onClick={() => void exportShareImage(data)}><span aria-hidden="true">↓</span> Download PNG</button>
+              <button
+                className="inline-flex h-10 items-center justify-center gap-2 rounded-xl bg-ink px-4 text-xs font-semibold text-surface transition hover:opacity-90"
+                type="button"
+                onClick={() => void exportShareImage(data)}
+              >
+                <span aria-hidden="true">↓</span> Download PNG
+              </button>
             </div>
           </aside>
         </div>

@@ -206,7 +206,11 @@ export default function WeeklyLeaders({ report }: Props) {
   }
 
   return (
-    <section className="border-t border-hairline py-12" id="week-leaders" aria-labelledby="week-leaders-heading">
+    <section
+      className="border-t border-hairline py-12"
+      id="week-leaders"
+      aria-labelledby="week-leaders-heading"
+    >
       <div className="mb-[22px] flex items-start justify-between gap-[18px] max-[760px]:flex-wrap">
         <div>
           <div

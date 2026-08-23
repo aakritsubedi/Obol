@@ -29,14 +29,21 @@ type SortDirection = "asc" | "desc";
 
 function sortModels(models: AggregatedModel[], key: SortKey, direction: SortDirection): AggregatedModel[] {
   return [...models].sort((left, right) => {
-    const compared = key === "name"
-      ? modelName(left).localeCompare(modelName(right))
-      : Number(left[key]) - Number(right[key]);
+    const compared =
+      key === "name"
+        ? modelName(left).localeCompare(modelName(right))
+        : Number(left[key]) - Number(right[key]);
     return (direction === "asc" ? compared : -compared) || modelName(left).localeCompare(modelName(right));
   });
 }
 
-function SortButton({ label, sortKey, active, direction, onSort }: {
+function SortButton({
+  label,
+  sortKey,
+  active,
+  direction,
+  onSort,
+}: {
   label: string;
   sortKey: SortKey;
   active: boolean;
@@ -51,7 +58,8 @@ function SortButton({ label, sortKey, active, direction, onSort }: {
       aria-label={`Sort by ${label}`}
       aria-sort={active ? (direction === "asc" ? "ascending" : "descending") : "none"}
     >
-      {label}<span aria-hidden="true">{active ? (direction === "asc" ? "↑" : "↓") : "↕"}</span>
+      {label}
+      <span aria-hidden="true">{active ? (direction === "asc" ? "↑" : "↓") : "↕"}</span>
     </button>
   );
 }
@@ -149,22 +157,58 @@ export default function ModelTable({ report, period }: Props) {
             <thead>
               <tr>
                 <th className="pb-3 text-left">
-                  <SortButton label="Model" sortKey="name" active={sortKey === "name"} direction={sortDirection} onSort={changeSort} />
+                  <SortButton
+                    label="Model"
+                    sortKey="name"
+                    active={sortKey === "name"}
+                    direction={sortDirection}
+                    onSort={changeSort}
+                  />
                 </th>
                 <th className="px-3 pb-3 text-right">
-                  <SortButton label="Cost" sortKey="totalCost" active={sortKey === "totalCost"} direction={sortDirection} onSort={changeSort} />
+                  <SortButton
+                    label="Cost"
+                    sortKey="totalCost"
+                    active={sortKey === "totalCost"}
+                    direction={sortDirection}
+                    onSort={changeSort}
+                  />
                 </th>
                 <th className="px-3 pb-3 text-right">
-                  <SortButton label="Input" sortKey="inputTokens" active={sortKey === "inputTokens"} direction={sortDirection} onSort={changeSort} />
+                  <SortButton
+                    label="Input"
+                    sortKey="inputTokens"
+                    active={sortKey === "inputTokens"}
+                    direction={sortDirection}
+                    onSort={changeSort}
+                  />
                 </th>
                 <th className="px-3 pb-3 text-right">
-                  <SortButton label="Output" sortKey="outputTokens" active={sortKey === "outputTokens"} direction={sortDirection} onSort={changeSort} />
+                  <SortButton
+                    label="Output"
+                    sortKey="outputTokens"
+                    active={sortKey === "outputTokens"}
+                    direction={sortDirection}
+                    onSort={changeSort}
+                  />
                 </th>
                 <th className="px-3 pb-3 text-right">
-                  <SortButton label="Cache read" sortKey="cacheReadTokens" active={sortKey === "cacheReadTokens"} direction={sortDirection} onSort={changeSort} />
+                  <SortButton
+                    label="Cache read"
+                    sortKey="cacheReadTokens"
+                    active={sortKey === "cacheReadTokens"}
+                    direction={sortDirection}
+                    onSort={changeSort}
+                  />
                 </th>
                 <th className="px-3 pb-3 text-right">
-                  <SortButton label="Total tokens" sortKey="totalTokens" active={sortKey === "totalTokens"} direction={sortDirection} onSort={changeSort} />
+                  <SortButton
+                    label="Total tokens"
+                    sortKey="totalTokens"
+                    active={sortKey === "totalTokens"}
+                    direction={sortDirection}
+                    onSort={changeSort}
+                  />
                 </th>
                 <th className="pb-3 text-right text-[10px] font-semibold uppercase tracking-[0.07em] text-muted">
                   Share
@@ -244,7 +288,9 @@ function ProviderGroupRows({
               <ProviderLogo agent={group.agent} size={16} />
               <strong className="text-xs font-semibold">{providerName(group.agent)}</strong>
             </span>
-            <small className="text-[10px] text-muted">{models.length} {models.length === 1 ? "model" : "models"}</small>
+            <small className="text-[10px] text-muted">
+              {models.length} {models.length === 1 ? "model" : "models"}
+            </small>
           </button>
         </td>
         <td className={`${cell} bg-panel`}>{formatCurrency(cost)}</td>
@@ -254,7 +300,12 @@ function ProviderGroupRows({
         <td className={`${cell} bg-panel`}>{formatTokens(tokens)}</td>
         <td className="border-t border-hairline bg-panel py-3 pr-3 text-right tabular-nums">
           <div className="ml-auto flex w-[74px] items-center justify-end gap-1.5">
-            <span className="h-1.5 w-10 overflow-hidden rounded-full bg-track"><span className="block h-full rounded-full bg-subtle" style={{ width: `${Math.min(100, share)}%` }} /></span>
+            <span className="h-1.5 w-10 overflow-hidden rounded-full bg-track">
+              <span
+                className="block h-full rounded-full bg-subtle"
+                style={{ width: `${Math.min(100, share)}%` }}
+              />
+            </span>
             <span className="w-8 text-right text-[10px]">{share.toFixed(share >= 10 ? 1 : 2)}%</span>
           </div>
         </td>
@@ -289,7 +340,10 @@ function ModelRow({ model, totalCost }: { model: AggregatedModel; totalCost: num
       <td className="border-t border-hairline py-3 pr-3 text-right tabular-nums">
         <div className="ml-auto flex w-[74px] items-center justify-end gap-1.5">
           <span className="h-1.5 w-10 overflow-hidden rounded-full bg-track">
-            <span className="block h-full rounded-full bg-subtle" style={{ width: `${Math.min(100, share)}%` }} />
+            <span
+              className="block h-full rounded-full bg-subtle"
+              style={{ width: `${Math.min(100, share)}%` }}
+            />
           </span>
           <span className="w-8 text-right text-[10px]">{share.toFixed(share >= 10 ? 1 : 2)}%</span>
         </div>

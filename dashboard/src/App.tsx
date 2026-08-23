@@ -273,43 +273,47 @@ export default function App() {
       <header className="sticky top-0 z-20 mx-auto flex max-w-[1244px] flex-col gap-2 border-b border-hairline bg-surface/90 px-8 py-3.5 backdrop-blur-xl max-[760px]:px-[18px]">
         <div className="flex w-full items-center justify-between gap-5">
           <div className="flex min-w-0 items-center gap-3">
-          <span className="whitespace-nowrap text-sm font-bold tracking-[-0.02em]">Obol</span>
-          <span className="inline-flex min-h-7 items-center gap-1.5 whitespace-nowrap rounded-full bg-wash px-2.5 py-1.5 text-[11px] text-subtle max-[760px]:hidden">
-            ◷ Local data · {summary.agents.length} active today
-          </span>
+            <span className="whitespace-nowrap text-sm font-bold tracking-[-0.02em]">Obol</span>
+            <span className="inline-flex min-h-7 items-center gap-1.5 whitespace-nowrap rounded-full bg-wash px-2.5 py-1.5 text-[11px] text-subtle max-[760px]:hidden">
+              ◷ Local data · {summary.agents.length} active today
+            </span>
           </div>
           <div className="flex items-center gap-2.5 max-[440px]:gap-1.5">
-          <div
-            className={`inline-flex min-h-7 items-center gap-1.5 rounded-full px-2.5 py-1.5 text-[11px] ${summary.stale ? "bg-warn-soft text-warn-strong" : "bg-ok-soft text-ok-strong"}`}
-          >
-            <span className={`h-1.5 w-1.5 rounded-full ${summary.stale ? "bg-warn" : "bg-ok"}`} />
-            {summary.stale ? "Cached snapshot" : "Live"}
-          </div>
-          <button
-            className="rounded-full border border-hairline bg-transparent px-3 py-2 text-[11px] font-semibold text-ink transition hover:bg-wash focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink max-[520px]:px-2"
-            onClick={() => setSettingsOpen(true)}
-            aria-label="Open settings"
-          >
-            ⚙ <span className="max-[520px]:hidden">Settings</span>
-          </button>
-          <button
-            className="rounded-full border border-hairline bg-transparent px-3 py-2 text-[11px] font-semibold text-muted transition hover:bg-wash hover:text-ink focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink disabled:cursor-default disabled:opacity-50 max-[440px]:px-2.5"
-            onClick={() => void doRefresh()}
-            disabled={refreshing}
-            aria-label="Refresh usage"
-          >
-            ↻ <span className="max-[440px]:hidden">{refreshing ? "Refreshing" : "Refresh"}</span>
-          </button>
-          <button
-            className="inline-flex items-center gap-1.5 rounded-full border border-ink bg-ink px-3 py-2 text-[11px] font-semibold text-surface transition hover:opacity-90 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink max-[520px]:px-2"
-            onClick={() => setShareOpen(true)}
-            aria-label="Share usage"
-          >
-            <span aria-hidden="true">↗</span><span className="max-[520px]:hidden">Share</span>
-          </button>
+            <div
+              className={`inline-flex min-h-7 items-center gap-1.5 rounded-full px-2.5 py-1.5 text-[11px] ${summary.stale ? "bg-warn-soft text-warn-strong" : "bg-ok-soft text-ok-strong"}`}
+            >
+              <span className={`h-1.5 w-1.5 rounded-full ${summary.stale ? "bg-warn" : "bg-ok"}`} />
+              {summary.stale ? "Cached snapshot" : "Live"}
+            </div>
+            <button
+              className="rounded-full border border-hairline bg-transparent px-3 py-2 text-[11px] font-semibold text-ink transition hover:bg-wash focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink max-[520px]:px-2"
+              onClick={() => setSettingsOpen(true)}
+              aria-label="Open settings"
+            >
+              ⚙ <span className="max-[520px]:hidden">Settings</span>
+            </button>
+            <button
+              className="rounded-full border border-hairline bg-transparent px-3 py-2 text-[11px] font-semibold text-muted transition hover:bg-wash hover:text-ink focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink disabled:cursor-default disabled:opacity-50 max-[440px]:px-2.5"
+              onClick={() => void doRefresh()}
+              disabled={refreshing}
+              aria-label="Refresh usage"
+            >
+              ↻ <span className="max-[440px]:hidden">{refreshing ? "Refreshing" : "Refresh"}</span>
+            </button>
+            <button
+              className="inline-flex items-center gap-1.5 rounded-full border border-ink bg-ink px-3 py-2 text-[11px] font-semibold text-surface transition hover:opacity-90 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink max-[520px]:px-2"
+              onClick={() => setShareOpen(true)}
+              aria-label="Share usage"
+            >
+              <span aria-hidden="true">↗</span>
+              <span className="max-[520px]:hidden">Share</span>
+            </button>
           </div>
         </div>
-        <nav className="flex w-full items-center gap-1 overflow-x-auto border-t border-hairline pt-2" aria-label="Dashboard sections">
+        <nav
+          className="flex w-full items-center gap-1 overflow-x-auto border-t border-hairline pt-2"
+          aria-label="Dashboard sections"
+        >
           {[
             ["Week", "#week-leaders"],
             ["Activity", "#activity"],
@@ -318,7 +322,11 @@ export default function App() {
             ["Models", "#models"],
             ["Projects", "#projects"],
           ].map(([label, href]) => (
-            <a className="shrink-0 rounded-full px-3 py-1 text-[11px] text-muted transition hover:bg-wash hover:text-ink" href={href} key={href}>
+            <a
+              className="shrink-0 rounded-full px-3 py-1 text-[11px] text-muted transition hover:bg-wash hover:text-ink"
+              href={href}
+              key={href}
+            >
               {label}
             </a>
           ))}
@@ -438,10 +446,19 @@ export default function App() {
                   aria-expanded={exportOpen}
                   onClick={() => setExportOpen((value) => !value)}
                 >
-                  <span aria-hidden="true" className="text-sm leading-none">↓</span> Export <span aria-hidden="true" className="ml-0.5 text-[10px]">▾</span>
+                  <span aria-hidden="true" className="text-sm leading-none">
+                    ↓
+                  </span>{" "}
+                  Export{" "}
+                  <span aria-hidden="true" className="ml-0.5 text-[10px]">
+                    ▾
+                  </span>
                 </button>
                 {exportOpen && (
-                  <div className="absolute right-0 top-[calc(100%+6px)] z-10 grid w-40 gap-0.5 overflow-hidden rounded-xl border border-hairline bg-card p-1.5 shadow-[0_12px_30px_rgba(0,0,0,.16)]" role="menu">
+                  <div
+                    className="absolute right-0 top-[calc(100%+6px)] z-10 grid w-40 gap-0.5 overflow-hidden rounded-xl border border-hairline bg-card p-1.5 shadow-[0_12px_30px_rgba(0,0,0,.16)]"
+                    role="menu"
+                  >
                     <button
                       className="flex w-full items-center rounded-lg px-3 py-2.5 text-left text-[11px] text-ink hover:bg-wash"
                       type="button"
@@ -478,7 +495,11 @@ export default function App() {
         <ModelTable report={report} period={period} />
         {projects.length > 0 && (
           <>
-            <section className="border-t border-hairline py-8" id="projects" aria-labelledby="project-chart-heading">
+            <section
+              className="border-t border-hairline py-8"
+              id="projects"
+              aria-labelledby="project-chart-heading"
+            >
               <div className="mb-[22px]">
                 <div
                   className="text-[10px] font-semibold uppercase tracking-[0.13em] leading-tight text-muted"
@@ -488,7 +509,9 @@ export default function App() {
                 </div>
                 <h2 className="mt-1.5 flex flex-wrap items-center gap-2 text-[17px] font-bold tracking-[-0.025em]">
                   Cost by Claude project
-                  <span className="rounded-full bg-wash px-2 py-0.5 text-[10px] font-semibold text-subtle">Claude only</span>
+                  <span className="rounded-full bg-wash px-2 py-0.5 text-[10px] font-semibold text-subtle">
+                    Claude only
+                  </span>
                 </h2>
                 <p className="mt-1 text-[11px] text-muted">
                   Last {activeRange} days · of {formatCurrency(projectTotal)} Claude spend
