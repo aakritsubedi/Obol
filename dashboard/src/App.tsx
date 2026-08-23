@@ -11,6 +11,7 @@ import {
   type WidgetConfig,
 } from "./api";
 import BudgetSettings from "./components/BudgetSettings";
+import ContributionChart from "./components/ContributionChart";
 import CostChart from "./components/CostChart";
 import { formatCurrency, formatRelativeTime, formatUpdatedAt } from "./components/format";
 import ModelTable from "./components/ModelTable";
@@ -311,6 +312,7 @@ export default function App() {
         <nav className="flex w-full items-center gap-1 overflow-x-auto border-t border-hairline pt-2" aria-label="Dashboard sections">
           {[
             ["Week", "#week-leaders"],
+            ["Activity", "#activity"],
             ["History", "#history"],
             ["Providers", "#providers"],
             ["Models", "#models"],
@@ -357,6 +359,8 @@ export default function App() {
 
         <Ticker summary={summary} />
         <WeeklyLeaders report={report} />
+
+        <ContributionChart rows={report?.daily || []} />
 
         <section className="border-t border-dashed py-12" id="history" aria-labelledby="history-heading">
           <div className="mb-[22px] flex items-start justify-between gap-[18px] max-[760px]:flex-wrap">
