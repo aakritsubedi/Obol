@@ -13,14 +13,19 @@ interface Props {
   onClose: () => void;
 }
 
-interface ShareModel {
+export interface ShareModel {
   model: string;
   provider: string;
   cost: number;
   tokens: number;
 }
 
-interface ShareData {
+export const SHARE_TOP_MODEL_COUNT = 4;
+export const SHARE_ADDITIONAL_MODEL_COUNT = 5;
+export const SHARE_TOKEN_WEIGHT = 0.6;
+export const SHARE_COST_WEIGHT = 0.4;
+
+export interface ShareData {
   rangeLabel: string;
   dateLabel: string;
   cost: number;
@@ -29,6 +34,11 @@ interface ShareData {
   modelCount: number;
   trackedSince: string;
   dailyRows: UsageRow[];
+}
+
+export interface ModelTotals {
+  cost: number;
+  tokens: number;
 }
 
 const ranges: Array<{ value: ShareRange; label: string }> = [
@@ -69,6 +79,45 @@ function modelTokens(model: ModelBreakdown): number {
     (sum, key) => sum + numberValue(model[key]),
     0,
   );
+}
+
+function modelTotals(models: ShareModel[]): ModelTotals {
+  return models.reduce(
+    (totals, model) => ({
+      cost: totals.cost + Math.max(0, model.cost),
+      tokens: totals.tokens + Math.max(0, model.tokens),
+    }),
+    { cost: 0, tokens: 0 },
+  );
+}
+
+/**
+ * Rank models using comparable metric shares instead of adding raw dollars to
+ * raw token counts. Each model contributes a share of the visible model
+ * totals, then tokens and cost are combined with the requested 60/40 weights.
+ */
+export function weightedModelScore(model: ShareModel, totals: ModelTotals): number {
+  const tokenShare = totals.tokens > 0 ? Math.max(0, model.tokens) / totals.tokens : 0;
+  const costShare = totals.cost > 0 ? Math.max(0, model.cost) / totals.cost : 0;
+  return tokenShare * SHARE_TOKEN_WEIGHT + costShare * SHARE_COST_WEIGHT;
+}
+
+export function rankShareModels(models: ShareModel[]): ShareModel[] {
+  const totals = modelTotals(models);
+  return [...models].sort((left, right) => {
+    const scoreDifference = weightedModelScore(right, totals) - weightedModelScore(left, totals);
+    if (scoreDifference !== 0) return scoreDifference;
+    return (
+      right.tokens - left.tokens ||
+      right.cost - left.cost ||
+      left.provider.localeCompare(right.provider) ||
+      left.model.localeCompare(right.model)
+    );
+  });
+}
+
+export function visibleShareModels(models: ShareModel[]): ShareModel[] {
+  return rankShareModels(models).slice(0, SHARE_TOP_MODEL_COUNT + SHARE_ADDITIONAL_MODEL_COUNT);
 }
 
 function buildShareData(report: Report | null, summary: Summary, range: ShareRange): ShareData {
@@ -120,7 +169,7 @@ function buildShareData(report: Report | null, summary: Summary, range: ShareRan
     dateLabel,
     cost,
     tokens,
-    models: [...models.values()].sort((a, b) => b.cost - a.cost || b.tokens - a.tokens).slice(0, 5),
+    models: visibleShareModels([...models.values()]),
     modelCount: models.size,
     trackedSince: first ? formatPeriod(first) : "usage began",
     dailyRows: report?.daily || [],
@@ -174,6 +223,41 @@ function drawRoundedImage(
   return true;
 }
 
+function fitCanvasText(context: CanvasRenderingContext2D, value: string, maxWidth: number): string {
+  if (context.measureText(value).width <= maxWidth) return value;
+  const suffix = "…";
+  let result = value;
+  while (result.length > 1 && context.measureText(`${result}${suffix}`).width > maxWidth) {
+    result = result.slice(0, -1);
+  }
+  return `${result.trimEnd()}${suffix}`;
+}
+
+function drawModelComment(
+  context: CanvasRenderingContext2D,
+  image: HTMLImageElement | null,
+  model: ShareModel,
+  x: number,
+  y: number,
+  width: number,
+) {
+  const color = providerColor(model.provider);
+  const iconSize = 20;
+  const textX = x + iconSize + 10;
+  if (!drawRoundedImage(context, image, x, y - 14, iconSize, 5)) {
+    context.fillStyle = color;
+    roundedRect(context, x, y - 14, iconSize, iconSize, 5);
+    context.fill();
+  }
+  context.fillStyle = "#e7e9ed";
+  context.font = "600 11px ui-monospace, SFMono-Regular, Menlo, monospace";
+  context.fillText(fitCanvasText(context, model.model, Math.max(40, width - (textX - x))), textX, y);
+  const metrics = `${formatCurrency(model.cost)} · ${formatTokens(model.tokens)} tokens`;
+  context.fillStyle = "#aeb4bf";
+  context.font = "500 10px ui-monospace, SFMono-Regular, Menlo, monospace";
+  context.fillText(metrics, textX, y + 15);
+}
+
 const exportContributionColors: Record<0 | 1 | 2 | 3 | 4, string> = {
   0: "#24272d",
   1: "#033a16",
@@ -202,7 +286,9 @@ function contributionGraphLayout(
   const weekCount = Math.max(1, calendar.weeks.length);
   const cellSize = Math.max(8, Math.min(maxCellSize, (plotWidth - gap * (weekCount - 1)) / weekCount));
   const plotHeight = cellSize * 7 + gap * 6;
-  const topOffset = 58;
+  // Leave a full line between the subtitle and month labels; the old offset
+  // placed labels only a few pixels below the subtitle in activity exports.
+  const topOffset = 84;
   return { gap, labelWidth, cellSize, topOffset, plotHeight, height: topOffset + plotHeight };
 }
 
@@ -292,9 +378,14 @@ function drawContributionGraph(
 }
 
 async function exportShareImage(data: ShareData) {
+  const topModels = data.models.slice(0, SHARE_TOP_MODEL_COUNT);
+  const additionalModels = data.models.slice(
+    SHARE_TOP_MODEL_COUNT,
+    SHARE_TOP_MODEL_COUNT + SHARE_ADDITIONAL_MODEL_COUNT,
+  );
   const providerImages = new Map<string, HTMLImageElement | null>();
   await Promise.all(
-    [...new Set(data.models.map((model) => model.provider))].map(async (provider) => {
+    [...new Set([...topModels, ...additionalModels].map((model) => model.provider))].map(async (provider) => {
       const id = providerConfig(provider).id;
       providerImages.set(provider, id ? await loadImage(`/providers/${id}.png`) : null);
     }),
@@ -302,7 +393,16 @@ async function exportShareImage(data: ShareData) {
   const obolIcon = await loadImage("/favicon-32.png");
   const canvas = document.createElement("canvas");
   canvas.width = 1200;
-  const canvasHeight = Math.max(560, 356 + data.models.length * 68);
+  const detailRowStep = 56;
+  const moreColumns = 2;
+  const moreRowStep = 42;
+  const detailStartY = 177;
+  const firstRowBottom = detailStartY + topModels.length * detailRowStep;
+  const moreHeaderY = firstRowBottom + 28;
+  const moreStartY = moreHeaderY + 25;
+  const moreRows = Math.ceil(additionalModels.length / moreColumns);
+  const modelContentBottom = additionalModels.length ? moreStartY + moreRows * moreRowStep : firstRowBottom;
+  const canvasHeight = Math.max(560, modelContentBottom + 110);
   canvas.height = canvasHeight;
   const footerY = canvasHeight - 74;
   const outerHeight = canvasHeight - 48;
@@ -336,11 +436,6 @@ async function exportShareImage(data: ShareData) {
   context.fillStyle = "#737987";
   context.font = "500 12px ui-monospace, SFMono-Regular, Menlo, monospace";
   context.fillText("OBOL / USAGE", 1030, 62);
-  context.strokeStyle = "#343840";
-  context.beginPath();
-  context.moveTo(528, 89);
-  context.lineTo(528, footerY);
-  context.stroke();
   context.fillStyle = "#9399a7";
   context.font = "500 14px ui-monospace, SFMono-Regular, Menlo, monospace";
   context.fillText(`// ${data.dateLabel.toLowerCase()}`, 62, 135);
@@ -365,9 +460,9 @@ async function exportShareImage(data: ShareData) {
   });
   context.fillStyle = "#858b98";
   context.font = "600 12px ui-monospace, SFMono-Regular, Menlo, monospace";
-  context.fillText("// top_models", 570, 135);
-  for (const [index, model] of data.models.entries()) {
-    const y = 177 + index * 68;
+  context.fillText("// top models", 570, 135);
+  for (const [index, model] of topModels.entries()) {
+    const y = detailStartY + index * detailRowStep;
     const color = providerColor(model.provider);
     if (!drawRoundedImage(context, providerImages.get(model.provider) || null, 570, y - 15, 22, 6)) {
       context.fillStyle = color;
@@ -379,12 +474,38 @@ async function exportShareImage(data: ShareData) {
     context.fillText(model.model, 602, y);
     context.fillStyle = "#737987";
     context.font = "500 11px ui-monospace, SFMono-Regular, Menlo, monospace";
-    context.fillText(providerName(model.provider).toLowerCase(), 602, y + 18);
+    context.fillText(providerName(model.provider).toLowerCase(), 602, y + 14);
     context.fillStyle = "#aeb4bf";
     context.font = "500 12px ui-monospace, SFMono-Regular, Menlo, monospace";
     context.fillText(`${formatCurrency(model.cost)} · ${formatTokens(model.tokens)}`, 965, y + 5);
   }
+  if (additionalModels.length) {
+    context.strokeStyle = "#343840";
+    context.lineWidth = 1;
+    context.beginPath();
+    context.moveTo(25, firstRowBottom + 8);
+    context.lineTo(1175, firstRowBottom + 8);
+    context.stroke();
+    context.fillStyle = "#858b98";
+    context.font = "600 11px ui-monospace, SFMono-Regular, Menlo, monospace";
+    context.fillText("// other models used", 62, moreHeaderY);
+    const moreWidth = 1110;
+    const columnWidth = (moreWidth - (moreColumns - 1) * 18) / moreColumns;
+    additionalModels.forEach((model, index) => {
+      const column = index % moreColumns;
+      const row = Math.floor(index / moreColumns);
+      drawModelComment(
+        context,
+        providerImages.get(model.provider) || null,
+        model,
+        62 + column * (columnWidth + 18),
+        moreStartY + row * moreRowStep,
+        columnWidth,
+      );
+    });
+  }
   context.strokeStyle = "#343840";
+  context.lineWidth = 1;
   context.beginPath();
   context.moveTo(25, footerY);
   context.lineTo(1175, footerY);
@@ -408,10 +529,6 @@ async function exportShareImage(data: ShareData) {
     canvasHeight - 43,
   );
   context.restore();
-  context.strokeStyle = "#343840";
-  context.lineWidth = 2;
-  roundedRect(context, 24, 24, 1152, outerHeight, 18);
-  context.stroke();
   canvas.toBlob(
     (blob) => blob && downloadBlob(`obol-${data.rangeLabel.toLowerCase().replace(/ /g, "-")}.png`, blob),
     "image/png",
@@ -463,13 +580,9 @@ async function exportContributionImage(rows: UsageRow[]) {
   context.fillStyle = "#737987";
   context.font = "500 12px ui-monospace, SFMono-Regular, Menlo, monospace";
   context.fillText("OBOL / ACTIVITY", canvasWidth - 210, 62);
-  context.strokeStyle = "#343840";
-  context.lineWidth = 2;
-  context.beginPath();
-  context.moveTo(25, 108);
-  context.lineTo(canvasWidth - 25, 108);
-  context.stroke();
   drawContributionGraph(context, calendar, contentX, graphTop, contentWidth, 40);
+  context.strokeStyle = "#343840";
+  context.lineWidth = 1;
   context.beginPath();
   context.moveTo(25, footerY);
   context.lineTo(canvasWidth - 25, footerY);
@@ -489,10 +602,6 @@ async function exportContributionImage(rows: UsageRow[]) {
   context.font = "500 12px ui-monospace, SFMono-Regular, Menlo, monospace";
   context.fillText("local · UTF-8 · usage snapshot", canvasWidth - 350, canvasHeight - 43);
   context.restore();
-  context.strokeStyle = "#343840";
-  context.lineWidth = 2;
-  roundedRect(context, 24, 24, canvasWidth - 48, outerHeight, 18);
-  context.stroke();
   canvas.toBlob((blob) => blob && downloadBlob(`obol-contribution-${calendar.year}.png`, blob), "image/png");
 }
 
@@ -510,15 +619,40 @@ function ModelRow({ model }: { model: ShareModel }) {
             {formatCurrency(model.cost)} · {formatTokens(model.tokens)}
           </span>
         </div>
-        <p className="mt-1 text-[9px] text-[#737987]">{providerName(model.provider).toLowerCase()}</p>
+        <p className="mt-0.5 text-[9px] text-[#737987]">{providerName(model.provider).toLowerCase()}</p>
       </div>
     </div>
+  );
+}
+
+function ModelComment({ model }: { model: ShareModel }) {
+  const color = providerColor(model.provider);
+  return (
+    <span
+      className="inline-flex min-w-0 items-start gap-2 text-[10px]"
+      title={`${model.model} · ${providerName(model.provider)} · ${formatCurrency(model.cost)} · ${formatTokens(model.tokens)} tokens`}
+    >
+      <ProviderLogo agent={model.provider} size={20} color={color} />
+      <span className="min-w-0">
+        <span className="block truncate font-semibold text-[#e7e9ed]">
+          {model.model.split("/")[1] ? model.model.split("/")[1] : model.model}
+        </span>
+        <span className="mt-0.5 block whitespace-nowrap tabular-nums text-[#aeb4bf]">
+          {formatCurrency(model.cost)} · {formatTokens(model.tokens)} tokens
+        </span>
+      </span>
+    </span>
   );
 }
 
 export default function ShareDialog({ report, summary, onClose }: Props) {
   const [range, setRange] = useState<ShareRange>("today");
   const data = useMemo(() => buildShareData(report, summary, range), [range, report, summary]);
+  const topModels = data.models.slice(0, SHARE_TOP_MODEL_COUNT);
+  const additionalModels = data.models.slice(
+    SHARE_TOP_MODEL_COUNT,
+    SHARE_TOP_MODEL_COUNT + SHARE_ADDITIONAL_MODEL_COUNT,
+  );
 
   return (
     <div
@@ -558,8 +692,8 @@ export default function ShareDialog({ report, summary, onClose }: Props) {
           </div>
         </div>
         <div className="grid gap-10 p-6 lg:grid-cols-[minmax(0,1fr)_250px]">
-          <div className="overflow-hidden rounded-[14px] border border-[#343840] bg-[#111216] font-mono text-[#f5f6f8] shadow-[0_18px_40px_rgba(0,0,0,.18)]">
-            <div className="flex h-11 items-center gap-2 border-b border-[#343840] bg-[#1d1f25] px-4">
+          <div className="overflow-hidden rounded-[14px] bg-[#111216] font-mono text-[#f5f6f8] shadow-[0_18px_40px_rgba(0,0,0,.18)]">
+            <div className="flex h-11 items-center gap-2 bg-[#1d1f25] px-4">
               <span className="h-2.5 w-2.5 rounded-full bg-[#f06b60]" />
               <span className="h-2.5 w-2.5 rounded-full bg-[#f1bd4a]" />
               <span className="h-2.5 w-2.5 rounded-full bg-[#59bf55]" />
@@ -568,7 +702,7 @@ export default function ShareDialog({ report, summary, onClose }: Props) {
               </span>
               <span className="ml-auto text-[9px] text-[#737987]">OBOL / USAGE</span>
             </div>
-            <div className="grid grid-cols-[.85fr_1.15fr] max-[640px]:grid-cols-1 max-[640px]:divide-x-0">
+            <div className="grid grid-cols-[.85fr_1.15fr] max-[640px]:grid-cols-1">
               <div className="p-5 sm:p-6">
                 <div className="text-[12px] text-[#858b98]">// {data.dateLabel.toLowerCase()}</div>
                 <div className="mt-5 text-4xl font-bold tracking-[-0.07em] sm:text-5xl">
@@ -592,10 +726,10 @@ export default function ShareDialog({ report, summary, onClose }: Props) {
                 </div>
               </div>
               <div className="p-5 sm:p-6">
-                <div className="mb-5 text-[10px] font-semibold text-[#858b98]">// top_models</div>
-                <div className="space-y-4">
-                  {data.models.length ? (
-                    data.models.map((model) => (
+                <div className="mb-5 text-[10px] font-semibold text-[#858b98]">// top models</div>
+                <div className="space-y-3">
+                  {topModels.length ? (
+                    topModels.map((model) => (
                       <ModelRow key={`${model.provider}-${model.model}`} model={model} />
                     ))
                   ) : (
@@ -603,8 +737,18 @@ export default function ShareDialog({ report, summary, onClose }: Props) {
                   )}
                 </div>
               </div>
+              {additionalModels.length > 0 && (
+                <div className="col-span-full border-t border-[#343840] px-5 pb-5 pt-4 sm:px-6">
+                  <div className="mb-2 text-[10px] font-semibold text-[#858b98]">// other models used</div>
+                  <div className="grid grid-cols-1 gap-x-8 gap-y-2 min-[520px]:grid-cols-2">
+                    {additionalModels.map((model) => (
+                      <ModelComment key={`${model.provider}-${model.model}`} model={model} />
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
-            <div className="flex h-10 items-center justify-between gap-4 border-t border-[#343840] px-5 text-[10px] sm:px-6">
+            <div className="flex h-fit py-2.5 items-center justify-between gap-4 border-t border-[#343840] px-5 text-[10px] sm:px-6">
               <span className="inline-flex items-center gap-2 font-semibold">
                 <img src="/favicon-32.png" alt="" className="h-4 w-4 rounded-[4px]" /> obol
               </span>
