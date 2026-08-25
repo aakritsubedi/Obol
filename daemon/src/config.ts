@@ -14,6 +14,7 @@ export const DEFAULT_CONFIG: WidgetConfig = {
   warningThreshold: 0.8,
   launchAtLogin: false,
   historyDays: 90,
+  journalIdleMinutes: 15,
 };
 
 export function stateDirectory(): string {
@@ -68,6 +69,7 @@ function parseConfig(value: unknown): WidgetConfig {
   const refreshIntervalMs = Number(input.refreshIntervalMs);
   const warningThreshold = Number(input.warningThreshold);
   const historyDays = Number(input.historyDays);
+  const journalIdleMinutes = Number(input.journalIdleMinutes);
 
   return {
     port: Number.isInteger(port) && port >= 0 && port <= 65535 ? port : DEFAULT_CONFIG.port,
@@ -86,6 +88,10 @@ function parseConfig(value: unknown): WidgetConfig {
       Number.isInteger(historyDays) && historyDays >= 7 && historyDays <= 365
         ? historyDays
         : DEFAULT_CONFIG.historyDays,
+    journalIdleMinutes:
+      Number.isInteger(journalIdleMinutes) && journalIdleMinutes >= 1 && journalIdleMinutes <= 120
+        ? journalIdleMinutes
+        : DEFAULT_CONFIG.journalIdleMinutes,
   };
 }
 

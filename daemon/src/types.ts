@@ -121,6 +121,96 @@ export interface WidgetConfig extends BudgetConfig {
   refreshIntervalMs: number;
   launchAtLogin: boolean;
   historyDays: number;
+  journalIdleMinutes: number;
+}
+
+export interface JournalSession {
+  id: string;
+  /** Which agent recorded this session — "claude", "codex", … */
+  provider: string;
+  title: string | null;
+  project: string;
+  projectPath: string;
+  gitBranch: string | null;
+  startedAt: string;
+  endedAt: string;
+  activeMinutes: number;
+  humanPrompts: number;
+  assistantTurns: number;
+  toolCalls: number;
+  filesEdited: string[];
+  models: string[];
+  // What the person actually asked for, with the editor's injected context
+  // stripped out. Capped per session and truncated per line.
+  prompts: string[];
+  toolMix: Record<string, number>;
+  // Apportioned from the project total by output tokens: ccusage reports cost
+  // per project per day, never per session. An estimate, not a measurement.
+  totalCost: number | null;
+}
+
+export interface JournalProject {
+  name: string;
+  path: string;
+  activeMinutes: number;
+  sessions: number;
+  filesEdited: number;
+  toolCalls: number;
+  /** The agents that worked on this project during the day. */
+  providers: string[];
+  // Only Claude reports spend per project, so this is null for a project no
+  // Claude session touched.
+  totalCost: number | null;
+}
+
+export interface DayJournal {
+  date: string;
+  timezone: string;
+  idleMinutes: number;
+  activeMinutes: number;
+  blocks: number;
+  spanMinutes: number;
+  firstEventAt: string | null;
+  lastEventAt: string | null;
+  humanPrompts: number;
+  assistantTurns: number;
+  toolCalls: number;
+  toolMix: Record<string, number>;
+  filesEdited: number;
+  testRuns: number;
+  /** Every agent that recorded work on this day. */
+  providers: string[];
+  sessions: JournalSession[];
+  projects: JournalProject[];
+  // Every agent's spend for the day, matching the dashboard's Today card.
+  totalCost: number;
+  totalTokens: number;
+  computedAt: string;
+}
+
+export function emptyJournal(date: string, timezone: string, idleMinutes: number): DayJournal {
+  return {
+    date,
+    timezone,
+    idleMinutes,
+    activeMinutes: 0,
+    blocks: 0,
+    spanMinutes: 0,
+    firstEventAt: null,
+    lastEventAt: null,
+    humanPrompts: 0,
+    assistantTurns: 0,
+    toolCalls: 0,
+    toolMix: {},
+    filesEdited: 0,
+    testRuns: 0,
+    providers: [],
+    sessions: [],
+    projects: [],
+    totalCost: 0,
+    totalTokens: 0,
+    computedAt: new Date().toISOString(),
+  };
 }
 
 export interface BudgetEvaluation {

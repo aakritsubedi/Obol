@@ -27,6 +27,16 @@
     --contribution-level-2: #40c463;
     --contribution-level-3: #30a14e;
     --contribution-level-4: #216e39;
+    /* The journal is styled as a paper note, so it keeps a warm palette of its
+       own rather than inheriting the cool grays the rest of the dashboard uses. */
+    --note-paper: #fffdf6;
+    --note-edge: rgba(17, 17, 20, 0.09);
+    --note-rule: rgba(17, 17, 20, 0.07);
+    --note-ink: #1f1f22;
+    --note-subtle: #55555b;
+    --note-muted: #8a8a8e;
+    --note-accent: #eab000;
+    --note-accent-soft: #fff3c9;
   }
   @media (prefers-color-scheme: dark) {
     :root {
@@ -52,6 +62,14 @@
       --contribution-level-2: #196c2e;
       --contribution-level-3: #2ea043;
       --contribution-level-4: #56d364;
+      --note-paper: #1c1c1e;
+      --note-edge: rgba(255, 255, 255, 0.11);
+      --note-rule: rgba(255, 255, 255, 0.07);
+      --note-ink: #f2f2f7;
+      --note-subtle: #c7c7cc;
+      --note-muted: #98989f;
+      --note-accent: #ffd60a;
+      --note-accent-soft: rgba(255, 214, 10, 0.16);
     }
   }
 

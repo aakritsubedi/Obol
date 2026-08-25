@@ -4,8 +4,10 @@ import { fileURLToPath } from "node:url";
 import { SnapshotStore } from "./cache.js";
 import { runOnce, runUsage } from "./ccusage.js";
 import { ConfigStore, migrateLegacyState } from "./config.js";
+import { readDayJournal } from "./journal.js";
 import { DaemonServer } from "./server.js";
-import { type CcusageReport, emptyBlocks, type WidgetConfig } from "./types.js";
+import { dateForTimeZone } from "./time.js";
+import { type CcusageReport, type DayJournal, emptyBlocks, type WidgetConfig } from "./types.js";
 import { AgentLogWatcher } from "./watcher.js";
 
 const daemonDirectory = resolve(fileURLToPath(new URL(".", import.meta.url)));
@@ -16,6 +18,10 @@ function dashboardRoot(): string {
 
 function hasFlag(name: string): boolean {
   return process.argv.includes(name);
+}
+
+function systemTimeZone(): string {
+  return Intl.DateTimeFormat().resolvedOptions().timeZone || process.env.TZ || "UTC";
 }
 
 function flagValue(name: string): string | undefined {
@@ -52,6 +58,14 @@ async function main(): Promise<void> {
   }
 
   const token = randomBytes(32).toString("hex");
+  // Walking the transcript tree is far more expensive than serving a snapshot,
+  // so each day is computed once. Today's entry is dropped whenever the watcher
+  // sees a transcript change or a refresh lands new cost data; past days do not
+  // change and are kept for the life of the daemon.
+  const journalCache = new Map<string, DayJournal>();
+  const forgetToday = (): void => {
+    journalCache.delete(dateForTimeZone(new Date(), systemTimeZone()));
+  };
   let refreshPromise: Promise<void> | null = null;
   let debounceTimer: NodeJS.Timeout | null = null;
   let fallbackTimer: NodeJS.Timeout | null = null;
@@ -73,6 +87,8 @@ async function main(): Promise<void> {
         liveReport = result.fullReport ?? result.report ?? liveReport;
         const message = result.errors.length ? result.errors.join("; ") : null;
         await store.apply(report, blocks, config, message);
+        // Today's journal quotes cost from this report, so it has to be rebuilt.
+        forgetToday();
         server?.broadcast(store.get().summary);
       } else {
         await store.markError(config, result.errors.join("; ") || "ccusage refresh failed");
@@ -123,9 +139,27 @@ async function main(): Promise<void> {
         if (patch.historyDays !== undefined) {
           await scheduleRefresh(true);
         }
+        if (patch.journalIdleMinutes !== undefined) journalCache.clear();
         return config;
       },
       refresh: () => scheduleRefresh(true),
+      getJournal: async (requested: string | null) => {
+        const timezone = systemTimeZone();
+        const date = requested ?? dateForTimeZone(new Date(), timezone);
+        const cached = journalCache.get(date);
+        if (cached && cached.idleMinutes === config.journalIdleMinutes) return cached;
+        const journal = await readDayJournal({
+          date,
+          timezone,
+          idleMinutes: config.journalIdleMinutes,
+          report: liveReport,
+        });
+        // Caching a journal built before the first ccusage run would pin its
+        // costs at zero for the rest of the day, so hold it back until the
+        // report it drew from actually had project rows to join against.
+        if (liveReport.projects.length > 0) journalCache.set(date, journal);
+        return journal;
+      },
     },
   });
 
@@ -139,6 +173,7 @@ async function main(): Promise<void> {
   });
 
   watcher = new AgentLogWatcher(() => {
+    forgetToday();
     void scheduleRefresh();
   });
   watcher.start();

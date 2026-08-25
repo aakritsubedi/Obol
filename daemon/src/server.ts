@@ -2,7 +2,7 @@ import { readFile, stat } from "node:fs/promises";
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
 import type { AddressInfo } from "node:net";
 import { extname, join, normalize, resolve } from "node:path";
-import type { BlocksReport, CcusageReport, Summary, WidgetConfig } from "./types.js";
+import type { BlocksReport, CcusageReport, DayJournal, Summary, WidgetConfig } from "./types.js";
 
 export interface ServerHandlers {
   getSummary: () => Summary;
@@ -11,6 +11,7 @@ export interface ServerHandlers {
   getConfig: () => WidgetConfig;
   updateConfig: (patch: Partial<WidgetConfig>) => Promise<WidgetConfig>;
   refresh: () => Promise<void>;
+  getJournal: (date: string | null) => Promise<DayJournal>;
 }
 
 export interface ServerOptions {
@@ -189,6 +190,15 @@ export class DaemonServer {
       }
       if (req.method === "GET" && url.pathname === "/api/blocks/active") {
         json(res, 200, this.options.handlers.getBlocks());
+        return;
+      }
+      if (req.method === "GET" && url.pathname === "/api/journal") {
+        const date = url.searchParams.get("date");
+        if (date !== null && !/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+          json(res, 400, { error: "date must be YYYY-MM-DD" });
+          return;
+        }
+        json(res, 200, await this.options.handlers.getJournal(date));
         return;
       }
       if (req.method === "GET" && url.pathname === "/api/config") {

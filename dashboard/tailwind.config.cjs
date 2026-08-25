@@ -27,6 +27,16 @@ module.exports = {
             soft: "var(--color-over-soft)",
             DEFAULT: "var(--color-over)",
             strong: "var(--color-over-strong)"
+          },
+          note: {
+            paper: "var(--note-paper)",
+            edge: "var(--note-edge)",
+            rule: "var(--note-rule)",
+            ink: "var(--note-ink)",
+            subtle: "var(--note-subtle)",
+            muted: "var(--note-muted)",
+            accent: "var(--note-accent)",
+            "accent-soft": "var(--note-accent-soft)"
           }
         },
         fontFamily: {

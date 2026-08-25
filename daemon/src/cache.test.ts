@@ -11,6 +11,7 @@ const config: WidgetConfig = {
   warningThreshold: 0.8,
   launchAtLogin: false,
   historyDays: 90,
+  journalIdleMinutes: 15,
 };
 
 function todayKey(): string {

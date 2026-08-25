@@ -105,6 +105,69 @@ export interface WidgetConfig {
   warningThreshold: number;
   launchAtLogin: boolean;
   historyDays: number;
+  journalIdleMinutes: number;
+}
+
+export interface JournalSession {
+  id: string;
+  /** Which agent recorded this session — "claude", "codex", … */
+  provider: string;
+  title: string | null;
+  project: string;
+  projectPath: string;
+  gitBranch: string | null;
+  startedAt: string;
+  endedAt: string;
+  activeMinutes: number;
+  humanPrompts: number;
+  assistantTurns: number;
+  toolCalls: number;
+  filesEdited: string[];
+  models: string[];
+  // What the person actually asked for, with injected editor context stripped.
+  prompts: string[];
+  toolMix: Record<string, number>;
+  // Apportioned from the project total; an estimate, never a measured figure.
+  totalCost: number | null;
+}
+
+export interface JournalProject {
+  name: string;
+  path: string;
+  activeMinutes: number;
+  sessions: number;
+  filesEdited: number;
+  toolCalls: number;
+  /** The agents that worked on this project during the day. */
+  providers?: string[];
+  // Only Claude reports spend per project, so this is null for a project no
+  // Claude session touched.
+  totalCost: number | null;
+}
+
+export interface DayJournal {
+  date: string;
+  timezone: string;
+  idleMinutes: number;
+  activeMinutes: number;
+  blocks: number;
+  spanMinutes: number;
+  firstEventAt: string | null;
+  lastEventAt: string | null;
+  humanPrompts: number;
+  assistantTurns: number;
+  toolCalls: number;
+  toolMix: Record<string, number>;
+  filesEdited: number;
+  testRuns: number;
+  /** Every agent that recorded work on this day. */
+  providers?: string[];
+  sessions: JournalSession[];
+  projects: JournalProject[];
+  // Every agent's spend for the day, matching the Today card.
+  totalCost: number;
+  totalTokens: number;
+  computedAt: string;
 }
 
 function token(): string {
@@ -145,6 +208,8 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 export const getSummary = () => request<Summary>("/api/summary");
 export const getReport = () => request<Report>("/api/report");
 export const getConfig = () => request<WidgetConfig>("/api/config");
+export const getJournal = (date?: string) =>
+  request<DayJournal>(`/api/journal${date ? `?date=${encodeURIComponent(date)}` : ""}`);
 export const refresh = () => request<Summary>("/api/refresh", { method: "POST" });
 export const updateConfig = (patch: Partial<WidgetConfig>) =>
   request<WidgetConfig>("/api/config", {

@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
 import {
+  type DayJournal,
   getConfig,
+  getJournal,
   getReport,
   type Report,
   refresh,
@@ -13,7 +15,10 @@ import {
 import BudgetSettings from "./components/BudgetSettings";
 import ContributionChart from "./components/ContributionChart";
 import CostChart from "./components/CostChart";
+import ErrorBoundary from "./components/ErrorBoundary";
 import { formatCurrency, formatRelativeTime, formatUpdatedAt } from "./components/format";
+import JournalCard from "./components/JournalCard";
+import { weekOptions } from "./components/journal";
 import ModelTable from "./components/ModelTable";
 import ProjectTable from "./components/ProjectTable";
 import ProviderTable from "./components/ProviderTable";
@@ -138,6 +143,13 @@ export default function App() {
   const [metric, setMetric] = useState<ChartMetric>("cost");
   const [summary, setSummary] = useState<Summary>(loadingSummary);
   const [report, setReport] = useState<Report | null>(null);
+  const [journal, setJournal] = useState<DayJournal | null>(null);
+  // The picker spans this week, Sunday through today, and opens on today.
+  const journalOptions = useMemo(() => weekOptions(new Date()), []);
+  const [journalDate, setJournalDate] = useState(
+    () => journalOptions[journalOptions.length - 1]?.value || "",
+  );
+  const [journalLoading, setJournalLoading] = useState(true);
   const [config, setConfig] = useState<WidgetConfig | null>(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -204,13 +216,38 @@ export default function App() {
     };
   }, []);
 
+  useEffect(() => {
+    if (!journalDate) return;
+    let active = true;
+    setJournalLoading(true);
+    getJournal(journalDate)
+      .then((next) => {
+        if (active) setJournal(next);
+      })
+      .catch(() => {
+        if (active) setJournal(null);
+      })
+      .finally(() => {
+        if (active) setJournalLoading(false);
+      });
+    return () => {
+      active = false;
+    };
+  }, [journalDate]);
+
   async function doRefresh() {
     setRefreshing(true);
     try {
       const next = await refresh();
-      const nextReport = await getReport();
+      const [nextReport, nextJournal] = await Promise.all([
+        getReport(),
+        // The journal walks transcript files rather than reading the snapshot,
+        // so a failure there must not cost us the rest of the dashboard.
+        getJournal(journalDate).catch(() => null),
+      ]);
       setSummary(next);
       setReport(nextReport);
+      if (nextJournal) setJournal(nextJournal);
       setError(next.stale ? next.error : null);
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : "Refresh failed");
@@ -527,6 +564,17 @@ export default function App() {
             Budget configuration is unavailable.
           </div>
         )}
+
+        <ErrorBoundary label="The task list">
+          <JournalCard
+            journal={journal}
+            options={journalOptions}
+            date={journalDate}
+            onDateChange={setJournalDate}
+            loading={journalLoading}
+          />
+        </ErrorBoundary>
+
         <footer className="mt-3 text-center text-[10px] text-muted">
           Costs are estimates from pricing table, not invoices. <span className="px-1.5">•</span> Data stays
           on this Mac. <span className="px-1.5">•</span> Last refresh {formatRelativeTime(summary.updatedAt)}
