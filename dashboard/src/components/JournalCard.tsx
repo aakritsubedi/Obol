@@ -165,14 +165,14 @@ function TaskRow({ task }: { task: Task }) {
                 <ul className="mt-1.5 flex flex-col gap-0.5">
                   {(allFiles ? filesEdited : filesEdited.slice(0, VISIBLE_FILES)).map((file) => (
                     <li
-                  key={file}
-                  className="truncate font-mono text-[11.5px] leading-relaxed text-note-muted"
-                  title={file}
-                >
-                  {relativeFile(file, task.projectPath)}
-                </li>
-              ))}
-            </ul>
+                      key={file}
+                      className="truncate font-mono text-[11.5px] leading-relaxed text-note-muted"
+                      title={file}
+                    >
+                      {relativeFile(file, task.projectPath)}
+                    </li>
+                  ))}
+                </ul>
                 {filesEdited.length > VISIBLE_FILES && (
                   <button
                     type="button"

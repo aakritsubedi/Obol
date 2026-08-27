@@ -25,7 +25,10 @@ export function formatClock(iso: string | null, locale?: string): string {
   return new Intl.DateTimeFormat(locale, { hour: "numeric", minute: "2-digit" }).format(date);
 }
 
-export function sessionRange(session: Pick<JournalSession, "startedAt" | "endedAt">, locale?: string): string {
+export function sessionRange(
+  session: Pick<JournalSession, "startedAt" | "endedAt">,
+  locale?: string,
+): string {
   return `${formatClock(session.startedAt, locale)} – ${formatClock(session.endedAt, locale)}`;
 }
 

@@ -385,10 +385,7 @@ describe("groupTasks", () => {
   it("titles the task from the named session, whichever comes first", () => {
     const tasks = groupTasks(
       journal({
-        sessions: [
-          session({ id: "a", title: null }),
-          session({ id: "b", title: "Ship the parser" }),
-        ],
+        sessions: [session({ id: "a", title: null }), session({ id: "b", title: "Ship the parser" })],
       }),
     );
     expect(tasks[0].title).toBe("Ship the parser");

@@ -42,12 +42,7 @@ afterEach(async () => {
 // doubled the way SQLite expects.
 const literal = (value: string): string => value.replace(/'/g, "''");
 
-function message(
-  id: string,
-  sessionId: string,
-  time: number,
-  data: Record<string, unknown>,
-): string {
+function message(id: string, sessionId: string, time: number, data: Record<string, unknown>): string {
   return `INSERT INTO message (id, session_id, time_created, data) VALUES ('${literal(id)}', '${literal(sessionId)}', ${time}, '${literal(JSON.stringify(data))}')`;
 }
 
