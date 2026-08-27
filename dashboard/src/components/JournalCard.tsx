@@ -5,11 +5,11 @@ import {
   clipboardSummary,
   type DayOption,
   groupTasks,
-  type Task,
   narrative,
   noteStamp,
   relativeFile,
   sessionRange,
+  type Task,
   toolShares,
   workTags,
 } from "./journal";
