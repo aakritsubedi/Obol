@@ -122,6 +122,9 @@ export interface WidgetConfig extends BudgetConfig {
   launchAtLogin: boolean;
   historyDays: number;
   journalIdleMinutes: number;
+  // Display only. Every cost this daemon reports — budgets and alerts included
+  // — stays in USD; the menu bar and dashboard convert at the point of render.
+  currency: string;
 }
 
 export interface JournalSession {

@@ -12,6 +12,7 @@ const config: WidgetConfig = {
   launchAtLogin: false,
   historyDays: 90,
   journalIdleMinutes: 15,
+  currency: "USD",
 };
 
 function todayKey(): string {

@@ -35,10 +35,6 @@ final class DaemonController: ObservableObject {
         start()
     }
 
-    var menuTitle: String {
-        UsageClient.currencySymbol + UsageClient.amount(summary.today.totalCost)
-    }
-
     var liveLabel: String {
         summary.stale ? "Cached" : "Live"
     }
@@ -98,6 +94,15 @@ final class DaemonController: ObservableObject {
         if let url = components?.url {
             NSWorkspace.shared.open(url)
         }
+    }
+
+    /// The display currency lives in the daemon's config so the menu bar and
+    /// the dashboard read the same choice; the conversion itself happens in
+    /// CurrencyController, at render time, in each surface.
+    func setCurrency(_ code: String) {
+        guard config.currency != code else { return }
+        config.currency = code
+        Task { await saveConfig() }
     }
 
     func setLaunchAtLogin(_ enabled: Bool) {
@@ -211,8 +216,12 @@ final class DaemonController: ObservableObject {
                 Task { await self?.pollSummary() }
             }
             // One daemon-managed refresh on startup replaces the disk snapshot;
-            // subsequent polling remains a cheap cached read.
-            Task { await refresh() }
+            // subsequent polling remains a cheap cached read. The config comes
+            // with it so the display currency does not wait a poll interval.
+            Task {
+                await refresh()
+                await loadConfig()
+            }
             return
         }
         runtimeTimer = Timer.scheduledTimer(withTimeInterval: 0.1, repeats: false) { [weak self] _ in
@@ -225,14 +234,21 @@ final class DaemonController: ObservableObject {
         do {
             let next = try await client.summary(baseURL: baseURL, token: token)
             apply(next)
-            if let nextConfig = try? await client.config(baseURL: baseURL, token: token) {
-                config = nextConfig
-                healLaunchAtLogin()
-            }
+            await loadConfig()
         } catch {
             connected = false
             statusMessage = "Daemon unavailable; showing the last good snapshot."
         }
+    }
+
+    private func loadConfig() async {
+        guard let baseURL, !token.isEmpty else { return }
+        guard let nextConfig = try? await client.config(baseURL: baseURL, token: token) else { return }
+        config = nextConfig
+        healLaunchAtLogin()
+        // config.json is the shared source of truth for the display currency,
+        // so a change made in one surface reaches the other on its next read.
+        CurrencyController.shared?.adopt(code: nextConfig.currency)
     }
 
     private func saveConfig() async {

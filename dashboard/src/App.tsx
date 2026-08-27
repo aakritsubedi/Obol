@@ -16,7 +16,13 @@ import BudgetSettings from "./components/BudgetSettings";
 import ContributionChart from "./components/ContributionChart";
 import CostChart from "./components/CostChart";
 import ErrorBoundary from "./components/ErrorBoundary";
-import { formatCurrency, formatRelativeTime, formatUpdatedAt } from "./components/format";
+import {
+  formatCurrency,
+  formatRelativeTime,
+  formatUpdatedAt,
+  type MoneyDisplay,
+  setMoneyDisplay,
+} from "./components/format";
 import JournalCard from "./components/JournalCard";
 import { weekOptions } from "./components/journal";
 import ModelTable from "./components/ModelTable";
@@ -27,6 +33,7 @@ import Ticker from "./components/Ticker";
 import TodayCard, { type Last7Summary } from "./components/TodayCard";
 import TotalsCard from "./components/TotalsCard";
 import WeeklyLeaders from "./components/WeeklyLeaders";
+import { loadMoneyDisplay, USD } from "./currency";
 import { type ExportMetric, exportCsv, exportJson } from "./export";
 
 type HistoryPeriod = "daily" | "weekly" | "monthly";
@@ -151,6 +158,9 @@ export default function App() {
   );
   const [journalLoading, setJournalLoading] = useState(true);
   const [config, setConfig] = useState<WidgetConfig | null>(null);
+  // Held in state purely to re-render on change; formatCurrency reads the
+  // module-level setting that the effect below installs.
+  const [money, setMoney] = useState<MoneyDisplay>(USD);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -215,6 +225,21 @@ export default function App() {
       document.removeEventListener("visibilitychange", refreshOnFocus);
     };
   }, []);
+
+  // The menu bar app owns the currency choice and writes it to the shared
+  // config; the dashboard follows whatever it finds there.
+  useEffect(() => {
+    const code = config?.currency || USD.code;
+    let active = true;
+    void loadMoneyDisplay(code).then((next) => {
+      if (!active) return;
+      setMoneyDisplay(next);
+      setMoney(next);
+    });
+    return () => {
+      active = false;
+    };
+  }, [config?.currency]);
 
   useEffect(() => {
     if (!journalDate) return;
@@ -577,7 +602,15 @@ export default function App() {
 
         <footer className="mt-3 text-center text-[10px] text-muted">
           Costs are estimates from pricing table, not invoices. <span className="px-1.5">•</span> Data stays
-          on this Mac. <span className="px-1.5">•</span> Last refresh {formatRelativeTime(summary.updatedAt)}
+          on this Mac.
+          {money.code !== USD.code && (
+            <>
+              {" "}
+              <span className="px-1.5">•</span> Shown in {money.code} at 1 {USD.code} ={" "}
+              {money.rate.toFixed(2)}
+            </>
+          )}{" "}
+          <span className="px-1.5">•</span> Last refresh {formatRelativeTime(summary.updatedAt)}
         </footer>
       </main>
       {settingsOpen && config && (

@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   displayName,
   formatCurrency,
@@ -9,9 +9,18 @@ import {
   formatSignedCurrency,
   formatTokens,
   formatUpdatedAt,
+  heroFontSize,
+  moneyDisplay,
   numberValue,
   projectName,
+  setMoneyDisplay,
 } from "./format";
+
+// The display currency is module-level state, so anything that changes it has
+// to put it back or it leaks into whatever runs next.
+afterEach(() => {
+  setMoneyDisplay({ code: "USD", rate: 1 });
+});
 
 describe("numberValue", () => {
   it("passes numbers through and parses numeric strings", () => {
@@ -37,6 +46,40 @@ describe("formatCurrency", () => {
 
   it("coerces junk to zero", () => {
     expect(formatCurrency(undefined, "en-US")).toBe("$0.00");
+  });
+});
+
+describe("setMoneyDisplay", () => {
+  it("converts and relabels every amount at once", () => {
+    setMoneyDisplay({ code: "NPR", rate: 152.75 });
+    // Intl separates a lettered currency code from the figure with U+00A0.
+    expect(formatCurrency(10, "en-US")).toBe("NPR\u00a01,527.50");
+    expect(formatSignedCurrency(-10, "en-US")).toBe("−NPR\u00a01,527.50");
+  });
+
+  it("refuses a rate that cannot convert anything", () => {
+    setMoneyDisplay({ code: "NPR", rate: Number.NaN });
+    expect(moneyDisplay()).toEqual({ code: "USD", rate: 1 });
+
+    setMoneyDisplay({ code: "NPR", rate: 0 });
+    expect(moneyDisplay()).toEqual({ code: "USD", rate: 1 });
+    expect(formatCurrency(10, "en-US")).toBe("$10.00");
+  });
+});
+
+describe("heroFontSize", () => {
+  it("shrinks the divisor as the amount gets longer", () => {
+    // "$17.26" leaves room to hit the cap; "NPR 283,484.36" has to come down.
+    expect(heroFontSize("$17.26", 64)).toBe("clamp(24px, calc((100cqi - 48px) / 3.48), 64px)");
+    expect(heroFontSize("NPR 283,484.36", 64)).toBe("clamp(24px, calc((100cqi - 48px) / 8.12), 64px)");
+  });
+
+  it("takes the card's own padding off the container width", () => {
+    expect(heroFontSize("$1.00", 84, 64)).toBe("clamp(24px, calc((100cqi - 64px) / 2.90), 84px)");
+  });
+
+  it("never divides by zero on an empty amount", () => {
+    expect(heroFontSize("", 64)).toBe("clamp(24px, calc((100cqi - 48px) / 0.58), 64px)");
   });
 });
 

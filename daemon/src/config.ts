@@ -15,6 +15,7 @@ export const DEFAULT_CONFIG: WidgetConfig = {
   launchAtLogin: false,
   historyDays: 90,
   journalIdleMinutes: 15,
+  currency: "USD",
 };
 
 export function stateDirectory(): string {
@@ -63,6 +64,15 @@ function nonNegativeOrNull(value: unknown, fallback: number | null): number | nu
   return Number.isFinite(parsed) && parsed >= 0 ? parsed : fallback;
 }
 
+// An ISO 4217 alphabetic code and nothing else: the value is handed straight to
+// a rate lookup and to Intl.NumberFormat, both of which are stricter than the
+// config file is.
+function currencyCode(value: unknown, fallback: string): string {
+  if (typeof value !== "string") return fallback;
+  const code = value.trim().toUpperCase();
+  return /^[A-Z]{3}$/.test(code) ? code : fallback;
+}
+
 function parseConfig(value: unknown): WidgetConfig {
   const input = typeof value === "object" && value !== null ? (value as Record<string, unknown>) : {};
   const port = Number(input.port);
@@ -92,6 +102,7 @@ function parseConfig(value: unknown): WidgetConfig {
       Number.isInteger(journalIdleMinutes) && journalIdleMinutes >= 1 && journalIdleMinutes <= 120
         ? journalIdleMinutes
         : DEFAULT_CONFIG.journalIdleMinutes,
+    currency: currencyCode(input.currency, DEFAULT_CONFIG.currency),
   };
 }
 

@@ -6,12 +6,50 @@ export function numberValue(value: unknown): number {
 // Formatting functions accept an optional locale so tests can pin output;
 // at runtime they default to the user's locale, as before.
 
+export interface MoneyDisplay {
+  /** ISO 4217 code the amounts are rendered in. */
+  code: string;
+  /** Multiplier from the USD figures the daemon reports. 1 for USD. */
+  rate: number;
+}
+
+// The display currency is chosen in the menu bar app and applies to every
+// amount on the page at once, so it lives here as one module-level setting
+// rather than being threaded through the ~45 call sites below. Every cost the
+// daemon reports — and everything the exports write — stays in USD; the
+// conversion happens here, at the moment of rendering.
+let money: MoneyDisplay = { code: "USD", rate: 1 };
+
+export function setMoneyDisplay(next: MoneyDisplay): void {
+  money = Number.isFinite(next.rate) && next.rate > 0 ? next : { code: "USD", rate: 1 };
+}
+
+export function moneyDisplay(): MoneyDisplay {
+  return money;
+}
+
 export function formatCurrency(value: unknown, locale?: string): string {
   return new Intl.NumberFormat(locale, {
     style: "currency",
-    currency: "USD",
+    currency: money.code,
     maximumFractionDigits: 2,
-  }).format(numberValue(value));
+  }).format(numberValue(value) * money.rate);
+}
+
+/**
+ * Font size for a hero amount, shrinking as the amount gets longer so it stays
+ * inside its card.
+ *
+ * "$17.26" and "NPR 283,484.36" are the same figure in two currencies, and a
+ * size picked for the first overflows the card with the second. The width is
+ * expressed in container query units so it tracks the card rather than the
+ * viewport — the card must set `container-type: inline-size`. 0.58em is about
+ * the advance of one bold tabular digit, and `padding` is the card's own
+ * horizontal padding, which container units include but the text cannot use.
+ */
+export function heroFontSize(text: string, max: number, padding = 48): string {
+  const ems = Math.max(text.length, 1) * 0.58;
+  return `clamp(24px, calc((100cqi - ${padding}px) / ${ems.toFixed(2)}), ${max}px)`;
 }
 
 export function formatSignedCurrency(value: unknown, locale?: string): string {

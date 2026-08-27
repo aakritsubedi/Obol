@@ -4,8 +4,12 @@ import SwiftUI
 struct PopoverView: View {
     @ObservedObject var controller: DaemonController
     @ObservedObject var updates: UpdateController
+    @ObservedObject var currency: CurrencyController
 
     @State private var showingSettings = false
+    @State private var currencyPickerOpen = false
+    @State private var currencyQuery = ""
+    @FocusState private var currencySearchFocused: Bool
 
     var body: some View {
         Group {
@@ -25,10 +29,12 @@ struct PopoverView: View {
         .onAppear {
             controller.popoverOpened()
             updates.popoverOpened()
+            currency.popoverOpened()
         }
         .onDisappear {
             controller.popoverClosed()
             showingSettings = false
+            closeCurrencyPicker()
         }
     }
 
@@ -90,11 +96,11 @@ struct PopoverView: View {
     /// formatter never gets a chance to render `US$`; they are styled
     /// identically so the total still reads as one number.
     private var totalAmount: some View {
-        let value = UsageClient.amount(controller.summary.today.totalCost)
+        let value = currency.amount(controller.summary.today.totalCost)
         let tracking = WidgetStyle.TypeScale.heroTracking
 
         return HStack(alignment: .firstTextBaseline, spacing: 0) {
-            Text(UsageClient.currencySymbol)
+            Text(currency.symbol)
                 .tracking(tracking)
             Text(value)
                 .monospacedDigit()
@@ -109,7 +115,7 @@ struct PopoverView: View {
         .animation(.easeOut(duration: 0.35), value: value)
         .accessibilityElement(children: .ignore)
         .accessibilityLabel("Spent today")
-        .accessibilityValue("\(value) US dollars")
+        .accessibilityValue("\(value) \(currency.active.name)")
     }
 
     private var statusLabel: some View {
@@ -155,7 +161,7 @@ struct PopoverView: View {
                                 .font(WidgetStyle.TypeScale.caption)
                                 .foregroundStyle(.secondary)
                                 .frame(minWidth: 36, alignment: .trailing)
-                            Text(UsageClient.currencySymbol + UsageClient.amount(provider.totalCost))
+                            Text(currency.display(provider.totalCost))
                                 .monospacedDigit()
                         }
                         .font(WidgetStyle.TypeScale.row)
@@ -163,7 +169,7 @@ struct PopoverView: View {
                         .accessibilityLabel(
                             "\(ProviderCatalog.name(for: provider.agent)) "
                                 + "\(UsageClient.compactTokens(provider.totalTokens)) tokens, "
-                                + "\(UsageClient.amount(provider.totalCost)) US dollars"
+                                + "\(currency.amount(provider.totalCost)) \(currency.active.name)"
                         )
                     }
                 }
@@ -221,11 +227,16 @@ struct PopoverView: View {
                 Spacer(minLength: 8)
                 iconButton(systemName: "xmark", help: "Back to usage") {
                     showingSettings = false
+                    closeCurrencyPicker()
                 }
             }
 
             hairline
                 .padding(.top, 14)
+
+            currencyRow
+
+            hairline
 
             // Label and control are separate views rather than a plain Toggle:
             // a Toggle sizes to its content, which parks the switch against the
@@ -279,6 +290,190 @@ struct PopoverView: View {
             .accessibilityElement(children: .combine)
             .accessibilityLabel("Version")
             .accessibilityValue(Self.appVersion)
+        }
+        .onAppear { currency.settingsOpened() }
+    }
+
+    /// Everything the daemon reports is priced in USD; picking a currency here
+    /// converts at display time only, so budgets and alerts keep their units.
+    private var currencyRow: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(spacing: 8) {
+                Text("Currency")
+                Spacer(minLength: 8)
+                currencyTrigger
+            }
+
+            if currencyPickerOpen {
+                currencyPicker
+            }
+
+            HStack(spacing: 10) {
+                Text(currencyCaption)
+                    .fixedSize(horizontal: false, vertical: true)
+                currencyRetry
+            }
+            .font(WidgetStyle.TypeScale.caption)
+            .foregroundStyle(.secondary)
+        }
+        .font(WidgetStyle.TypeScale.row)
+        .padding(.vertical, 14)
+        .animation(.easeInOut(duration: 0.15), value: currency.rateState)
+    }
+
+    /// The trigger shows the code alone: the row it sits in is 340pt wide, and
+    /// the names belong in the list it opens.
+    private var currencyTrigger: some View {
+        Button {
+            if currencyPickerOpen {
+                closeCurrencyPicker()
+            } else {
+                currencyPickerOpen = true
+            }
+        } label: {
+            HStack(spacing: 5) {
+                Text(currency.selected.code)
+                Image(systemName: "chevron.up.chevron.down")
+                    .font(.system(size: 9, weight: .semibold))
+                    .foregroundStyle(.secondary)
+            }
+            .padding(.horizontal, 8)
+            .padding(.vertical, 3)
+            .background(
+                RoundedRectangle(cornerRadius: 6, style: .continuous)
+                    .fill(Color.primary.opacity(0.06))
+            )
+            .contentShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("Display currency")
+        .accessibilityValue(currency.selected.name)
+    }
+
+    /// The list keeps a fixed height and scrolls inside it. The directory runs
+    /// to 165 entries, and a list that grew with the result count would resize
+    /// the whole popover on every keystroke.
+    private var currencyPicker: some View {
+        VStack(spacing: 0) {
+            currencySearchField
+            hairline
+            currencyList
+        }
+        .background(Color.primary.opacity(0.03))
+        .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: 8, style: .continuous)
+                .strokeBorder(WidgetStyle.hairline)
+        )
+    }
+
+    private var currencySearchField: some View {
+        HStack(spacing: 6) {
+            Image(systemName: "magnifyingglass")
+                .font(.system(size: 11))
+                .foregroundStyle(.secondary)
+            TextField("Search currencies", text: $currencyQuery)
+                .textFieldStyle(.plain)
+                .focused($currencySearchFocused)
+                .onAppear { currencySearchFocused = true }
+            if !currencyQuery.isEmpty {
+                Button {
+                    currencyQuery = ""
+                    currencySearchFocused = true
+                } label: {
+                    Image(systemName: "xmark.circle.fill")
+                        .font(.system(size: 11))
+                        .foregroundStyle(.secondary)
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Clear search")
+            }
+        }
+        .font(WidgetStyle.TypeScale.row)
+        .padding(.horizontal, 9)
+        .padding(.vertical, 7)
+    }
+
+    private var currencyList: some View {
+        ScrollViewReader { proxy in
+            ScrollView {
+                LazyVStack(alignment: .leading, spacing: 0) {
+                    if currencyResults.isEmpty {
+                        Text(currencyEmptyMessage)
+                            .font(WidgetStyle.TypeScale.caption)
+                            .foregroundStyle(.secondary)
+                            .padding(.horizontal, 6)
+                            .padding(.vertical, 10)
+                    } else {
+                        ForEach(currencyResults) { option in
+                            CurrencyRow(option: option, selected: option.code == currency.selected.code) {
+                                currency.select(option)
+                                closeCurrencyPicker()
+                            }
+                            .id(option.code)
+                        }
+                    }
+                }
+                .padding(4)
+            }
+            .frame(height: 186)
+            // Open onto the current pick rather than the top of the alphabet.
+            .onAppear { proxy.scrollTo(currency.selected.code, anchor: .center) }
+        }
+    }
+
+    /// The directory carries USD along with everything else. Until it loads,
+    /// USD and the current pick are the only entries there are to offer.
+    private var currencyResults: [CurrencyOption] {
+        let directory = currency.options.isEmpty ? currencyFallback : currency.options
+        return directory.filter { currency.matches($0, query: currencyQuery) }
+    }
+
+    private var currencyFallback: [CurrencyOption] {
+        guard currency.selected.code != CurrencyOption.usd.code else { return [.usd] }
+        return [.usd, currency.selected].sorted { $0.code < $1.code }
+    }
+
+    private var currencyEmptyMessage: String {
+        if currency.options.isEmpty, case .loading = currency.optionsState {
+            return "Loading the currency list…"
+        }
+        return "No currency matches “\(currencyQuery.trimmingCharacters(in: .whitespaces))”."
+    }
+
+    private func closeCurrencyPicker() {
+        currencyPickerOpen = false
+        currencyQuery = ""
+        currencySearchFocused = false
+    }
+
+    private var currencyCaption: String {
+        switch currency.rateState {
+        case .loading:
+            return "Fetching today's exchange rate…"
+        case let .failed(message):
+            return message
+        case .idle:
+            break
+        }
+        guard currency.options.isEmpty else {
+            return currency.rateSummary ?? currency.selected.name
+        }
+        switch currency.optionsState {
+        case .loading: return "Loading the currency list…"
+        case let .failed(message): return message
+        case .idle: return currency.rateSummary ?? currency.selected.name
+        }
+    }
+
+    @ViewBuilder
+    private var currencyRetry: some View {
+        if case .failed = currency.rateState {
+            Button("Retry") { currency.retryRate() }
+                .buttonStyle(.link)
+        } else if case .failed = currency.optionsState {
+            Button("Retry") { currency.retryOptions() }
+                .buttonStyle(.link)
         }
     }
 
@@ -387,6 +582,49 @@ struct PopoverView: View {
         action: @escaping () -> Void
     ) -> some View {
         IconButton(systemName: systemName, help: help, badge: badge, action: action)
+    }
+}
+
+/// One line of the currency list. The code sits in a fixed column so the names
+/// beside it start on a common left edge, the way the provider rows align.
+private struct CurrencyRow: View {
+    let option: CurrencyOption
+    let selected: Bool
+    let action: () -> Void
+
+    @State private var hovering = false
+
+    var body: some View {
+        Button(action: action) {
+            HStack(spacing: 8) {
+                Text(option.code)
+                    .monospacedDigit()
+                    .frame(width: 34, alignment: .leading)
+                Text(option.name)
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+                    .foregroundStyle(.secondary)
+                Spacer(minLength: 6)
+                if selected {
+                    Image(systemName: "checkmark")
+                        .font(.system(size: 10, weight: .semibold))
+                }
+            }
+            .font(WidgetStyle.TypeScale.row)
+            .padding(.horizontal, 6)
+            .padding(.vertical, 5)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(
+                RoundedRectangle(cornerRadius: 5, style: .continuous)
+                    .fill(Color.primary.opacity(hovering ? 0.07 : 0))
+            )
+            .contentShape(RoundedRectangle(cornerRadius: 5, style: .continuous))
+        }
+        .buttonStyle(.plain)
+        .onHover { hovering = $0 }
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("\(option.code), \(option.name)")
+        .accessibilityAddTraits(selected ? [.isSelected] : [])
     }
 }
 

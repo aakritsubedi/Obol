@@ -1,6 +1,6 @@
 import { useMemo } from "react";
 import type { Report, Summary, WidgetConfig } from "../api";
-import { formatCurrency, formatPeriod, formatTokens } from "./format";
+import { formatCurrency, formatPeriod, formatTokens, heroFontSize } from "./format";
 import { aggregateByProvider, aggregateModels, estimateCacheSavings, modelName, totalsFrom } from "./totals";
 
 interface Comparison {
@@ -43,7 +43,7 @@ export default function TotalsCard({ report, summary, config }: Props) {
 
   return (
     <section
-      className="min-w-0 rounded-[24px] border border-hairline bg-card p-6 shadow-[0_1px_2px_rgba(0,0,0,.04),0_14px_36px_rgba(0,0,0,.035)] max-[760px]:rounded-[20px] max-[760px]:p-[22px]"
+      className="min-w-0 rounded-[24px] border border-hairline bg-card p-6 shadow-[0_1px_2px_rgba(0,0,0,.04),0_14px_36px_rgba(0,0,0,.035)] [container-type:inline-size] max-[760px]:rounded-[20px] max-[760px]:p-[22px]"
       aria-labelledby="total-spend-heading"
     >
       <div className="flex items-center justify-between gap-4">
@@ -57,7 +57,10 @@ export default function TotalsCard({ report, summary, config }: Props) {
           history window · since {since ? formatPeriod(since) : "usage began"}
         </span>
       </div>
-      <div className="mt-4 text-[clamp(40px,5vw,64px)] font-bold tabular-nums leading-[0.98] tracking-[-0.05em]">
+      <div
+        className="mt-4 font-bold tabular-nums leading-[0.98] tracking-[-0.05em]"
+        style={{ fontSize: heroFontSize(formatCurrency(totals.totalCost), 64) }}
+      >
         {formatCurrency(totals.totalCost)}
       </div>
       <p className="mt-3 text-xs leading-5 text-muted">

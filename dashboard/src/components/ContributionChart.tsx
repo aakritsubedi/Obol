@@ -2,7 +2,7 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import type { UsageRow } from "../api";
 import { buildContributionCalendar, type ContributionDay, type ContributionWeek } from "./contribution";
-import { formatCurrency, formatTokens } from "./format";
+import { formatCurrency, formatTokens, moneyDisplay } from "./format";
 
 interface Props {
   rows: UsageRow[];
@@ -103,7 +103,11 @@ function ContributionTooltip({ tooltip }: { tooltip: TooltipState }) {
 
 export default function ContributionChart({ rows }: Props) {
   const todayKey = new Date().toDateString();
-  const calendar = useMemo(() => buildContributionCalendar(rows, new Date()), [rows, todayKey]);
+  // The calendar bakes each day's tooltip text, currency included, so a change
+  // of display currency has to rebuild it — unlike the totals below, which stay
+  // numbers until they are rendered.
+  const money = moneyDisplay();
+  const calendar = useMemo(() => buildContributionCalendar(rows, new Date()), [rows, todayKey, money]);
   const plotRef = useRef<HTMLDivElement>(null);
   const anchorRef = useRef<HTMLElement | null>(null);
   const [plotWidth, setPlotWidth] = useState(0);

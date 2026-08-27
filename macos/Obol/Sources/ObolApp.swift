@@ -4,16 +4,17 @@ import SwiftUI
 struct ObolApp: App {
     @StateObject private var controller = DaemonController()
     @StateObject private var updates = UpdateController()
+    @StateObject private var currency = CurrencyController()
 
     var body: some Scene {
         MenuBarExtra {
-            PopoverView(controller: controller, updates: updates)
+            PopoverView(controller: controller, updates: updates, currency: currency)
         } label: {
             HStack(spacing: 5) {
                 Circle()
                     .fill(controller.liveColor)
                     .frame(width: 6, height: 6)
-                Text(controller.menuTitle)
+                Text(menuTitle)
                     .font(WidgetStyle.TypeScale.row)
                     .monospacedDigit()
             }
@@ -29,8 +30,13 @@ struct ObolApp: App {
             }
             .accessibilityElement(children: .combine)
             .accessibilityLabel("Today's spend")
-            .accessibilityValue(controller.menuTitle)
+            .accessibilityValue(menuTitle)
         }
         .menuBarExtraStyle(.window)
+    }
+
+    /// The daemon's total, rendered in whichever currency Settings selected.
+    private var menuTitle: String {
+        currency.display(controller.summary.today.totalCost)
     }
 }

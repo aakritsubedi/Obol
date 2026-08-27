@@ -142,6 +142,9 @@ struct UsageSummary: Decodable {
         CodingKey { case today, agents, burnRate, projection, budgetStatus, budget, updatedAt, stale, error }
 }
 
+/// A subset view of the daemon's config: the fields the menu bar reads or
+/// writes. A PUT of this struct patches only these keys, so the ones the
+/// dashboard owns survive untouched.
 struct WidgetConfig: Codable {
     var port: Int
     var refreshIntervalMs: Int
@@ -149,6 +152,7 @@ struct WidgetConfig: Codable {
     var monthlyBudget: Double?
     var warningThreshold: Double
     var launchAtLogin: Bool
+    var currency: String
 
     static let `default` = WidgetConfig(
         port: 4737,
@@ -156,8 +160,48 @@ struct WidgetConfig: Codable {
         dailyBudget: nil,
         monthlyBudget: nil,
         warningThreshold: 0.8,
-        launchAtLogin: false
+        launchAtLogin: false,
+        currency: CurrencyOption.usd.code
     )
+
+    /// Decoded field by field so an older daemon — one bundled before a field
+    /// existed — degrades to the default instead of failing the whole read and
+    /// leaving the popover with no config at all.
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        let fallback = WidgetConfig.default
+        port = try container.decodeIfPresent(Int.self, forKey: .port) ?? fallback.port
+        refreshIntervalMs = try container.decodeIfPresent(Int.self, forKey: .refreshIntervalMs)
+            ?? fallback.refreshIntervalMs
+        dailyBudget = try container.decodeIfPresent(Double.self, forKey: .dailyBudget)
+        monthlyBudget = try container.decodeIfPresent(Double.self, forKey: .monthlyBudget)
+        warningThreshold = try container.decodeIfPresent(Double.self, forKey: .warningThreshold)
+            ?? fallback.warningThreshold
+        launchAtLogin = try container.decodeIfPresent(Bool.self, forKey: .launchAtLogin) ?? fallback.launchAtLogin
+        currency = try container.decodeIfPresent(String.self, forKey: .currency) ?? fallback.currency
+    }
+
+    init(
+        port: Int,
+        refreshIntervalMs: Int,
+        dailyBudget: Double?,
+        monthlyBudget: Double?,
+        warningThreshold: Double,
+        launchAtLogin: Bool,
+        currency: String
+    ) {
+        self.port = port
+        self.refreshIntervalMs = refreshIntervalMs
+        self.dailyBudget = dailyBudget
+        self.monthlyBudget = monthlyBudget
+        self.warningThreshold = warningThreshold
+        self.launchAtLogin = launchAtLogin
+        self.currency = currency
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case port, refreshIntervalMs, dailyBudget, monthlyBudget, warningThreshold, launchAtLogin, currency
+    }
 }
 
 struct RuntimeState: Decodable {
@@ -211,15 +255,13 @@ struct UsageClient {
         return try JSONDecoder().decode(T.self, from: data)
     }
 
-    static let currencyCode = "USD"
-    static let currencySymbol = "$"
-
     /// Just the numeric part, e.g. `6.66`.
     ///
-    /// The currency style formatter is deliberately not used here: on a locale
-    /// whose currency is not USD it disambiguates the symbol to `US$`, which is
-    /// noise in a widget that only ever reports dollars. Views compose the code
-    /// or symbol themselves so the two can be styled apart.
+    /// The currency style formatter is deliberately not used here: it would
+    /// disambiguate a symbol against the machine's locale — rendering `US$`
+    /// where the widget means `$` — and it owns the symbol's placement, which
+    /// the hero total needs to style apart from the digits. CurrencyController
+    /// picks the symbol; this only ever formats the number.
     static func amount(_ value: Double) -> String {
         let formatter = NumberFormatter()
         formatter.numberStyle = .decimal

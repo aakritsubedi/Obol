@@ -1,5 +1,5 @@
 import type { Summary } from "../api";
-import { formatCurrency, formatTokens } from "./format";
+import { formatCurrency, formatTokens, heroFontSize } from "./format";
 
 export interface Last7Summary {
   totalCost: number;
@@ -47,7 +47,7 @@ export default function TodayCard({ summary, week, trend }: Props) {
 
   return (
     <section
-      className="min-w-0 rounded-[24px] border border-hairline bg-card p-8 shadow-[0_1px_2px_rgba(0,0,0,.04),0_14px_36px_rgba(0,0,0,.045)] max-[760px]:rounded-[20px] max-[760px]:p-[22px]"
+      className="min-w-0 rounded-[24px] border border-hairline bg-card p-8 shadow-[0_1px_2px_rgba(0,0,0,.04),0_14px_36px_rgba(0,0,0,.045)] [container-type:inline-size] max-[760px]:rounded-[20px] max-[760px]:p-[22px]"
       aria-labelledby="today-heading"
     >
       <div className="flex items-start justify-between gap-4">
@@ -62,7 +62,10 @@ export default function TodayCard({ summary, week, trend }: Props) {
         </div>
       </div>
 
-      <div className="mt-4 text-[clamp(58px,7vw,84px)] font-bold tabular-nums leading-[0.92] tracking-[-0.055em]">
+      <div
+        className="mt-4 font-bold tabular-nums leading-[0.92] tracking-[-0.055em]"
+        style={{ fontSize: heroFontSize(formatCurrency(summary.today.totalCost), 84, 64) }}
+      >
         {formatCurrency(summary.today.totalCost)}
       </div>
       <div className="mt-2.5 flex flex-wrap items-center gap-2 text-xs text-muted">

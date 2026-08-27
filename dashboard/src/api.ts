@@ -106,6 +106,9 @@ export interface WidgetConfig {
   launchAtLogin: boolean;
   historyDays: number;
   journalIdleMinutes: number;
+  // Display only, chosen in the menu bar app's settings. Every cost below is
+  // still USD; the dashboard converts when it renders.
+  currency: string;
 }
 
 export interface JournalSession {
