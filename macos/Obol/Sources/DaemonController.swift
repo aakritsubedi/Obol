@@ -17,6 +17,7 @@ final class DaemonController: ObservableObject {
 
     private let client = UsageClient()
     private let notifier = Notifier()
+    private let keepAwake = KeepAwakeController()
     private var daemon: Process?
     private var runtimeTimer: Timer?
     private var pollingTimer: Timer?
@@ -52,6 +53,10 @@ final class DaemonController: ObservableObject {
 
     var launchAtLogin: Bool {
         config.launchAtLogin
+    }
+
+    var keepAwakeEnabled: Bool {
+        config.keepAwake
     }
 
     func start() {
@@ -120,6 +125,17 @@ final class DaemonController: ObservableObject {
         }
     }
 
+    /// The assertion is taken before the write goes out: the point of the
+    /// toggle is the machine's behaviour right now, and a daemon that is slow
+    /// or gone should not delay it. A failed write only costs the setting its
+    /// persistence, which `saveConfig` already reports.
+    func setKeepAwake(_ enabled: Bool) {
+        guard config.keepAwake != enabled else { return }
+        config.keepAwake = enabled
+        keepAwake.apply(enabled)
+        Task { await saveConfig() }
+    }
+
     func quit() {
         stop()
         NSApp.terminate(nil)
@@ -127,6 +143,7 @@ final class DaemonController: ObservableObject {
 
     func stop() {
         shuttingDown = true
+        keepAwake.apply(false)
         runtimeTimer?.invalidate()
         pollingTimer?.invalidate()
         runtimeTimer = nil
@@ -246,6 +263,9 @@ final class DaemonController: ObservableObject {
         guard let nextConfig = try? await client.config(baseURL: baseURL, token: token) else { return }
         config = nextConfig
         healLaunchAtLogin()
+        // Restores the assertion after a relaunch, and re-asserts it on every
+        // poll so an edit made straight to config.json still takes effect.
+        keepAwake.apply(nextConfig.keepAwake)
         // config.json is the shared source of truth for the display currency,
         // so a change made in one surface reaches the other on its next read.
         CurrencyController.shared?.adopt(code: nextConfig.currency)

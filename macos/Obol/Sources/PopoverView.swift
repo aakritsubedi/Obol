@@ -256,6 +256,10 @@ struct PopoverView: View {
             .font(WidgetStyle.TypeScale.row)
             .padding(.vertical, 14)
 
+            hairline
+
+            keepAwakeRow
+
             if controller.notificationsDenied {
                 hairline
 
@@ -294,10 +298,48 @@ struct PopoverView: View {
         .onAppear { currency.settingsOpened() }
     }
 
+    /// Holds off idle sleep so an agent left running overnight is still working
+    /// in the morning. The caption names the two limits up front — the lid, and
+    /// the display — so nobody closes the laptop expecting the run to survive.
+    private var keepAwakeRow: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            HStack(spacing: 8) {
+                Text("Keep awake")
+                Spacer(minLength: 8)
+                Toggle("", isOn: Binding(
+                    get: { controller.keepAwakeEnabled },
+                    set: { controller.setKeepAwake($0) }
+                ))
+                .labelsHidden()
+                .toggleStyle(.switch)
+                .controlSize(.mini)
+                .accessibilityLabel("Keep awake")
+            }
+
+            Text(keepAwakeCaption)
+                .font(WidgetStyle.TypeScale.footnote)
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+                .padding(.top, 3)
+        }
+        .font(WidgetStyle.TypeScale.row)
+        .padding(.vertical, 14)
+        .animation(.easeInOut(duration: 0.15), value: controller.keepAwakeEnabled)
+    }
+
+    private var keepAwakeCaption: String {
+        controller.keepAwakeEnabled
+            ? "Your Mac won't idle to sleep."
+            : "Your Mac sleeps on its usual schedule."
+    }
+
     /// Everything the daemon reports is priced in USD; picking a currency here
     /// converts at display time only, so budgets and alerts keep their units.
+    /// Spacing is per-gap rather than one VStack value: the receipt sits tight
+    /// under the row it annotates, while the picker — a bordered box, not a line
+    /// of text — still needs room to read as a separate surface.
     private var currencyRow: some View {
-        VStack(alignment: .leading, spacing: 8) {
+        VStack(alignment: .leading, spacing: 0) {
             HStack(spacing: 8) {
                 Text("Currency")
                 Spacer(minLength: 8)
@@ -306,6 +348,7 @@ struct PopoverView: View {
 
             if currencyPickerOpen {
                 currencyPicker
+                    .padding(.top, 8)
             }
 
             HStack(spacing: 10) {
@@ -313,8 +356,9 @@ struct PopoverView: View {
                     .fixedSize(horizontal: false, vertical: true)
                 currencyRetry
             }
-            .font(WidgetStyle.TypeScale.caption)
+            .font(WidgetStyle.TypeScale.footnote)
             .foregroundStyle(.secondary)
+            .padding(.top, 3)
         }
         .font(WidgetStyle.TypeScale.row)
         .padding(.vertical, 14)

@@ -60,5 +60,9 @@ enum WidgetStyle {
         static let icon = Font.system(size: 13, weight: .regular)
         /// Error and status text.
         static let caption = Font.system(size: 11)
+        /// A note attached to the row above it — the exchange-rate receipt, the
+        /// keep-awake explainer. One step under `caption` so it reads as part of
+        /// that row rather than as a line competing with it.
+        static let footnote = Font.system(size: 10)
     }
 }

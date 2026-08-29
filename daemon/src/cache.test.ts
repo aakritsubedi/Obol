@@ -10,6 +10,7 @@ const config: WidgetConfig = {
   monthlyBudget: null,
   warningThreshold: 0.8,
   launchAtLogin: false,
+  keepAwake: false,
   historyDays: 90,
   journalIdleMinutes: 15,
   currency: "USD",

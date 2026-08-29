@@ -104,6 +104,8 @@ export interface WidgetConfig {
   monthlyBudget: number | null;
   warningThreshold: number;
   launchAtLogin: boolean;
+  // Menu bar only: while true the app keeps the Mac from idling into sleep.
+  keepAwake: boolean;
   historyDays: number;
   journalIdleMinutes: number;
   // Display only, chosen in the menu bar app's settings. Every cost below is

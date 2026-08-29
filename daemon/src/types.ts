@@ -120,6 +120,9 @@ export interface WidgetConfig extends BudgetConfig {
   port: number;
   refreshIntervalMs: number;
   launchAtLogin: boolean;
+  // Menu bar only. While true the app holds a power-management assertion so an
+  // agent run is not cut short by the Mac idling into sleep.
+  keepAwake: boolean;
   historyDays: number;
   journalIdleMinutes: number;
   // Display only. Every cost this daemon reports — budgets and alerts included

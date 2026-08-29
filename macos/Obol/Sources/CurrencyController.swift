@@ -1,3 +1,4 @@
+import AppKit
 import Combine
 import Foundation
 
@@ -84,17 +85,25 @@ struct CurrencyClient {
     }
 
     func rate(for code: String) async throws -> CurrencyRate {
+        // A scheduled check exists to find out whether the number moved, so it
+        // has to reach the service. Left on the default policy, URLCache can
+        // answer from a response stored hours ago and the fetch would only ever
+        // confirm what is already on screen.
         let rows: [RateRow] = try await get(path: "rates", query: [
             URLQueryItem(name: "base", value: CurrencyOption.usd.code),
             URLQueryItem(name: "quotes", value: code),
-        ])
+        ], cachePolicy: .reloadIgnoringLocalCacheData)
         guard let row = rows.first(where: { $0.quote == code }) else {
             throw CurrencyClientError.missingRate(code)
         }
         return CurrencyRate(code: code, rate: row.rate, quotedOn: row.date, fetchedAt: Date())
     }
 
-    private func get<T: Decodable>(path: String, query: [URLQueryItem]) async throws -> T {
+    private func get<T: Decodable>(
+        path: String,
+        query: [URLQueryItem],
+        cachePolicy: URLRequest.CachePolicy = .useProtocolCachePolicy
+    ) async throws -> T {
         guard var components = URLComponents(string: "\(host)/\(path)") else {
             throw CurrencyClientError.invalidURL
         }
@@ -102,6 +111,7 @@ struct CurrencyClient {
         guard let url = components.url else { throw CurrencyClientError.invalidURL }
 
         var request = URLRequest(url: url)
+        request.cachePolicy = cachePolicy
         request.setValue("application/json", forHTTPHeaderField: "Accept")
         request.setValue("Obol/1.0 (https://github.com/aakritsubedi/obol)", forHTTPHeaderField: "User-Agent")
 
@@ -196,9 +206,14 @@ final class CurrencyController: ObservableObject {
     @Published private(set) var optionsState: LoadState = .idle
     @Published private(set) var rateState: LoadState = .idle
 
-    /// Reference rates are published once per business day; anything more
-    /// frequent than this is traffic for no new number.
-    private static let rateMaxAge: TimeInterval = 6 * 60 * 60
+    /// Checked at 09:00, 15:00, and 21:00 local time.
+    ///
+    /// The reference bank publishes once per business day, around 16:00 CET, so
+    /// an age threshold either fetched well before the new number existed or sat
+    /// on the old one for hours after it landed. Fixed times are cheaper — three
+    /// requests a day, no polling — and land the update within a few hours of
+    /// publication from any timezone.
+    private static let refreshHours = [9, 15, 21]
     /// The directory only moves when a currency is minted or retired.
     private static let optionsMaxAge: TimeInterval = 7 * 24 * 60 * 60
 
@@ -206,6 +221,8 @@ final class CurrencyController: ObservableObject {
     private var defaults: CurrencyDefaults
     private var rateTask: Task<Void, Never>?
     private var optionsTask: Task<Void, Never>?
+    private var refreshTimer: Timer?
+    private var wakeObserver: NSObjectProtocol?
 
     init(client: CurrencyClient = CurrencyClient(), defaults: CurrencyDefaults = CurrencyDefaults()) {
         self.client = client
@@ -217,11 +234,16 @@ final class CurrencyController: ObservableObject {
         options = defaults.options
         rate = Self.rate(for: selected, in: defaults.rates)
         Self.shared = self
+        startRefreshSchedule()
     }
 
     deinit {
         rateTask?.cancel()
         optionsTask?.cancel()
+        refreshTimer?.invalidate()
+        if let wakeObserver {
+            NSWorkspace.shared.notificationCenter.removeObserver(wakeObserver)
+        }
     }
 
     // MARK: - Formatting
@@ -267,13 +289,13 @@ final class CurrencyController: ObservableObject {
     // MARK: - Lifecycle
 
     func popoverOpened() {
-        refreshRateIfStale()
+        refreshRateIfDue()
     }
 
     /// The directory is 165 entries of JSON nobody needs until they go looking
     /// for the picker, so it is fetched when Settings opens, not at launch.
     func settingsOpened() {
-        refreshRateIfStale()
+        refreshRateIfDue()
         loadOptionsIfStale()
     }
 
@@ -300,7 +322,7 @@ final class CurrencyController: ObservableObject {
         // nothing to show until the fetch below lands, and `active` keeps the
         // amounts labelled USD in the meantime.
         rate = Self.rate(for: option, in: defaults.rates)
-        refreshRateIfStale()
+        refreshRateIfDue()
     }
 
     /// The directory entry for a code, or a bare stand-in when the directory
@@ -333,11 +355,81 @@ final class CurrencyController: ObservableObject {
 
     // MARK: - Fetching
 
-    private func refreshRateIfStale() {
+    /// Due when the last successful read predates the most recent scheduled
+    /// check — which is also true when a check was slept through, or when the
+    /// app was not running for it.
+    private func refreshRateIfDue(now: Date = Date()) {
         guard selected.code != CurrencyOption.usd.code else { return }
-        let fresh = rate.map { Date().timeIntervalSince($0.fetchedAt) < Self.rateMaxAge } ?? false
-        guard !fresh else { return }
+        guard let rate else {
+            fetchRate(for: selected)
+            return
+        }
+        guard rate.fetchedAt < Self.lastRefreshSlot(onOrBefore: now) else { return }
         fetchRate(for: selected)
+    }
+
+    private func startRefreshSchedule() {
+        scheduleNextRefresh()
+        // Timers do not fire while the Mac is asleep, and a laptop is usually
+        // shut overnight. Re-checking on wake turns a slept-through 09:00 into a
+        // fetch on open rather than a wait until 15:00.
+        wakeObserver = NSWorkspace.shared.notificationCenter.addObserver(
+            forName: NSWorkspace.didWakeNotification,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            Task { @MainActor in self?.runScheduledRefresh() }
+        }
+    }
+
+    /// One-shot rather than a repeating interval: a repeating timer drifts off
+    /// the hour and cannot follow a daylight-saving shift, while re-arming after
+    /// each fire recomputes the next wall-clock slot from scratch.
+    private func scheduleNextRefresh() {
+        refreshTimer?.invalidate()
+        let timer = Timer(fire: Self.nextRefreshSlot(after: Date()), interval: 0, repeats: false) { [weak self] _ in
+            Task { @MainActor in self?.runScheduledRefresh() }
+        }
+        // The exact second does not matter; the slack lets macOS coalesce this
+        // with whatever else it planned to wake for.
+        timer.tolerance = 60
+        RunLoop.main.add(timer, forMode: .common)
+        refreshTimer = timer
+    }
+
+    private func runScheduledRefresh() {
+        refreshRateIfDue()
+        scheduleNextRefresh()
+    }
+
+    /// The most recent scheduled check at or before `date`.
+    static func lastRefreshSlot(onOrBefore date: Date, calendar: Calendar = .current) -> Date {
+        if let latest = slots(on: date, calendar: calendar).last(where: { $0 <= date }) {
+            return latest
+        }
+        // Earlier than the first slot of the day, so the last one was yesterday.
+        guard let yesterday = calendar.date(byAdding: .day, value: -1, to: date),
+              let latest = slots(on: yesterday, calendar: calendar).last
+        else { return date }
+        return latest
+    }
+
+    /// The next scheduled check strictly after `date`.
+    static func nextRefreshSlot(after date: Date, calendar: Calendar = .current) -> Date {
+        if let next = slots(on: date, calendar: calendar).first(where: { $0 > date }) {
+            return next
+        }
+        guard let tomorrow = calendar.date(byAdding: .day, value: 1, to: date),
+              let first = slots(on: tomorrow, calendar: calendar).first
+        else { return date.addingTimeInterval(6 * 60 * 60) }
+        return first
+    }
+
+    /// Sorted because a daylight-saving jump can shift one slot past another.
+    private static func slots(on date: Date, calendar: Calendar) -> [Date] {
+        refreshHours
+            .compactMap { calendar.date(bySettingHour: $0, minute: 0, second: 0, of: date) }
+            .sorted()
     }
 
     private func loadOptionsIfStale() {
@@ -365,7 +457,7 @@ final class CurrencyController: ObservableObject {
             // The selection moved while this was in flight; fetch what it needs
             // now that the single task slot is free again.
             if option != selected {
-                refreshRateIfStale()
+                refreshRateIfDue()
             }
         }
         do {

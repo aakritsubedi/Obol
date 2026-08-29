@@ -50,7 +50,23 @@ if [ "$SKIP_BUILD_VALUE" != "1" ]; then
 fi
 
 echo "==> Building $APP_NAME.app (Release)"
-xcodebuild \
+# Discard the derived-data tree outright rather than leaning on xcodebuild's
+# `clean`, which empties the build products but keeps ModuleCache.noindex.
+# Precompiled headers record the absolute path they were built under, so moving
+# or renaming the checkout leaves every later run failing with "PCH was compiled
+# with module cache path ..." against the old location. This is a from-scratch
+# Release build regardless, so there is no incremental work worth preserving.
+case "$DERIVED_DATA" in
+  */.xcodebuild) rm -rf "$DERIVED_DATA" ;;
+  *) echo "error: refusing to clear unexpected derived data path $DERIVED_DATA" >&2; exit 1 ;;
+esac
+mkdir -p "$DERIVED_DATA"
+
+# xcodebuild is quiet on success but its output is the only record of why a
+# build failed; keep it on disk so a failure reports the compiler error instead
+# of just the list of commands that failed.
+BUILD_LOG="$DERIVED_DATA/xcodebuild.log"
+if ! xcodebuild \
   -project "$ROOT/macos/$APP_NAME.xcodeproj" \
   -scheme "$APP_NAME" \
   -configuration Release \
@@ -61,7 +77,11 @@ xcodebuild \
   MARKETING_VERSION="$OBOL_VERSION" \
   CURRENT_PROJECT_VERSION="$CURRENT_PROJECT_VERSION" \
   CODE_SIGNING_ALLOWED=NO \
-  clean build >/dev/null
+  build >"$BUILD_LOG" 2>&1; then
+  echo "error: xcodebuild failed; see $BUILD_LOG" >&2
+  grep -E "(error|warning): " "$BUILD_LOG" | tail -40 >&2 || tail -40 "$BUILD_LOG" >&2
+  exit 1
+fi
 
 APP_SOURCE="$DERIVED_DATA/Build/Products/Release/$APP_NAME.app"
 if [ ! -d "$APP_SOURCE" ]; then

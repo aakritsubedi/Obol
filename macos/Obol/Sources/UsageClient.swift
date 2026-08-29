@@ -152,6 +152,7 @@ struct WidgetConfig: Codable {
     var monthlyBudget: Double?
     var warningThreshold: Double
     var launchAtLogin: Bool
+    var keepAwake: Bool
     var currency: String
 
     static let `default` = WidgetConfig(
@@ -161,6 +162,7 @@ struct WidgetConfig: Codable {
         monthlyBudget: nil,
         warningThreshold: 0.8,
         launchAtLogin: false,
+        keepAwake: false,
         currency: CurrencyOption.usd.code
     )
 
@@ -178,6 +180,7 @@ struct WidgetConfig: Codable {
         warningThreshold = try container.decodeIfPresent(Double.self, forKey: .warningThreshold)
             ?? fallback.warningThreshold
         launchAtLogin = try container.decodeIfPresent(Bool.self, forKey: .launchAtLogin) ?? fallback.launchAtLogin
+        keepAwake = try container.decodeIfPresent(Bool.self, forKey: .keepAwake) ?? fallback.keepAwake
         currency = try container.decodeIfPresent(String.self, forKey: .currency) ?? fallback.currency
     }
 
@@ -188,6 +191,7 @@ struct WidgetConfig: Codable {
         monthlyBudget: Double?,
         warningThreshold: Double,
         launchAtLogin: Bool,
+        keepAwake: Bool,
         currency: String
     ) {
         self.port = port
@@ -196,11 +200,12 @@ struct WidgetConfig: Codable {
         self.monthlyBudget = monthlyBudget
         self.warningThreshold = warningThreshold
         self.launchAtLogin = launchAtLogin
+        self.keepAwake = keepAwake
         self.currency = currency
     }
 
     private enum CodingKeys: String, CodingKey {
-        case port, refreshIntervalMs, dailyBudget, monthlyBudget, warningThreshold, launchAtLogin, currency
+        case port, refreshIntervalMs, dailyBudget, monthlyBudget, warningThreshold, launchAtLogin, keepAwake, currency
     }
 }
 
