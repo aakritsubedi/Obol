@@ -4,7 +4,7 @@ import { fileURLToPath } from "node:url";
 import { SnapshotStore } from "./cache.js";
 import { runOnce, runUsage } from "./ccusage.js";
 import { ConfigStore, migrateLegacyState } from "./config.js";
-import { readDayJournal } from "./journal.js";
+import { activeSessions, readDayJournal } from "./journal.js";
 import { DaemonServer } from "./server.js";
 import { dateForTimeZone } from "./time.js";
 import { type CcusageReport, type DayJournal, emptyBlocks, type WidgetConfig } from "./types.js";
@@ -118,6 +118,24 @@ async function main(): Promise<void> {
     config = await configStore.update({ port: requestedPort });
   }
 
+  const readJournal = async (requested: string | null): Promise<DayJournal> => {
+    const timezone = systemTimeZone();
+    const date = requested ?? dateForTimeZone(new Date(), timezone);
+    const cached = journalCache.get(date);
+    if (cached && cached.idleMinutes === config.journalIdleMinutes) return cached;
+    const journal = await readDayJournal({
+      date,
+      timezone,
+      idleMinutes: config.journalIdleMinutes,
+      report: liveReport,
+    });
+    // Caching a journal built before the first ccusage run would pin its
+    // costs at zero for the rest of the day, so hold it back until the
+    // report it drew from actually had project rows to join against.
+    if (liveReport.projects.length > 0) journalCache.set(date, journal);
+    return journal;
+  };
+
   server = new DaemonServer({
     port: config.port,
     token,
@@ -143,23 +161,12 @@ async function main(): Promise<void> {
         return config;
       },
       refresh: () => scheduleRefresh(true),
-      getJournal: async (requested: string | null) => {
-        const timezone = systemTimeZone();
-        const date = requested ?? dateForTimeZone(new Date(), timezone);
-        const cached = journalCache.get(date);
-        if (cached && cached.idleMinutes === config.journalIdleMinutes) return cached;
-        const journal = await readDayJournal({
-          date,
-          timezone,
-          idleMinutes: config.journalIdleMinutes,
-          report: liveReport,
-        });
-        // Caching a journal built before the first ccusage run would pin its
-        // costs at zero for the rest of the day, so hold it back until the
-        // report it drew from actually had project rows to join against.
-        if (liveReport.projects.length > 0) journalCache.set(date, journal);
-        return journal;
-      },
+      getJournal: readJournal,
+      // Built from today's journal rather than a separate walk of the
+      // transcripts: the cache above is already dropped whenever the watcher
+      // sees a write, which is exactly when a running session changes.
+      getActiveSessions: async () =>
+        activeSessions(await readJournal(null), new Date(), config.journalIdleMinutes),
     },
   });
 

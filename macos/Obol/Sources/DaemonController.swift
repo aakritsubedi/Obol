@@ -14,6 +14,7 @@ final class DaemonController: ObservableObject {
     @Published private(set) var statusMessage: String?
     @Published private(set) var isPopoverPresented = false
     @Published private(set) var notificationsDenied = false
+    @Published private(set) var activeSessions: [ActiveSession] = []
 
     private let client = UsageClient()
     private let notifier = Notifier()
@@ -33,22 +34,45 @@ final class DaemonController: ObservableObject {
             self?.notificationsDenied = denied
         }
         notifier.requestPermission()
+        // config.json is the shared record, but it is a second away at launch
+        // and never arrives at all if the daemon cannot start. Keeping the choice
+        // locally too means the machine stays awake from the moment the app does,
+        // and keeps doing so when the daemon is missing Node or has crashed.
+        config.keepAwake = Self.rememberedKeepAwake
+        keepAwake.apply(config.keepAwake)
         start()
+    }
+
+    private static let keepAwakeDefaultsKey = "com.aakritsubedi.obol.keepAwake"
+
+    private static var rememberedKeepAwake: Bool {
+        get { UserDefaults.standard.bool(forKey: keepAwakeDefaultsKey) }
+        set { UserDefaults.standard.set(newValue, forKey: keepAwakeDefaultsKey) }
     }
 
     var liveLabel: String {
         summary.stale ? "Cached" : "Live"
     }
 
+    /// Budget health, for the menu bar dot — the one indicator visible without
+    /// opening anything, and the right place for "you are over budget" to show.
     var liveColor: Color {
         if summary.stale {
             return WidgetStyle.warning
         }
         switch summary.budgetStatus {
-        case .ok: return WidgetStyle.codex
+        case .ok: return WidgetStyle.success
         case .warn: return WidgetStyle.warning
         case .over: return WidgetStyle.danger
         }
+    }
+
+    /// Freshness, for the popover's status label. That label reads "Live" or
+    /// "Cached", so it answers whether the data is current and is coloured by
+    /// that alone; tinting it by budget made a perfectly live reading show red
+    /// and left the word and its colour saying different things.
+    var liveStatusColor: Color {
+        summary.stale ? WidgetStyle.warning : WidgetStyle.success
     }
 
     var launchAtLogin: Bool {
@@ -87,9 +111,22 @@ final class DaemonController: ObservableObject {
         do {
             let next = try await client.refresh(baseURL: baseURL, token: token)
             apply(next)
+            await loadActiveSessions()
         } catch {
             statusMessage = "Refresh unavailable; showing the last good snapshot."
         }
+    }
+
+    /// Only while the popover is on screen. Serving this walks today's
+    /// transcripts, and nothing renders the list when the window is shut.
+    ///
+    /// A failed read leaves the previous list in place rather than emptying it,
+    /// so a dropped poll reads as "unchanged" instead of flashing the empty
+    /// state at a session that is still running.
+    private func loadActiveSessions() async {
+        guard isPopoverPresented, let baseURL, !token.isEmpty else { return }
+        guard let next = try? await client.activeSessions(baseURL: baseURL, token: token) else { return }
+        activeSessions = next
     }
 
     func openDashboard() {
@@ -132,6 +169,7 @@ final class DaemonController: ObservableObject {
     func setKeepAwake(_ enabled: Bool) {
         guard config.keepAwake != enabled else { return }
         config.keepAwake = enabled
+        Self.rememberedKeepAwake = enabled
         keepAwake.apply(enabled)
         Task { await saveConfig() }
     }
@@ -252,6 +290,7 @@ final class DaemonController: ObservableObject {
             let next = try await client.summary(baseURL: baseURL, token: token)
             apply(next)
             await loadConfig()
+            await loadActiveSessions()
         } catch {
             connected = false
             statusMessage = "Daemon unavailable; showing the last good snapshot."
@@ -261,11 +300,11 @@ final class DaemonController: ObservableObject {
     private func loadConfig() async {
         guard let baseURL, !token.isEmpty else { return }
         guard let nextConfig = try? await client.config(baseURL: baseURL, token: token) else { return }
-        config = nextConfig
+        config = adoptingKeepAwake(from: nextConfig)
         healLaunchAtLogin()
         // Restores the assertion after a relaunch, and re-asserts it on every
         // poll so an edit made straight to config.json still takes effect.
-        keepAwake.apply(nextConfig.keepAwake)
+        keepAwake.apply(config.keepAwake)
         // config.json is the shared source of truth for the display currency,
         // so a change made in one surface reaches the other on its next read.
         CurrencyController.shared?.adopt(code: nextConfig.currency)
@@ -273,9 +312,23 @@ final class DaemonController: ObservableObject {
 
     private func saveConfig() async {
         guard let baseURL, !token.isEmpty else { return }
-        do { config = try await client.update(config: config, baseURL: baseURL, token: token) } catch {
+        do {
+            let saved = try await client.update(config: config, baseURL: baseURL, token: token)
+            config = adoptingKeepAwake(from: saved)
+        } catch {
             statusMessage = "Could not save preferences."
         }
+    }
+
+    /// A daemon that predates `keepAwake` drops the key on the way through, so
+    /// its reply describes every setting except this one. Taking the reply
+    /// wholesale would turn the switch off again on the very next poll; the
+    /// local choice stands until a daemon that knows the field speaks.
+    private func adoptingKeepAwake(from next: WidgetConfig) -> WidgetConfig {
+        guard !next.reportedKeepAwake else { return next }
+        var merged = next
+        merged.keepAwake = config.keepAwake
+        return merged
     }
 
     private func apply(_ next: UsageSummary) {

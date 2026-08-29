@@ -2,7 +2,14 @@ import { readFile, stat } from "node:fs/promises";
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
 import type { AddressInfo } from "node:net";
 import { extname, join, normalize, resolve } from "node:path";
-import type { BlocksReport, CcusageReport, DayJournal, Summary, WidgetConfig } from "./types.js";
+import type {
+  ActiveSession,
+  BlocksReport,
+  CcusageReport,
+  DayJournal,
+  Summary,
+  WidgetConfig,
+} from "./types.js";
 
 export interface ServerHandlers {
   getSummary: () => Summary;
@@ -12,6 +19,7 @@ export interface ServerHandlers {
   updateConfig: (patch: Partial<WidgetConfig>) => Promise<WidgetConfig>;
   refresh: () => Promise<void>;
   getJournal: (date: string | null) => Promise<DayJournal>;
+  getActiveSessions: () => Promise<ActiveSession[]>;
 }
 
 export interface ServerOptions {
@@ -199,6 +207,10 @@ export class DaemonServer {
           return;
         }
         json(res, 200, await this.options.handlers.getJournal(date));
+        return;
+      }
+      if (req.method === "GET" && url.pathname === "/api/sessions/active") {
+        json(res, 200, await this.options.handlers.getActiveSessions());
         return;
       }
       if (req.method === "GET" && url.pathname === "/api/config") {

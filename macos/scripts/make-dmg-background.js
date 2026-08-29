@@ -103,6 +103,13 @@ function run(argv) {
         drawMotif(m[0], m[1], m[2], m[3], m[4]);
     }
 
+    // The bitmap is 2x its point size, and a rep created from raw planes reports
+    // its size in *pixels* — so the PNG would declare itself 1320x840pt at 72dpi
+    // and Finder would draw it at double scale, leaving a scrollable window with
+    // only the top-left quarter of the art visible. Stating the point size makes
+    // it a 144dpi image: laid out at 660x420, still rendered from every pixel.
+    rep.setSize($.NSMakeSize(widthPt, heightPt));
+
     const png = rep.representationUsingTypeProperties($.NSBitmapImageFileTypePNG, $.NSDictionary.dictionary);
     if (!png.writeToFileAtomically(out, true)) {
         throw new Error("could not write " + out);

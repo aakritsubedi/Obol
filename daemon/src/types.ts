@@ -150,8 +150,28 @@ export interface JournalSession {
   // stripped out. Capped per session and truncated per line.
   prompts: string[];
   toolMix: Record<string, number>;
+  // Output tokens only — the one token figure a transcript records per session,
+  // and the weight the cost below is apportioned by. Null when the transcript
+  // recorded none, which for a provider that logs no usage at all (Codex) is
+  // every session: a count nobody reported is unknown, not zero.
+  outputTokens: number | null;
   // Apportioned from the project total by output tokens: ccusage reports cost
   // per project per day, never per session. An estimate, not a measurement.
+  totalCost: number | null;
+}
+
+// A session with work recorded inside the idle window — one an agent is
+// plausibly still driving. Deliberately narrower than JournalSession: the menu
+// bar polls this every few seconds and needs none of the prompt or tool detail.
+export interface ActiveSession {
+  id: string;
+  provider: string;
+  project: string;
+  gitBranch: string | null;
+  startedAt: string;
+  lastEventAt: string;
+  activeMinutes: number;
+  outputTokens: number | null;
   totalCost: number | null;
 }
 

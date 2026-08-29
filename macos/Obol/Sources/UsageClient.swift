@@ -52,6 +52,35 @@ struct ProviderSummary: Decodable, Identifiable {
     private enum CodingKeys: String, CodingKey { case agent, totalCost, totalTokens }
 }
 
+/// A session an agent is still driving, as reported by `/api/sessions/active`.
+///
+/// `outputTokens` and `totalCost` are both nullable: only Claude's transcripts
+/// join to per-project spend, and Codex records no usage at all, so either can
+/// be absent for a perfectly healthy session. The row leaves the column blank in
+/// that case rather than inventing a figure to show.
+struct ActiveSession: Decodable, Identifiable {
+    let id: String
+    let provider: String
+    let project: String
+    let gitBranch: String?
+    let outputTokens: Double?
+    let totalCost: Double?
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        id = try container.decodeIfPresent(String.self, forKey: .id) ?? UUID().uuidString
+        provider = try container.decodeIfPresent(String.self, forKey: .provider) ?? "unknown"
+        project = try container.decodeIfPresent(String.self, forKey: .project) ?? "unknown"
+        gitBranch = try container.decodeIfPresent(String.self, forKey: .gitBranch)
+        outputTokens = try container.decodeIfPresent(Double.self, forKey: .outputTokens)
+        totalCost = try container.decodeIfPresent(Double.self, forKey: .totalCost)
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case id, provider, project, gitBranch, outputTokens, totalCost
+    }
+}
+
 struct BurnRate: Decodable {
     let costPerHour: Double
 
@@ -155,6 +184,15 @@ struct WidgetConfig: Codable {
     var keepAwake: Bool
     var currency: String
 
+    /// Whether the daemon actually sent `keepAwake`, as opposed to defaulting.
+    ///
+    /// A daemon older than the field omits it entirely, and its silence must not
+    /// be read as "off": the config poll would then release the sleep assertion
+    /// seconds after the switch was flipped, and the switch would flip itself
+    /// back. Not part of the wire format — it describes the response, so it is
+    /// absent from CodingKeys and never encoded on a write.
+    var reportedKeepAwake = true
+
     static let `default` = WidgetConfig(
         port: 4737,
         refreshIntervalMs: 300_000,
@@ -180,7 +218,11 @@ struct WidgetConfig: Codable {
         warningThreshold = try container.decodeIfPresent(Double.self, forKey: .warningThreshold)
             ?? fallback.warningThreshold
         launchAtLogin = try container.decodeIfPresent(Bool.self, forKey: .launchAtLogin) ?? fallback.launchAtLogin
-        keepAwake = try container.decodeIfPresent(Bool.self, forKey: .keepAwake) ?? fallback.keepAwake
+        // Derived from the decoded value rather than `contains`, which counts an
+        // explicit null as an answer. Absent and null both mean "no opinion".
+        let reported = try container.decodeIfPresent(Bool.self, forKey: .keepAwake)
+        reportedKeepAwake = reported != nil
+        keepAwake = reported ?? fallback.keepAwake
         currency = try container.decodeIfPresent(String.self, forKey: .currency) ?? fallback.currency
     }
 
@@ -231,6 +273,10 @@ struct UsageClient {
 
     func config(baseURL: URL, token: String) async throws -> WidgetConfig {
         try await get(path: "api/config", baseURL: baseURL, token: token)
+    }
+
+    func activeSessions(baseURL: URL, token: String) async throws -> [ActiveSession] {
+        try await get(path: "api/sessions/active", baseURL: baseURL, token: token)
     }
 
     func refresh(baseURL: URL, token: String) async throws -> UsageSummary {

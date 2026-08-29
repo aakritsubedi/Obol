@@ -10,12 +10,12 @@ enum WidgetStyle {
 
     // MARK: - Color
 
-    /// Provider hues are tuned per appearance. The dark-mode values are chosen
-    /// to glow slightly against a near-black card; the same values over a white
+    /// Status hues, tuned per appearance. The dark-mode values are chosen to
+    /// glow slightly against a near-black card; the same values over a white
     /// popover fall below a comfortable contrast ratio, so light mode gets
-    /// deeper, more saturated variants. The full set lives in
-    /// ProviderCatalog, which mirrors the dashboard's provider config.
-    static let codex = adaptive(
+    /// deeper, more saturated variants. Provider hues are a separate set and
+    /// live in ProviderCatalog, which mirrors the dashboard's provider config.
+    static let success = adaptive(
         dark: NSColor(srgbRed: 0.31, green: 0.75, blue: 0.57, alpha: 1),
         light: NSColor(srgbRed: 0.11, green: 0.52, blue: 0.37, alpha: 1)
     )

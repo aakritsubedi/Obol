@@ -197,6 +197,11 @@ if [ "$STYLE_DMG" = "1" ]; then
     echo "warning: could not generate installer background; using a plain disk image" >&2
     STYLE_DMG=0
   fi
+  # The leading dot alone does not hide the folder on an HFS+ volume, so the
+  # art directory sits in the installer window next to the app. The hidden flag
+  # travels into the image with the file. (A Finder set to show every file will
+  # still reveal it — that setting is the viewer's to make, not ours.)
+  chflags hidden "$STAGING/.background" 2>/dev/null || true
 fi
 
 RW_DMG=""

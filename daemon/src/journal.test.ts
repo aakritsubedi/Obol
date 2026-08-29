@@ -2,8 +2,9 @@ import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { activeSpan, projectName, promptText, readDayJournal } from "./journal.js";
+import { activeSessions, activeSpan, projectName, promptText, readDayJournal } from "./journal.js";
 import { claudeAdapter } from "./providers/claude.js";
+import type { DayJournal, JournalSession } from "./types.js";
 
 const TZ = "UTC";
 const DATE = "2026-08-25";
@@ -369,5 +370,93 @@ describe("readDayJournal", () => {
     await writeSession("-Users-dev-demo", "s1", [assistant(at("01:00:00"))]);
     expect((await read({ idleMinutes: 0 })).idleMinutes).toBe(15);
     expect((await read({ idleMinutes: 9_000 })).idleMinutes).toBe(120);
+  });
+});
+
+describe("activeSessions", () => {
+  function session(id: string, endedAt: string, overrides: Partial<JournalSession> = {}): JournalSession {
+    return {
+      id,
+      provider: "claude",
+      title: null,
+      project: "demo",
+      projectPath: "/Users/dev/demo",
+      gitBranch: "main",
+      startedAt: "2026-08-25T09:00:00.000Z",
+      endedAt,
+      activeMinutes: 12,
+      humanPrompts: 3,
+      assistantTurns: 5,
+      toolCalls: 7,
+      filesEdited: [],
+      models: [],
+      prompts: [],
+      toolMix: {},
+      outputTokens: 4200,
+      totalCost: 1.25,
+      ...overrides,
+    };
+  }
+
+  function journal(sessions: JournalSession[], idleMinutes = 15): DayJournal {
+    return { idleMinutes, sessions } as DayJournal;
+  }
+
+  const now = new Date("2026-08-25T10:00:00.000Z");
+
+  it("keeps sessions that wrote inside the idle window", () => {
+    const result = activeSessions(journal([session("a", "2026-08-25T09:50:00.000Z")]), now);
+    expect(result).toHaveLength(1);
+    expect(result[0]).toMatchObject({
+      id: "a",
+      provider: "claude",
+      project: "demo",
+      gitBranch: "main",
+      lastEventAt: "2026-08-25T09:50:00.000Z",
+      outputTokens: 4200,
+      totalCost: 1.25,
+    });
+  });
+
+  it("drops sessions idle for longer than the window", () => {
+    const result = activeSessions(journal([session("a", "2026-08-25T09:44:00.000Z")]), now);
+    expect(result).toEqual([]);
+  });
+
+  it("treats the window edge as still running", () => {
+    const result = activeSessions(journal([session("a", "2026-08-25T09:45:00.000Z")]), now);
+    expect(result).toHaveLength(1);
+  });
+
+  it("follows the configured idle window rather than the journal's", () => {
+    const day = journal([session("a", "2026-08-25T09:40:00.000Z")], 15);
+    expect(activeSessions(day, now)).toEqual([]);
+    expect(activeSessions(day, now, 30)).toHaveLength(1);
+  });
+
+  it("ignores a session timestamped in the future", () => {
+    const result = activeSessions(journal([session("a", "2026-08-25T10:05:00.000Z")]), now);
+    expect(result).toEqual([]);
+  });
+
+  it("orders the most recently active session first", () => {
+    const result = activeSessions(
+      journal([session("older", "2026-08-25T09:50:00.000Z"), session("newer", "2026-08-25T09:58:00.000Z")]),
+      now,
+    );
+    expect(result.map((entry) => entry.id)).toEqual(["newer", "older"]);
+  });
+
+  it("returns nothing when the day recorded no sessions", () => {
+    expect(activeSessions(journal([]), now)).toEqual([]);
+  });
+
+  it("passes through a session that reported no usage", () => {
+    const result = activeSessions(
+      journal([session("a", "2026-08-25T09:50:00.000Z", { outputTokens: null, totalCost: null })]),
+      now,
+    );
+    expect(result[0].outputTokens).toBeNull();
+    expect(result[0].totalCost).toBeNull();
   });
 });

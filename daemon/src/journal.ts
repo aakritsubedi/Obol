@@ -10,6 +10,7 @@ import {
 } from "./providers/index.js";
 import { dateForTimeZone } from "./time.js";
 import {
+  type ActiveSession,
   asRecord,
   type CcusageReport,
   type DayJournal,
@@ -233,6 +234,10 @@ export async function readDayJournal(options: JournalOptions): Promise<DayJourna
         models: [...session.models].sort(),
         prompts: session.prompts,
         toolMix: Object.fromEntries([...session.toolMix.entries()].sort((left, right) => right[1] - left[1])),
+        // Zero means the transcript carried no usage records — either the
+        // provider does not log any, or nothing was generated. Neither is a
+        // figure worth showing as a measurement.
+        outputTokens: session.outputTokens > 0 ? session.outputTokens : null,
         totalCost,
       };
     })
@@ -319,4 +324,38 @@ function slugFor(session: SessionAccumulator): string | null {
   if (session.provider !== "claude") return null;
   if (session.projectDir) return session.projectDir;
   return session.projectPath ? projectSlug(session.projectPath) : null;
+}
+
+// Sessions still being driven right now, newest activity first.
+//
+// A transcript records events, not a lifecycle: nothing marks a session as
+// finished, so "running" can only mean "wrote something recently". The idle
+// window that already decides where an active span ends is the same threshold
+// used here, which keeps the popover's notion of running consistent with the
+// active minutes the journal reports.
+export function activeSessions(
+  journal: DayJournal,
+  now: Date = new Date(),
+  idleMinutes: number = journal.idleMinutes,
+): ActiveSession[] {
+  const cutoff = now.getTime() - idleMinutes * 60_000;
+  return journal.sessions
+    .filter((session) => {
+      const last = Date.parse(session.endedAt);
+      // A clock skewed forward on the writing machine would otherwise park a
+      // session in the future and keep it permanently "running".
+      return Number.isFinite(last) && last >= cutoff && last <= now.getTime();
+    })
+    .map((session) => ({
+      id: session.id,
+      provider: session.provider,
+      project: session.project,
+      gitBranch: session.gitBranch,
+      startedAt: session.startedAt,
+      lastEventAt: session.endedAt,
+      activeMinutes: session.activeMinutes,
+      outputTokens: session.outputTokens,
+      totalCost: session.totalCost,
+    }))
+    .sort((left, right) => right.lastEventAt.localeCompare(left.lastEventAt));
 }

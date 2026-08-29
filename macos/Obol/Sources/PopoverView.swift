@@ -47,6 +47,12 @@ struct PopoverView: View {
             providerBreakdown
                 .padding(.top, 26)
 
+            hairline
+                .padding(.top, 18)
+
+            activeSessionsSection
+                .padding(.top, 14)
+
             if let statusMessage = controller.statusMessage {
                 Text(statusMessage)
                     .font(WidgetStyle.TypeScale.caption)
@@ -121,13 +127,13 @@ struct PopoverView: View {
     private var statusLabel: some View {
         HStack(spacing: 6) {
             Circle()
-                .fill(controller.liveColor)
+                .fill(controller.liveStatusColor)
                 .frame(width: 6, height: 6)
                 .modifier(PulsingDot(active: !controller.summary.stale))
             Text(controller.liveLabel)
                 .font(WidgetStyle.TypeScale.status)
         }
-        .foregroundStyle(controller.liveColor)
+        .foregroundStyle(controller.liveStatusColor)
         .padding(.trailing, 4)
         .accessibilityElement(children: .combine)
         .accessibilityLabel(controller.liveLabel)
@@ -175,6 +181,130 @@ struct PopoverView: View {
                 }
             }
         }
+    }
+
+    /// The work happening right now, under its own rule: everything above is the
+    /// day's accumulated total, and these are the sessions still being written
+    /// to. A session counts as running while its last transcript write falls
+    /// inside the daemon's idle window.
+    private var activeSessionsSection: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text("Active now")
+                .font(WidgetStyle.TypeScale.sectionLabel)
+                .tracking(WidgetStyle.TypeScale.sectionLabelTracking)
+                .foregroundStyle(.secondary)
+
+            if controller.activeSessions.isEmpty {
+                Text("No agent is running right now.")
+                    .font(WidgetStyle.TypeScale.row)
+                    .foregroundStyle(.secondary)
+            } else {
+                VStack(alignment: .leading, spacing: 9) {
+                    ForEach(controller.activeSessions) { session in
+                        activeSessionRow(session)
+                    }
+                }
+            }
+        }
+        .animation(.easeOut(duration: 0.2), value: controller.activeSessions.map(\.id))
+    }
+
+    /// The project leads — it is what the row is about — with the agent and the
+    /// branch demoted to matching glyph-and-label tags beneath it. Tokens sit
+    /// above the price in a trailing column rather than beside it: at this width
+    /// a long converted amount and a token count competed for the same inches
+    /// and left the project barely a word wide.
+    private func activeSessionRow(_ session: ActiveSession) -> some View {
+        HStack(alignment: .top, spacing: 10) {
+            Image(systemName: "folder")
+                .font(.system(size: 14))
+                .symbolRenderingMode(.hierarchical)
+                .foregroundStyle(.secondary)
+                .frame(width: 20, height: 20)
+
+            VStack(alignment: .leading, spacing: 2) {
+                Text(session.project)
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+
+                HStack(spacing: 8) {
+                    HStack(spacing: 3) {
+                        ProviderBadge(agent: session.provider, size: 11)
+                        Text(ProviderCatalog.name(for: session.provider))
+                            .lineLimit(1)
+                            .truncationMode(.tail)
+                    }
+                    // The agent names itself in full; the branch gives up its
+                    // middle first, since both ends carry the meaning.
+                    .layoutPriority(1)
+
+                    if let branch = session.gitBranch, !branch.isEmpty {
+                        HStack(spacing: 3) {
+                            Image(systemName: "arrow.triangle.branch")
+                                .font(.system(size: 9))
+                            Text(branch)
+                                .lineLimit(1)
+                                .truncationMode(.middle)
+                        }
+                    }
+                }
+                .font(WidgetStyle.TypeScale.footnote)
+                .foregroundStyle(.secondary)
+            }
+
+            Spacer(minLength: 8)
+
+            // Nothing is drawn for a figure the session never reported, so the
+            // column simply ends where the data does.
+            VStack(alignment: .trailing, spacing: 2) {
+                if let tokens = Self.sessionTokens(session) {
+                    Text(tokens)
+                        .monospacedDigit()
+                        .font(WidgetStyle.TypeScale.footnote)
+                        .foregroundStyle(.secondary)
+                }
+
+                if let cost = sessionCost(session) {
+                    Text(cost)
+                        .monospacedDigit()
+                        .lineLimit(1)
+                }
+            }
+            .fixedSize(horizontal: true, vertical: false)
+        }
+        .font(WidgetStyle.TypeScale.row)
+        .help(session.totalCost == nil ? "" : "Estimated share of this project's spend today")
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(accessibilityLabel(for: session))
+    }
+
+    /// Nil when the transcript reported no usage — Codex records none at all.
+    private static func sessionTokens(_ session: ActiveSession) -> String? {
+        session.outputTokens.map(UsageClient.compactTokens)
+    }
+
+    /// Nil for a session with no per-project spend to draw on; only Claude's
+    /// join to one. The figure is apportioned from the project's daily total
+    /// rather than measured, so it carries a `≈` instead of presenting as an
+    /// exact charge.
+    private func sessionCost(_ session: ActiveSession) -> String? {
+        session.totalCost.map { "≈\(currency.display($0))" }
+    }
+
+    private func accessibilityLabel(for session: ActiveSession) -> String {
+        var parts = [ProviderCatalog.name(for: session.provider), session.project]
+        if let branch = session.gitBranch, !branch.isEmpty {
+            parts.append("branch \(branch)")
+        }
+        // A figure the session never reported is left unsaid here too, so the
+        // spoken row matches the drawn one.
+        if let tokens = session.outputTokens {
+            parts.append("\(UsageClient.compactTokens(tokens)) output tokens")
+        }
+        if let cost = session.totalCost {
+            parts.append("about \(currency.amount(cost)) \(currency.active.name)")
+        }
+        return parts.joined(separator: ", ")
     }
 
     private var providerBar: some View {
