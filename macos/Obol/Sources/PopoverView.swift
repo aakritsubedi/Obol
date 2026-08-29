@@ -455,12 +455,22 @@ struct PopoverView: View {
         .font(WidgetStyle.TypeScale.row)
         .padding(.vertical, 14)
         .animation(.easeInOut(duration: 0.15), value: controller.keepAwakeEnabled)
+        .animation(.easeInOut(duration: 0.15), value: controller.keepAwakeHolding)
     }
 
+    /// Which of the two states an enabled switch is actually in. "On" no longer
+    /// means "holding", and the difference is invisible without saying so.
     private var keepAwakeCaption: String {
-        controller.keepAwakeEnabled
-            ? "Your Mac won't idle to sleep."
-            : "Your Mac sleeps on its usual schedule."
+        guard controller.keepAwakeEnabled else {
+            return "Your Mac sleeps on its usual schedule."
+        }
+        let count = controller.activeSessions.count
+        guard count > 0 else {
+            return "Nothing is running, so your Mac sleeps as usual."
+        }
+        return count == 1
+            ? "Holding sleep off while 1 session runs."
+            : "Holding sleep off while \(count) sessions run."
     }
 
     /// Everything the daemon reports is priced in USD; picking a currency here

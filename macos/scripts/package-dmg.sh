@@ -236,6 +236,16 @@ fi
 
 if [ "$STYLE_DMG" = "1" ]; then
   sleep 1
+  # Hide the art folder on the mounted volume, before Finder is asked to lay the
+  # window out. A leading dot hides nothing here — Finder special-cases only a
+  # handful of names — and doing it after the styling step is too late: Finder
+  # writes .DS_Store from what it enumerated, so a folder still visible at that
+  # moment is recorded as a positioned item and keeps showing.
+  #
+  # Both attributes, because they are separate mechanisms: chflags sets the BSD
+  # UF_HIDDEN flag, SetFile sets the kIsInvisible bit in the Finder info.
+  chflags hidden "$MOUNT/.background" 2>/dev/null || true
+  SetFile -a V "$MOUNT/.background" 2>/dev/null || true
   LAYOUT_OK=1
   osascript <<OSA || LAYOUT_OK=0
 tell application "Finder"

@@ -15,6 +15,9 @@ final class DaemonController: ObservableObject {
     @Published private(set) var isPopoverPresented = false
     @Published private(set) var notificationsDenied = false
     @Published private(set) var activeSessions: [ActiveSession] = []
+    /// Whether the sleep assertion is actually held right now, as opposed to
+    /// merely switched on. Settings shows the difference.
+    @Published private(set) var keepAwakeHolding = false
 
     private let client = UsageClient()
     private let notifier = Notifier()
@@ -34,12 +37,11 @@ final class DaemonController: ObservableObject {
             self?.notificationsDenied = denied
         }
         notifier.requestPermission()
-        // config.json is the shared record, but it is a second away at launch
-        // and never arrives at all if the daemon cannot start. Keeping the choice
-        // locally too means the machine stays awake from the moment the app does,
-        // and keeps doing so when the daemon is missing Node or has crashed.
+        // config.json is the shared record, but it is a second away at launch,
+        // so the remembered choice restores the switch without waiting for it.
+        // Nothing is held yet: the first session read decides that, and idle
+        // sleep is minutes away regardless.
         config.keepAwake = Self.rememberedKeepAwake
-        keepAwake.apply(config.keepAwake)
         start()
     }
 
@@ -117,16 +119,21 @@ final class DaemonController: ObservableObject {
         }
     }
 
-    /// Only while the popover is on screen. Serving this walks today's
-    /// transcripts, and nothing renders the list when the window is shut.
+    /// Fetched when the popover is showing the list, and whenever keep-awake is
+    /// on — that setting decides on this data, so a shut window is no longer a
+    /// reason to skip the read. With both off, serving it would walk today's
+    /// transcripts for nobody.
     ///
-    /// A failed read leaves the previous list in place rather than emptying it,
-    /// so a dropped poll reads as "unchanged" instead of flashing the empty
-    /// state at a session that is still running.
+    /// A failed read leaves the previous list in place rather than emptying it.
+    /// A dropped poll then reads as "unchanged", which keeps the popover from
+    /// flashing its empty state and — more importantly — keeps the machine
+    /// awake through a blip rather than letting it sleep on a running agent.
     private func loadActiveSessions() async {
-        guard isPopoverPresented, let baseURL, !token.isEmpty else { return }
+        guard isPopoverPresented || config.keepAwake else { return }
+        guard let baseURL, !token.isEmpty else { return }
         guard let next = try? await client.activeSessions(baseURL: baseURL, token: token) else { return }
         activeSessions = next
+        syncKeepAwake()
     }
 
     func openDashboard() {
@@ -162,16 +169,34 @@ final class DaemonController: ObservableObject {
         }
     }
 
-    /// The assertion is taken before the write goes out: the point of the
-    /// toggle is the machine's behaviour right now, and a daemon that is slow
-    /// or gone should not delay it. A failed write only costs the setting its
-    /// persistence, which `saveConfig` already reports.
     func setKeepAwake(_ enabled: Bool) {
         guard config.keepAwake != enabled else { return }
         config.keepAwake = enabled
         Self.rememberedKeepAwake = enabled
-        keepAwake.apply(enabled)
-        Task { await saveConfig() }
+        syncKeepAwake()
+        Task {
+            // Nothing polls the session list while the setting is off, so
+            // switching it on has to go and find out what is running before it
+            // can hold anything. The write follows; a failed one costs the
+            // setting only its persistence, which `saveConfig` reports.
+            await loadActiveSessions()
+            await saveConfig()
+        }
+    }
+
+    /// The switch states an intent; the running sessions decide whether it has
+    /// anything to act on. With nothing running, a switch left on behaves
+    /// exactly as if it were off, so a machine abandoned after the work
+    /// finished sleeps on its usual schedule instead of burning down the
+    /// battery holding a vigil for an agent that already stopped.
+    ///
+    /// A session counts as running for as long as the daemon's idle window
+    /// (15 minutes by default) after its last transcript write, so the hold
+    /// outlives a quiet stretch mid-run rather than dropping between turns.
+    private func syncKeepAwake() {
+        let shouldHold = config.keepAwake && !activeSessions.isEmpty
+        keepAwake.apply(shouldHold)
+        keepAwakeHolding = shouldHold
     }
 
     func quit() {
@@ -182,6 +207,7 @@ final class DaemonController: ObservableObject {
     func stop() {
         shuttingDown = true
         keepAwake.apply(false)
+        keepAwakeHolding = false
         runtimeTimer?.invalidate()
         pollingTimer?.invalidate()
         runtimeTimer = nil
@@ -302,9 +328,9 @@ final class DaemonController: ObservableObject {
         guard let nextConfig = try? await client.config(baseURL: baseURL, token: token) else { return }
         config = adoptingKeepAwake(from: nextConfig)
         healLaunchAtLogin()
-        // Restores the assertion after a relaunch, and re-asserts it on every
-        // poll so an edit made straight to config.json still takes effect.
-        keepAwake.apply(config.keepAwake)
+        // Re-evaluated on every poll so an edit made straight to config.json
+        // still takes effect.
+        syncKeepAwake()
         // config.json is the shared source of truth for the display currency,
         // so a change made in one surface reaches the other on its next read.
         CurrencyController.shared?.adopt(code: nextConfig.currency)
