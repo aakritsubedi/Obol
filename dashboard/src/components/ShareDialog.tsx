@@ -2,7 +2,7 @@ import { useMemo, useState } from "react";
 import type { ModelBreakdown, Report, Summary, UsageRow } from "../api";
 import { ProviderLogo, providerColor, providerConfig, providerName } from "../providers";
 import { buildContributionCalendar, type ContributionCalendar, trimFutureContribution } from "./contribution";
-import { formatCurrency, formatPeriod, formatTokens, numberValue } from "./format";
+import { formatCurrency, formatPeriod, formatTokens, heroFontSize, numberValue } from "./format";
 import { modelName } from "./totals";
 
 type ShareRange = "today" | "week" | "month" | "total";
@@ -377,6 +377,131 @@ function drawContributionGraph(
   return layout.height;
 }
 
+const shareFonts = {
+  chrome: "600 14px ui-monospace, SFMono-Regular, Menlo, monospace",
+  chromeMuted: "500 12px ui-monospace, SFMono-Regular, Menlo, monospace",
+  date: "500 14px ui-monospace, SFMono-Regular, Menlo, monospace",
+  cost: "700 62px -apple-system, BlinkMacSystemFont, sans-serif",
+  costLabel: "500 13px ui-monospace, SFMono-Regular, Menlo, monospace",
+  usage: "500 13px ui-monospace, SFMono-Regular, Menlo, monospace",
+  section: "600 12px ui-monospace, SFMono-Regular, Menlo, monospace",
+  sectionSmall: "600 11px ui-monospace, SFMono-Regular, Menlo, monospace",
+  modelName: "600 15px ui-monospace, SFMono-Regular, Menlo, monospace",
+  modelProvider: "500 11px ui-monospace, SFMono-Regular, Menlo, monospace",
+  modelMetric: "500 12px ui-monospace, SFMono-Regular, Menlo, monospace",
+  moreName: "600 11px ui-monospace, SFMono-Regular, Menlo, monospace",
+  moreMetric: "500 10px ui-monospace, SFMono-Regular, Menlo, monospace",
+  footerBrand: "650 14px ui-monospace, SFMono-Regular, Menlo, monospace",
+  footerNote: "500 12px ui-monospace, SFMono-Regular, Menlo, monospace",
+};
+
+function textWidth(context: CanvasRenderingContext2D, font: string, value: string): number {
+  context.font = font;
+  return context.measureText(value).width;
+}
+
+const SHARE_FRAME_INSET = 24;
+export const SHARE_CONTENT_PAD = 62;
+export const SHARE_COLUMN_GAP = 64;
+export const SHARE_MIN_WIDTH = 1200;
+export const SHARE_MODEL_ICON_STEP = 32;
+export const SHARE_MODEL_METRIC_GAP = 28;
+const SHARE_USAGE_GAP = 20;
+const SHARE_USAGE_LABEL_Y = 278;
+const SHARE_USAGE_VALUE_Y = 302;
+
+/** The `// 367.5M tokens 🔥` comments under the hero amount, shared by card and export. */
+function usageComments(data: ShareData) {
+  return [
+    { value: formatTokens(data.tokens), label: "tokens 🔥" },
+    { value: String(data.modelCount), label: "models 🤖" },
+  ];
+}
+
+/**
+ * Measure every block before sizing the canvas so long values — NPR amounts,
+ * verbose model ids — widen the card instead of spilling past its frame.
+ */
+export function shareImageWidth(
+  context: CanvasRenderingContext2D,
+  data: ShareData,
+  topModels: ShareModel[],
+  additionalModels: ShareModel[],
+  moreColumns: number,
+) {
+  const usage = usageComments(data);
+  const usageWidth =
+    usage.reduce(
+      (sum, part) => sum + textWidth(context, shareFonts.usage, `// ${part.value} ${part.label}`),
+      0,
+    ) +
+    SHARE_USAGE_GAP * (usage.length - 1);
+  const leftWidth = Math.max(
+    textWidth(context, shareFonts.date, `// ${data.dateLabel.toLowerCase()}`),
+    textWidth(context, shareFonts.cost, formatCurrency(data.cost)),
+    textWidth(context, shareFonts.costLabel, "total_spend"),
+    textWidth(context, shareFonts.usage, "// total usage"),
+    usageWidth,
+  );
+
+  const modelRowWidths = topModels.map((model) => {
+    const name = textWidth(context, shareFonts.modelName, model.model);
+    const provider = textWidth(context, shareFonts.modelProvider, providerName(model.provider).toLowerCase());
+    const metric = textWidth(
+      context,
+      shareFonts.modelMetric,
+      `${formatCurrency(model.cost)} · ${formatTokens(model.tokens)}`,
+    );
+    return SHARE_MODEL_ICON_STEP + Math.max(name + SHARE_MODEL_METRIC_GAP + metric, provider);
+  });
+  const rightWidth = Math.max(
+    260,
+    textWidth(context, shareFonts.section, "// top models"),
+    ...modelRowWidths,
+  );
+
+  const moreCellWidths = additionalModels.map((model) =>
+    Math.max(
+      textWidth(context, shareFonts.moreName, model.model),
+      textWidth(
+        context,
+        shareFonts.moreMetric,
+        `${formatCurrency(model.cost)} · ${formatTokens(model.tokens)} tokens`,
+      ),
+    ),
+  );
+  const moreColumnWidth = moreCellWidths.length ? Math.max(...moreCellWidths) + 30 : 0;
+  const moreWidth = moreColumnWidth ? moreColumnWidth * moreColumns + 18 * (moreColumns - 1) : 0;
+
+  const chromeWidth =
+    145 +
+    textWidth(context, shareFonts.chrome, `usage/${data.rangeLabel.toLowerCase().replace(/ /g, "-")}.md`) +
+    36 +
+    40 +
+    textWidth(context, shareFonts.chromeMuted, "OBOL / USAGE") +
+    SHARE_CONTENT_PAD;
+  const footerNote =
+    data.rangeLabel === "Total" ? `tracked_since: ${data.trackedSince}` : "local · UTF-8 · usage snapshot";
+  const footerWidth =
+    53 +
+    27 +
+    textWidth(context, shareFonts.footerBrand, "obol") +
+    48 +
+    textWidth(context, shareFonts.footerNote, footerNote) +
+    SHARE_CONTENT_PAD;
+
+  const width = Math.ceil(
+    Math.max(
+      SHARE_MIN_WIDTH,
+      SHARE_CONTENT_PAD * 2 + leftWidth + SHARE_COLUMN_GAP + rightWidth,
+      SHARE_CONTENT_PAD * 2 + moreWidth,
+      chromeWidth,
+      footerWidth,
+    ),
+  );
+  return { width, leftWidth, rightWidth, moreColumnWidth, footerNote };
+}
+
 async function exportShareImage(data: ShareData) {
   const topModels = data.models.slice(0, SHARE_TOP_MODEL_COUNT);
   const additionalModels = data.models.slice(
@@ -392,31 +517,60 @@ async function exportShareImage(data: ShareData) {
   );
   const obolIcon = await loadImage("/favicon-32.png");
   const canvas = document.createElement("canvas");
-  canvas.width = 1200;
+  const context = canvas.getContext("2d");
+  if (!context) return;
+
   const detailRowStep = 56;
   const moreColumns = 2;
   const moreRowStep = 42;
   const detailStartY = 177;
-  const firstRowBottom = detailStartY + topModels.length * detailRowStep;
+  const {
+    width: canvasWidth,
+    leftWidth,
+    rightWidth,
+    moreColumnWidth,
+    footerNote,
+  } = shareImageWidth(context, data, topModels, additionalModels, moreColumns);
+  // Anchor the model list to the right edge so spare width lands in the gutter
+  // between the two sections rather than as a void inside every row.
+  const detailX = Math.max(
+    SHARE_CONTENT_PAD + leftWidth + SHARE_COLUMN_GAP,
+    canvasWidth - SHARE_CONTENT_PAD - rightWidth,
+  );
+  const metricsRight = canvasWidth - SHARE_CONTENT_PAD;
+  const frameRight = canvasWidth - SHARE_FRAME_INSET;
+  // Track where each column actually ends — the summary at its usage comments,
+  // the list at its last provider line — so a short card is not padded out with
+  // dead space before the footer.
+  const summaryBottom = SHARE_USAGE_VALUE_Y + 8;
+  const modelsBottom = topModels.length ? detailStartY + (topModels.length - 1) * detailRowStep + 20 : 135;
+  const firstRowBottom = Math.max(summaryBottom, modelsBottom);
   const moreHeaderY = firstRowBottom + 28;
   const moreStartY = moreHeaderY + 25;
   const moreRows = Math.ceil(additionalModels.length / moreColumns);
   const modelContentBottom = additionalModels.length ? moreStartY + moreRows * moreRowStep : firstRowBottom;
-  const canvasHeight = Math.max(560, modelContentBottom + 110);
+  const canvasHeight = Math.max(420, Math.ceil(modelContentBottom + 110));
+  canvas.width = canvasWidth;
   canvas.height = canvasHeight;
   const footerY = canvasHeight - 74;
-  const outerHeight = canvasHeight - 48;
-  const context = canvas.getContext("2d");
-  if (!context) return;
+  const outerHeight = canvasHeight - SHARE_FRAME_INSET * 2;
+
   context.fillStyle = "#111216";
   context.fillRect(0, 0, canvas.width, canvas.height);
   context.save();
-  roundedRect(context, 24, 24, 1152, outerHeight, 18);
+  roundedRect(
+    context,
+    SHARE_FRAME_INSET,
+    SHARE_FRAME_INSET,
+    canvasWidth - SHARE_FRAME_INSET * 2,
+    outerHeight,
+    18,
+  );
   context.clip();
   context.strokeStyle = "#343840";
   context.lineWidth = 2;
   context.fillStyle = "#1d1f25";
-  context.fillRect(25, 25, 1150, 64);
+  context.fillRect(25, 25, canvasWidth - 50, 64);
   [
     ["#f06b60", 55],
     ["#f1bd4a", 79],
@@ -427,70 +581,84 @@ async function exportShareImage(data: ShareData) {
     context.arc(Number(x), 57, 7, 0, Math.PI * 2);
     context.fill();
   });
+  const fileLabel = `usage/${data.rangeLabel.toLowerCase().replace(/ /g, "-")}.md`;
+  const pillWidth = Math.max(260, textWidth(context, shareFonts.chrome, fileLabel) + 36);
   context.fillStyle = "#2a2d35";
-  roundedRect(context, 145, 42, 260, 30, 7);
+  roundedRect(context, 145, 42, pillWidth, 30, 7);
   context.fill();
   context.fillStyle = "#cdd1da";
-  context.font = "600 14px ui-monospace, SFMono-Regular, Menlo, monospace";
-  context.fillText(`usage/${data.rangeLabel.toLowerCase().replace(/ /g, "-")}.md`, 163, 62);
+  context.font = shareFonts.chrome;
+  context.fillText(fileLabel, 163, 62);
   context.fillStyle = "#737987";
-  context.font = "500 12px ui-monospace, SFMono-Regular, Menlo, monospace";
-  context.fillText("OBOL / USAGE", 1030, 62);
+  context.font = shareFonts.chromeMuted;
+  context.textAlign = "right";
+  context.fillText("OBOL / USAGE", metricsRight, 62);
+  context.textAlign = "left";
   context.fillStyle = "#9399a7";
-  context.font = "500 14px ui-monospace, SFMono-Regular, Menlo, monospace";
-  context.fillText(`// ${data.dateLabel.toLowerCase()}`, 62, 135);
+  context.font = shareFonts.date;
+  context.fillText(`// ${data.dateLabel.toLowerCase()}`, SHARE_CONTENT_PAD, 135);
   context.fillStyle = "#f5f6f8";
-  context.font = "700 62px -apple-system, BlinkMacSystemFont, sans-serif";
-  context.fillText(formatCurrency(data.cost), 62, 212);
+  context.font = shareFonts.cost;
+  context.fillText(formatCurrency(data.cost), SHARE_CONTENT_PAD, 212);
   context.fillStyle = "#858b98";
-  context.font = "500 13px ui-monospace, SFMono-Regular, Menlo, monospace";
-  context.fillText("total_spend", 66, 237);
-  const metrics = [
-    ["Tokens", formatTokens(data.tokens)],
-    ["Models", String(data.modelCount)],
-  ];
-  metrics.forEach(([label, value], index) => {
-    const x = 62 + index * 142;
-    context.fillStyle = "#1d2026";
-    roundedRect(context, x, 274, 128, 34, 17);
-    context.fill();
-    context.fillStyle = "#cdd1da";
-    context.font = "600 11px ui-monospace, SFMono-Regular, Menlo, monospace";
-    context.fillText(`${value} ${label.toLowerCase()}`, x + 14, 296);
-  });
+  context.font = shareFonts.costLabel;
+  context.fillText("total_spend", SHARE_CONTENT_PAD + 4, 237);
   context.fillStyle = "#858b98";
-  context.font = "600 12px ui-monospace, SFMono-Regular, Menlo, monospace";
-  context.fillText("// top models", 570, 135);
+  context.font = shareFonts.usage;
+  context.fillText("// total usage", SHARE_CONTENT_PAD, SHARE_USAGE_LABEL_Y);
+  let usageX = SHARE_CONTENT_PAD;
+  for (const part of usageComments(data)) {
+    context.font = shareFonts.usage;
+    context.fillStyle = "#858b98";
+    context.fillText("// ", usageX, SHARE_USAGE_VALUE_Y);
+    usageX += textWidth(context, shareFonts.usage, "// ");
+    context.fillStyle = "#86efac";
+    context.fillText(part.value, usageX, SHARE_USAGE_VALUE_Y);
+    usageX += textWidth(context, shareFonts.usage, part.value);
+    context.fillStyle = "#858b98";
+    context.fillText(` ${part.label}`, usageX, SHARE_USAGE_VALUE_Y);
+    usageX += textWidth(context, shareFonts.usage, ` ${part.label}`) + SHARE_USAGE_GAP;
+  }
+  context.fillStyle = "#858b98";
+  context.font = shareFonts.section;
+  context.fillText("// top models", detailX, 135);
   for (const [index, model] of topModels.entries()) {
     const y = detailStartY + index * detailRowStep;
     const color = providerColor(model.provider);
-    if (!drawRoundedImage(context, providerImages.get(model.provider) || null, 570, y - 15, 22, 6)) {
+    if (!drawRoundedImage(context, providerImages.get(model.provider) || null, detailX, y - 15, 22, 6)) {
       context.fillStyle = color;
-      roundedRect(context, 570, y - 15, 22, 22, 6);
+      roundedRect(context, detailX, y - 15, 22, 22, 6);
       context.fill();
     }
+    const metric = `${formatCurrency(model.cost)} · ${formatTokens(model.tokens)}`;
+    const metricWidth = textWidth(context, shareFonts.modelMetric, metric);
+    const nameX = detailX + SHARE_MODEL_ICON_STEP;
     context.fillStyle = "#e7e9ed";
-    context.font = "600 15px ui-monospace, SFMono-Regular, Menlo, monospace";
-    context.fillText(model.model, 602, y);
+    context.font = shareFonts.modelName;
+    context.fillText(
+      fitCanvasText(context, model.model, metricsRight - metricWidth - SHARE_MODEL_METRIC_GAP - nameX),
+      nameX,
+      y,
+    );
     context.fillStyle = "#737987";
-    context.font = "500 11px ui-monospace, SFMono-Regular, Menlo, monospace";
-    context.fillText(providerName(model.provider).toLowerCase(), 602, y + 14);
+    context.font = shareFonts.modelProvider;
+    context.fillText(providerName(model.provider).toLowerCase(), nameX, y + 14);
     context.fillStyle = "#aeb4bf";
-    context.font = "500 12px ui-monospace, SFMono-Regular, Menlo, monospace";
-    context.fillText(`${formatCurrency(model.cost)} · ${formatTokens(model.tokens)}`, 965, y + 5);
+    context.font = shareFonts.modelMetric;
+    context.textAlign = "right";
+    context.fillText(metric, metricsRight, y + 5);
+    context.textAlign = "left";
   }
   if (additionalModels.length) {
     context.strokeStyle = "#343840";
     context.lineWidth = 1;
     context.beginPath();
     context.moveTo(25, firstRowBottom + 8);
-    context.lineTo(1175, firstRowBottom + 8);
+    context.lineTo(frameRight, firstRowBottom + 8);
     context.stroke();
     context.fillStyle = "#858b98";
-    context.font = "600 11px ui-monospace, SFMono-Regular, Menlo, monospace";
-    context.fillText("// other models used", 62, moreHeaderY);
-    const moreWidth = 1110;
-    const columnWidth = (moreWidth - (moreColumns - 1) * 18) / moreColumns;
+    context.font = shareFonts.sectionSmall;
+    context.fillText("// other models used", SHARE_CONTENT_PAD, moreHeaderY);
     additionalModels.forEach((model, index) => {
       const column = index % moreColumns;
       const row = Math.floor(index / moreColumns);
@@ -498,9 +666,9 @@ async function exportShareImage(data: ShareData) {
         context,
         providerImages.get(model.provider) || null,
         model,
-        62 + column * (columnWidth + 18),
+        SHARE_CONTENT_PAD + column * (moreColumnWidth + 18),
         moreStartY + row * moreRowStep,
-        columnWidth,
+        moreColumnWidth,
       );
     });
   }
@@ -508,7 +676,7 @@ async function exportShareImage(data: ShareData) {
   context.lineWidth = 1;
   context.beginPath();
   context.moveTo(25, footerY);
-  context.lineTo(1175, footerY);
+  context.lineTo(frameRight, footerY);
   context.stroke();
   if (!drawRoundedImage(context, obolIcon, 53, canvasHeight - 53, 18, 5)) {
     context.fillStyle = "#9d8cf2";
@@ -519,15 +687,13 @@ async function exportShareImage(data: ShareData) {
   context.font = "700 11px -apple-system, BlinkMacSystemFont, sans-serif";
   if (!obolIcon) context.fillText("o", 59, canvasHeight - 40);
   context.fillStyle = "#e7e9ed";
-  context.font = "650 14px ui-monospace, SFMono-Regular, Menlo, monospace";
+  context.font = shareFonts.footerBrand;
   context.fillText("obol", 80, canvasHeight - 43);
   context.fillStyle = "#858b98";
-  context.font = "500 12px ui-monospace, SFMono-Regular, Menlo, monospace";
-  context.fillText(
-    data.rangeLabel === "Total" ? `tracked_since: ${data.trackedSince}` : "local · UTF-8 · usage snapshot",
-    888,
-    canvasHeight - 43,
-  );
+  context.font = shareFonts.footerNote;
+  context.textAlign = "right";
+  context.fillText(footerNote, metricsRight, canvasHeight - 43);
+  context.textAlign = "left";
   context.restore();
   canvas.toBlob(
     (blob) => blob && downloadBlob(`obol-${data.rangeLabel.toLowerCase().replace(/ /g, "-")}.png`, blob),
@@ -579,7 +745,9 @@ async function exportContributionImage(rows: UsageRow[]) {
   context.fillText(`usage/activity-${calendar.year}.md`, 163, 62);
   context.fillStyle = "#737987";
   context.font = "500 12px ui-monospace, SFMono-Regular, Menlo, monospace";
-  context.fillText("OBOL / ACTIVITY", canvasWidth - 210, 62);
+  context.textAlign = "right";
+  context.fillText("OBOL / ACTIVITY", canvasWidth - contentX, 62);
+  context.textAlign = "left";
   drawContributionGraph(context, calendar, contentX, graphTop, contentWidth, 40);
   context.strokeStyle = "#343840";
   context.lineWidth = 1;
@@ -600,7 +768,9 @@ async function exportContributionImage(rows: UsageRow[]) {
   context.fillText("obol", 80, canvasHeight - 43);
   context.fillStyle = "#858b98";
   context.font = "500 12px ui-monospace, SFMono-Regular, Menlo, monospace";
-  context.fillText("local · UTF-8 · usage snapshot", canvasWidth - 350, canvasHeight - 43);
+  context.textAlign = "right";
+  context.fillText("local · UTF-8 · usage snapshot", canvasWidth - contentX, canvasHeight - 43);
+  context.textAlign = "left";
   context.restore();
   canvas.toBlob((blob) => blob && downloadBlob(`obol-contribution-${calendar.year}.png`, blob), "image/png");
 }
@@ -609,13 +779,18 @@ function ModelRow({ model }: { model: ShareModel }) {
   const color = providerColor(model.provider);
   return (
     <div className="flex items-center gap-2.5">
-      <ProviderLogo agent={model.provider} size={26} color={color} />
+      <span className="shrink-0">
+        <ProviderLogo agent={model.provider} size={26} color={color} />
+      </span>
       <div className="min-w-0 flex-1">
-        <div className="flex items-center justify-between gap-3 text-xs">
-          <span className="truncate font-semibold">
+        <div
+          className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-0.5 text-xs"
+          title={`${model.model} · ${formatCurrency(model.cost)} · ${formatTokens(model.tokens)}`}
+        >
+          <span className="min-w-0 flex-1 truncate font-semibold">
             {model.model.split("/")[1] ? model.model.split("/")[1] : model.model}
           </span>
-          <span className="shrink-0 tabular-nums text-[#aeb4bf]">
+          <span className="shrink-0 whitespace-nowrap tabular-nums text-[#aeb4bf]">
             {formatCurrency(model.cost)} · {formatTokens(model.tokens)}
           </span>
         </div>
@@ -632,12 +807,14 @@ function ModelComment({ model }: { model: ShareModel }) {
       className="inline-flex min-w-0 items-start gap-2 text-[10px]"
       title={`${model.model} · ${providerName(model.provider)} · ${formatCurrency(model.cost)} · ${formatTokens(model.tokens)} tokens`}
     >
-      <ProviderLogo agent={model.provider} size={20} color={color} />
+      <span className="shrink-0">
+        <ProviderLogo agent={model.provider} size={20} color={color} />
+      </span>
       <span className="min-w-0">
         <span className="block truncate font-semibold text-[#e7e9ed]">
           {model.model.split("/")[1] ? model.model.split("/")[1] : model.model}
         </span>
-        <span className="mt-0.5 block whitespace-nowrap tabular-nums text-[#aeb4bf]">
+        <span className="mt-0.5 block truncate tabular-nums text-[#aeb4bf]">
           {formatCurrency(model.cost)} · {formatTokens(model.tokens)} tokens
         </span>
       </span>
@@ -661,7 +838,7 @@ export default function ShareDialog({ report, summary, onClose }: Props) {
       onMouseDown={(event) => event.target === event.currentTarget && onClose()}
     >
       <div
-        className="w-full max-w-[920px] overflow-hidden rounded-[24px] border border-hairline bg-card text-ink shadow-[0_24px_80px_rgba(0,0,0,.24)]"
+        className="w-full max-w-[980px] overflow-hidden rounded-[24px] border border-hairline bg-card text-ink shadow-[0_24px_80px_rgba(0,0,0,.24)]"
         role="dialog"
         aria-modal="true"
         aria-labelledby="share-dialog-title"
@@ -702,24 +879,24 @@ export default function ShareDialog({ report, summary, onClose }: Props) {
               </span>
               <span className="ml-auto text-[9px] text-[#737987]">OBOL / USAGE</span>
             </div>
-            <div className="grid grid-cols-[.85fr_1.15fr] max-[640px]:grid-cols-1">
-              <div className="p-5 sm:p-6">
+            <div className="grid grid-cols-[.85fr_1.15fr] max-[640px]:grid-cols-1 [&>div]:min-w-0">
+              <div className="p-5 [container-type:inline-size] sm:p-6">
                 <div className="text-[12px] text-[#858b98]">// {data.dateLabel.toLowerCase()}</div>
-                <div className="mt-5 text-4xl font-bold tracking-[-0.07em] sm:text-5xl">
+                <div
+                  className="mt-5 font-bold leading-[1.05] tracking-[-0.06em]"
+                  style={{ fontSize: heroFontSize(formatCurrency(data.cost), 48) }}
+                >
                   {formatCurrency(data.cost)}
                 </div>
-                <div className="mt-1 text-[13px] text-[#858b98]">total spend</div>
-                <div className="flex flex-wrap gap-1 mt-7 ">
-                  <div className="text-[11px] text-[#858b98] block">// total usage</div>
+                <div className="mt-1 text-[13px] text-[#858b98]">total_spend</div>
+                <div className="mt-7 flex flex-wrap gap-1">
+                  <div className="block text-[11px] text-[#858b98]">// total usage</div>
                   <div className="flex flex-wrap gap-2">
-                    {[
-                      [formatTokens(data.tokens), "tokens", "🔥"],
-                      [String(data.modelCount), "models", "🤖"],
-                    ].map(([value, label, unit]) => (
-                      <div className="text-[11px] text-[#858b98] block">
+                    {usageComments(data).map((part) => (
+                      <div className="block text-[11px] text-[#858b98]" key={part.label}>
                         //&nbsp;
-                        <span className="text-green-300">{value}</span>&nbsp;
-                        {label} {unit}
+                        <span className="text-green-300">{part.value}</span>&nbsp;
+                        {part.label}
                       </div>
                     ))}
                   </div>
@@ -740,7 +917,7 @@ export default function ShareDialog({ report, summary, onClose }: Props) {
               {additionalModels.length > 0 && (
                 <div className="col-span-full border-t border-[#343840] px-5 pb-5 pt-4 sm:px-6">
                   <div className="mb-2 text-[10px] font-semibold text-[#858b98]">// other models used</div>
-                  <div className="grid grid-cols-1 gap-x-8 gap-y-2 min-[520px]:grid-cols-2">
+                  <div className="grid grid-cols-1 gap-x-8 gap-y-2 min-[520px]:grid-cols-2 [&>span]:min-w-0">
                     {additionalModels.map((model) => (
                       <ModelComment key={`${model.provider}-${model.model}`} model={model} />
                     ))}
@@ -755,7 +932,7 @@ export default function ShareDialog({ report, summary, onClose }: Props) {
               <span className="text-[#858b98]">
                 {data.rangeLabel === "Total"
                   ? `tracked_since: ${data.trackedSince}`
-                  : "local · usage snapshot"}
+                  : "local · UTF-8 · usage snapshot"}
               </span>
             </div>
           </div>
