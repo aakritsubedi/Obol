@@ -8,6 +8,23 @@ enum WidgetStyle {
     static let popoverWidth: CGFloat = 340
     static let inset: CGFloat = 18
 
+    /// The panel the popover is drawn in: the card, and the arrow that points
+    /// it at the menu bar item. Shared by the shape that draws the chrome and
+    /// by the geometry that places the window under the status item.
+    enum Chrome {
+        static let cornerRadius: CGFloat = 12
+        static let arrowWidth: CGFloat = 30
+        static let arrowHeight: CGFloat = 12
+        static let arrowTipRadius: CGFloat = 3
+        /// How far the flanks flare out into the card's top edge.
+        static let arrowJoinRadius: CGFloat = 6
+        /// Space between the bottom of the menu bar and the arrow's tip.
+        static let menuBarGap: CGFloat = 1
+        /// The closest the card comes to a screen edge before it stops
+        /// following the status item.
+        static let screenInset: CGFloat = 8
+    }
+
     // MARK: - Color
 
     /// Status hues, tuned per appearance. The dark-mode values are chosen to

@@ -56,19 +56,6 @@ final class DaemonController: ObservableObject {
         summary.stale ? "Cached" : "Live"
     }
 
-    /// Budget health, for the menu bar dot — the one indicator visible without
-    /// opening anything, and the right place for "you are over budget" to show.
-    var liveColor: Color {
-        if summary.stale {
-            return WidgetStyle.warning
-        }
-        switch summary.budgetStatus {
-        case .ok: return WidgetStyle.success
-        case .warn: return WidgetStyle.warning
-        case .over: return WidgetStyle.danger
-        }
-    }
-
     /// Freshness, for the popover's status label. That label reads "Live" or
     /// "Cached", so it answers whether the data is current and is coloured by
     /// that alone; tinting it by budget made a perfectly live reading show red

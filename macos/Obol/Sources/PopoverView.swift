@@ -23,16 +23,14 @@ struct PopoverView: View {
         .padding(.top, 18)
         .padding(.bottom, 12)
         .frame(width: WidgetStyle.popoverWidth)
-        // The menu bar window is translucent by default, which lets the desktop
-        // bleed through and muddies the text. Paint an opaque card instead.
-        .background(Color(nsColor: .windowBackgroundColor))
-        .onAppear {
-            controller.popoverOpened()
-            updates.popoverOpened()
-            currency.popoverOpened()
-        }
-        .onDisappear {
-            controller.popoverClosed()
+        // The card itself is painted by the panel's chrome, which draws the
+        // arrow out of the same shape.
+        //
+        // The panel is ordered out rather than torn down, so `onDisappear`
+        // never runs; the controller's own record of being open is what says
+        // to put the view back to usage for the next opening.
+        .onChange(of: controller.isPopoverPresented) { presented in
+            guard !presented else { return }
             showingSettings = false
             closeCurrencyPicker()
         }

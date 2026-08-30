@@ -11,6 +11,7 @@
 		A10000010000000000000002 /* DaemonController.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000010000000000000002 /* DaemonController.swift */; };
 		A10000010000000000000003 /* UsageClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000010000000000000003 /* UsageClient.swift */; };
 		A10000010000000000000004 /* PopoverView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000010000000000000004 /* PopoverView.swift */; };
+		A10000010000000000000016 /* MenuBarPanel.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000010000000000000016 /* MenuBarPanel.swift */; };
 		A10000010000000000000013 /* ProviderCatalog.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000010000000000000013 /* ProviderCatalog.swift */; };
 		A10000010000000000000014 /* CurrencyController.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000010000000000000014 /* CurrencyController.swift */; };
 		A10000010000000000000015 /* KeepAwakeController.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000010000000000000015 /* KeepAwakeController.swift */; };
@@ -34,6 +35,7 @@
 		A20000010000000000000002 /* DaemonController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DaemonController.swift; sourceTree = "<group>"; };
 		A20000010000000000000003 /* UsageClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UsageClient.swift; sourceTree = "<group>"; };
 		A20000010000000000000004 /* PopoverView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PopoverView.swift; sourceTree = "<group>"; };
+		A20000010000000000000016 /* MenuBarPanel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MenuBarPanel.swift; sourceTree = "<group>"; };
 		A20000010000000000000013 /* ProviderCatalog.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProviderCatalog.swift; sourceTree = "<group>"; };
 		A20000010000000000000014 /* CurrencyController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CurrencyController.swift; sourceTree = "<group>"; };
 		A20000010000000000000015 /* KeepAwakeController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeepAwakeController.swift; sourceTree = "<group>"; };
@@ -88,6 +90,7 @@
 				A20000010000000000000002 /* DaemonController.swift */,
 				A20000010000000000000003 /* UsageClient.swift */,
 				A20000010000000000000004 /* PopoverView.swift */,
+				A20000010000000000000016 /* MenuBarPanel.swift */,
 				A20000010000000000000013 /* ProviderCatalog.swift */,
 				A20000010000000000000014 /* CurrencyController.swift */,
 				A20000010000000000000015 /* KeepAwakeController.swift */,
@@ -274,6 +277,7 @@
 				A10000010000000000000002 /* DaemonController.swift in Sources */,
 				A10000010000000000000003 /* UsageClient.swift in Sources */,
 				A10000010000000000000004 /* PopoverView.swift in Sources */,
+				A10000010000000000000016 /* MenuBarPanel.swift in Sources */,
 				A10000010000000000000013 /* ProviderCatalog.swift in Sources */,
 				A10000010000000000000014 /* CurrencyController.swift in Sources */,
 				A10000010000000000000015 /* KeepAwakeController.swift in Sources */,

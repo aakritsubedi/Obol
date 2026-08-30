@@ -2,41 +2,34 @@ import SwiftUI
 
 @main
 struct ObolApp: App {
-    @StateObject private var controller = DaemonController()
-    @StateObject private var updates = UpdateController()
-    @StateObject private var currency = CurrencyController()
+    @NSApplicationDelegateAdaptor(AppDelegate.self) private var delegate
 
     var body: some Scene {
-        MenuBarExtra {
-            PopoverView(controller: controller, updates: updates, currency: currency)
-        } label: {
-            HStack(spacing: 5) {
-                Circle()
-                    .fill(controller.liveColor)
-                    .frame(width: 6, height: 6)
-                Text(menuTitle)
-                    .font(WidgetStyle.TypeScale.row)
-                    .monospacedDigit()
-            }
-            // Padding is constant so the item keeps its width when the popover
-            // opens; only the highlight behind it appears.
-            .padding(.horizontal, 7)
-            .padding(.vertical, 3)
-            .background {
-                if controller.isPopoverPresented {
-                    RoundedRectangle(cornerRadius: 5, style: .continuous)
-                        .fill(.primary.opacity(0.12))
-                }
-            }
-            .accessibilityElement(children: .combine)
-            .accessibilityLabel("Today's spend")
-            .accessibilityValue(menuTitle)
+        // The whole app is the status item and the panel it opens, which
+        // AppKit owns — SwiftUI's own menu bar scene cannot draw the arrow.
+        // A scene is still required, and Settings is the one that opens no
+        // window in an accessory app.
+        Settings {
+            EmptyView()
         }
-        .menuBarExtraStyle(.window)
     }
+}
 
-    /// The daemon's total, rendered in whichever currency Settings selected.
-    private var menuTitle: String {
-        currency.display(controller.summary.today.totalCost)
+@MainActor
+final class AppDelegate: NSObject, NSApplicationDelegate {
+    private var controller: DaemonController?
+    private var updates: UpdateController?
+    private var currency: CurrencyController?
+    private var menuBar: MenuBarPanelController?
+
+    func applicationDidFinishLaunching(_ notification: Notification) {
+        let controller = DaemonController()
+        let updates = UpdateController()
+        let currency = CurrencyController()
+
+        self.controller = controller
+        self.updates = updates
+        self.currency = currency
+        menuBar = MenuBarPanelController(controller: controller, updates: updates, currency: currency)
     }
 }
