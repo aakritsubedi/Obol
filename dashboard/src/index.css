@@ -2,18 +2,26 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Theme tokens are declared three times on purpose:
+   1. bare :root  - the complete light palette, the only unconditional source.
+   2. the prefers-color-scheme block, scoped away from an explicit light choice.
+   3. [data-theme="dark"] - so the in-app toggle wins over the OS in either
+      direction. See src/theme.ts, which stamps the attribute. */
 @layer base {
   :root {
     color-scheme: light dark;
-    --color-surface: #f4f4f6;
+
+    --color-surface: #f6f7f9;
     --color-card: #ffffff;
-    --color-panel: #fafafa;
-    --color-ink: #111114;
-    --color-subtle: #4a4e56;
-    --color-muted: #797f89;
-    --color-hairline: rgba(17, 17, 20, 0.08);
-    --color-wash: rgba(17, 17, 20, 0.045);
-    --color-track: rgba(17, 17, 20, 0.08);
+    --color-panel: #ecedf1;
+    --color-raised: #ffffff;
+    --color-ink: #0f1115;
+    --color-subtle: #474b54;
+    --color-muted: #71767f;
+    --color-hairline: rgba(15, 17, 21, 0.09);
+    --color-wash: rgba(15, 17, 21, 0.05);
+    --color-track: rgba(15, 17, 21, 0.09);
+
     --color-ok-soft: #ecfdf3;
     --color-ok: #059669;
     --color-ok-strong: #047857;
@@ -23,10 +31,20 @@
     --color-over-soft: #fef2f2;
     --color-over: #dc2626;
     --color-over-strong: #b91c1c;
+
+    --contribution-level-0: var(--color-wash);
     --contribution-level-1: #9be9a8;
     --contribution-level-2: #40c463;
     --contribution-level-3: #30a14e;
     --contribution-level-4: #216e39;
+
+    /* Cards are defined by their hairline, not by a drop shadow; the shadows
+       below only lift things that float above the page. */
+    --shadow-card: 0 1px 2px rgba(15, 17, 21, 0.04);
+    --shadow-raised: 0 1px 2px rgba(15, 17, 21, 0.06);
+    --shadow-pop: 0 8px 24px -6px rgba(15, 17, 21, 0.14), 0 2px 6px rgba(15, 17, 21, 0.06);
+    --shadow-dialog: 0 24px 60px -12px rgba(15, 17, 21, 0.28);
+
     /* The journal is styled as a paper note, so it keeps a warm palette of its
        own rather than inheriting the cool grays the rest of the dashboard uses. */
     --note-paper: #fffdf6;
@@ -38,32 +56,43 @@
     --note-accent: #eab000;
     --note-accent-soft: #fff3c9;
   }
+
   @media (prefers-color-scheme: dark) {
-    :root {
-      --color-surface: #101114;
-      --color-card: #1b1d21;
-      --color-panel: #22252a;
-      --color-ink: #f5f6f8;
-      --color-subtle: #d1d5db;
-      --color-muted: #aeb4bf;
-      --color-hairline: rgba(255, 255, 255, 0.12);
+    :root:not([data-theme="light"]) {
+      --color-surface: #0c0d10;
+      --color-card: #16181d;
+      --color-panel: #0f1114;
+      --color-raised: #272b32;
+      --color-ink: #f4f5f7;
+      --color-subtle: #cdd2da;
+      --color-muted: #9aa1ac;
+      --color-hairline: rgba(255, 255, 255, 0.1);
       --color-wash: rgba(255, 255, 255, 0.06);
-      --color-track: rgba(255, 255, 255, 0.12);
-      --color-ok-soft: #123126;
+      --color-track: rgba(255, 255, 255, 0.1);
+
+      --color-ok-soft: #10281f;
       --color-ok: #34d399;
       --color-ok-strong: #6ee7b7;
-      --color-warn-soft: #342613;
+      --color-warn-soft: #2c2011;
       --color-warn: #f59e0b;
       --color-warn-strong: #fbbf24;
-      --color-over-soft: #35191b;
+      --color-over-soft: #2d1618;
       --color-over: #f87171;
       --color-over-strong: #fca5a5;
+
+      --contribution-level-0: rgba(255, 255, 255, 0.05);
       --contribution-level-1: #033a16;
       --contribution-level-2: #196c2e;
       --contribution-level-3: #2ea043;
       --contribution-level-4: #56d364;
-      --note-paper: #1c1c1e;
-      --note-edge: rgba(255, 255, 255, 0.11);
+
+      --shadow-card: none;
+      --shadow-raised: 0 1px 2px rgba(0, 0, 0, 0.4);
+      --shadow-pop: 0 8px 24px -6px rgba(0, 0, 0, 0.6), 0 2px 6px rgba(0, 0, 0, 0.4);
+      --shadow-dialog: 0 24px 60px -12px rgba(0, 0, 0, 0.7);
+
+      --note-paper: #1a1a1c;
+      --note-edge: rgba(255, 255, 255, 0.1);
       --note-rule: rgba(255, 255, 255, 0.07);
       --note-ink: #f2f2f7;
       --note-subtle: #c7c7cc;
@@ -71,6 +100,49 @@
       --note-accent: #ffd60a;
       --note-accent-soft: rgba(255, 214, 10, 0.16);
     }
+  }
+
+  :root[data-theme="dark"] {
+    --color-surface: #0c0d10;
+    --color-card: #16181d;
+    --color-panel: #0f1114;
+    --color-raised: #272b32;
+    --color-ink: #f4f5f7;
+    --color-subtle: #cdd2da;
+    --color-muted: #9aa1ac;
+    --color-hairline: rgba(255, 255, 255, 0.1);
+    --color-wash: rgba(255, 255, 255, 0.06);
+    --color-track: rgba(255, 255, 255, 0.1);
+
+    --color-ok-soft: #10281f;
+    --color-ok: #34d399;
+    --color-ok-strong: #6ee7b7;
+    --color-warn-soft: #2c2011;
+    --color-warn: #f59e0b;
+    --color-warn-strong: #fbbf24;
+    --color-over-soft: #2d1618;
+    --color-over: #f87171;
+    --color-over-strong: #fca5a5;
+
+    --contribution-level-0: rgba(255, 255, 255, 0.05);
+    --contribution-level-1: #033a16;
+    --contribution-level-2: #196c2e;
+    --contribution-level-3: #2ea043;
+    --contribution-level-4: #56d364;
+
+    --shadow-card: none;
+    --shadow-raised: 0 1px 2px rgba(0, 0, 0, 0.4);
+    --shadow-pop: 0 8px 24px -6px rgba(0, 0, 0, 0.6), 0 2px 6px rgba(0, 0, 0, 0.4);
+    --shadow-dialog: 0 24px 60px -12px rgba(0, 0, 0, 0.7);
+
+    --note-paper: #1a1a1c;
+    --note-edge: rgba(255, 255, 255, 0.1);
+    --note-rule: rgba(255, 255, 255, 0.07);
+    --note-ink: #f2f2f7;
+    --note-subtle: #c7c7cc;
+    --note-muted: #98989f;
+    --note-accent: #ffd60a;
+    --note-accent-soft: rgba(255, 214, 10, 0.16);
   }
 
   html {
@@ -85,14 +157,34 @@
     font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", Inter, "Segoe UI", sans-serif;
     font-synthesis: none;
     text-rendering: optimizeLegibility;
+    -webkit-font-smoothing: antialiased;
   }
   button,
-  input {
+  input,
+  select,
+  textarea {
     font: inherit;
   }
   button {
     cursor: pointer;
   }
+  ::selection {
+    background: var(--color-wash);
+  }
+}
+
+/* Flipping the theme repaints every surface at once; a short crossfade keeps
+   that from reading as a flash. Only applied for the duration of a toggle. */
+.theme-switching,
+.theme-switching *,
+.theme-switching *::before,
+.theme-switching *::after {
+  transition:
+    background-color 180ms ease,
+    border-color 180ms ease,
+    color 180ms ease,
+    fill 180ms ease,
+    stroke 180ms ease !important;
 }
 
 /* Seamless ticker loop: content is rendered twice and scrolled by half. */
@@ -165,5 +257,11 @@
 @media (prefers-reduced-motion: reduce) {
   .obol-marquee {
     animation: none;
+  }
+  .theme-switching,
+  .theme-switching *,
+  .theme-switching *::before,
+  .theme-switching *::after {
+    transition: none !important;
   }
 }

@@ -3,6 +3,8 @@ import { createPortal } from "react-dom";
 import type { UsageRow } from "../api";
 import { buildContributionCalendar, type ContributionDay, type ContributionWeek } from "./contribution";
 import { formatCurrency, formatTokens, moneyDisplay } from "./format";
+import SectionHeader from "./SectionHeader";
+import { cardSurface, sectionShell } from "./ui";
 
 interface Props {
   rows: UsageRow[];
@@ -13,7 +15,7 @@ const chartMinWidth = 840;
 const tooltipWidth = 236;
 const tooltipMargin = 14;
 const levelColors: Record<0 | 1 | 2 | 3 | 4, string> = {
-  0: "var(--color-track)",
+  0: "var(--contribution-level-0)",
   1: "var(--contribution-level-1)",
   2: "var(--contribution-level-2)",
   3: "var(--contribution-level-3)",
@@ -65,7 +67,7 @@ function CalendarSquare({
       aria-disabled={dimmed || undefined}
       aria-label={day.label}
       aria-describedby={visible ? tooltipId(day) : undefined}
-      className={`contribution-square rounded-[4px] border-0 p-0 transition-[opacity,transform,box-shadow] duration-150 hover:scale-[1.12] hover:shadow-[0_0_0_2px_var(--color-surface),0_4px_12px_rgba(0,0,0,.24)] focus-visible:z-10 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink ${visible ? "relative z-10 scale-[1.12] shadow-[0_0_0_2px_var(--color-surface),0_4px_12px_rgba(0,0,0,.24)]" : ""}`}
+      className={`contribution-square rounded-[4px] border-0 p-0 transition-[opacity,transform,box-shadow] duration-150 hover:scale-[1.12] hover:shadow-[0_0_0_2px_var(--color-surface)] focus-visible:z-10 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink ${visible ? "relative z-10 scale-[1.12] shadow-[0_0_0_2px_var(--color-surface)]" : ""}`}
       onBlur={onLeave}
       onFocus={(event) => onHover(day, event.currentTarget)}
       onMouseEnter={(event) => onHover(day, event.currentTarget)}
@@ -83,7 +85,7 @@ function CalendarSquare({
 function ContributionTooltip({ tooltip }: { tooltip: TooltipState }) {
   return createPortal(
     <div
-      className={`pointer-events-none fixed z-[100] w-[min(236px,calc(100vw-28px))] rounded-xl border border-hairline bg-card px-3.5 py-2.5 text-left text-[10px] leading-relaxed text-ink shadow-[0_16px_40px_rgba(0,0,0,.28)] ${
+      className={`pointer-events-none fixed z-[100] w-[min(236px,calc(100vw-28px))] rounded-control border border-hairline bg-card px-3.5 py-2.5 text-left text-[10px] leading-relaxed text-ink shadow-pop ${
         tooltip.placement === "above" ? "-translate-x-1/2 -translate-y-full" : "-translate-x-1/2"
       }`}
       id={tooltipId(tooltip.day)}
@@ -200,39 +202,33 @@ export default function ContributionChart({ rows }: Props) {
   );
 
   return (
-    <section
-      aria-labelledby="activity-heading"
-      className="relative border-t border-dashed py-12"
-      id="activity"
-    >
-      <div className="mb-7 flex flex-wrap items-end justify-between gap-6">
-        <div className="min-w-0">
-          <div
-            className="text-[10px] font-semibold uppercase leading-tight tracking-[0.16em] text-muted"
-            id="activity-heading"
-          >
-            Activity
+    <section aria-labelledby="activity-heading" className={`relative ${sectionShell}`} id="activity">
+      <SectionHeader
+        eyebrow="Activity"
+        id="activity-heading"
+        title={`${calendar.year} token burn`}
+        description={
+          <>
+            Daily usage <span className="px-1">·</span> {formatTokens(yearTotals.tokens)} tokens
+            <span className="px-1">·</span> {formatCurrency(yearTotals.cost)} this year
+          </>
+        }
+        actions={
+          <div className="flex items-center gap-2 text-[10px] text-muted">
+            <span>Less</span>
+            <div className="flex items-center gap-1" aria-label="Activity intensity legend">
+              {[0, 1, 2, 3, 4].map((level) => (
+                <span
+                  className="h-[11px] w-[11px] rounded-[3px] ring-1 ring-inset ring-hairline"
+                  key={level}
+                  style={{ backgroundColor: levelColors[level as 0 | 1 | 2 | 3 | 4] }}
+                />
+              ))}
+            </div>
+            <span>More</span>
           </div>
-          <h2 className="mt-2 text-[22px] font-bold tracking-[-0.04em]">{calendar.year} token burn</h2>
-          <p className="mt-1.5 text-[11px] text-muted">
-            Daily usage <span className="px-1 text-subtle">·</span> {formatTokens(yearTotals.tokens)} tokens
-            <span className="px-1 text-subtle">·</span> {formatCurrency(yearTotals.cost)} this year
-          </p>
-        </div>
-        <div className="flex items-center gap-2 text-[10px] text-muted max-[520px]:w-full max-[520px]:justify-between">
-          <span>Less</span>
-          <div className="flex items-center gap-1.5" aria-label="Activity intensity legend">
-            {[0, 1, 2, 3, 4].map((level) => (
-              <span
-                className="h-3 w-3 rounded-[4px] shadow-[inset_0_0_0_1px_rgba(255,255,255,.06)]"
-                key={level}
-                style={{ backgroundColor: levelColors[level as 0 | 1 | 2 | 3 | 4] }}
-              />
-            ))}
-          </div>
-          <span>More</span>
-        </div>
-      </div>
+        }
+      />
 
       <div className="contribution-chart-scroll">
         <div className="contribution-chart" style={{ minWidth: chartMinWidth }}>

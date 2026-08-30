@@ -23,15 +23,20 @@ import {
   type MoneyDisplay,
   setMoneyDisplay,
 } from "./components/format";
+import { CHEVRON_DOWN, CLOCK, CLOSE, DOWNLOAD, Icon, REFRESH, SHARE, SLIDERS } from "./components/icons";
 import JournalCard from "./components/JournalCard";
 import { weekOptions } from "./components/journal";
 import ModelTable from "./components/ModelTable";
 import ProjectTable from "./components/ProjectTable";
 import ProviderTable from "./components/ProviderTable";
+import SectionHeader, { HeaderBadge } from "./components/SectionHeader";
+import Segmented from "./components/Segmented";
 import ShareDialog from "./components/ShareDialog";
+import ThemeToggle from "./components/ThemeToggle";
 import Ticker from "./components/Ticker";
 import TodayCard, { type Last7Summary } from "./components/TodayCard";
 import TotalsCard from "./components/TotalsCard";
+import { buttonGhost, buttonIcon, buttonPrimary, emptyState, sectionShell } from "./components/ui";
 import WeeklyLeaders from "./components/WeeklyLeaders";
 import { loadMoneyDisplay, USD } from "./currency";
 import { type ExportMetric, exportCsv, exportJson } from "./export";
@@ -142,6 +147,18 @@ function download(name: string, body: string, type: string): void {
   link.download = name;
   link.click();
   URL.revokeObjectURL(url);
+}
+
+function StatusPill({ stale }: { stale: boolean }) {
+  return (
+    <span
+      className={`inline-flex h-8 items-center gap-1.5 whitespace-nowrap rounded-full px-2.5 text-[11px] font-medium max-[520px]:hidden ${stale ? "bg-warn-soft text-warn-strong" : "bg-ok-soft text-ok-strong"}`}
+      title={stale ? "Showing the last cached snapshot" : "Reading live usage from the daemon"}
+    >
+      <span className={`h-1.5 w-1.5 rounded-full ${stale ? "bg-warn" : "bg-ok"}`} />
+      {stale ? "Cached" : "Live"}
+    </span>
+  );
 }
 
 export default function App() {
@@ -332,91 +349,92 @@ export default function App() {
 
   return (
     <div className="min-h-screen overflow-x-hidden bg-surface text-ink">
-      <header className="sticky top-0 z-20 mx-auto flex max-w-[1244px] flex-col gap-2 border-b border-hairline bg-surface/90 px-8 py-3.5 backdrop-blur-xl max-[760px]:px-[18px]">
-        <div className="flex w-full items-center justify-between gap-5">
-          <div className="flex min-w-0 items-center gap-3">
-            <span className="whitespace-nowrap text-sm font-bold tracking-[-0.02em]">Obol</span>
-            <span className="inline-flex min-h-7 items-center gap-1.5 whitespace-nowrap rounded-full bg-wash px-2.5 py-1.5 text-[11px] text-subtle max-[760px]:hidden">
-              ◷ Local data · {summary.agents.length} active today
-            </span>
-          </div>
-          <div className="flex items-center gap-2.5 max-[440px]:gap-1.5">
-            <div
-              className={`inline-flex min-h-7 items-center gap-1.5 rounded-full px-2.5 py-1.5 text-[11px] ${summary.stale ? "bg-warn-soft text-warn-strong" : "bg-ok-soft text-ok-strong"}`}
-            >
-              <span className={`h-1.5 w-1.5 rounded-full ${summary.stale ? "bg-warn" : "bg-ok"}`} />
-              {summary.stale ? "Cached snapshot" : "Live"}
+      <header className="sticky top-0 z-20 border-b border-hairline bg-surface/85 backdrop-blur-xl">
+        <div className="mx-auto flex max-w-[1180px] flex-col gap-2.5 px-8 py-3 max-[760px]:px-[18px]">
+          <div className="flex w-full items-center justify-between gap-4">
+            <div className="flex min-w-0 items-center gap-3">
+              <span className="flex items-center gap-2">
+                <img src="/favicon-32.png" alt="" className="h-[18px] w-[18px] shrink-0 rounded-[5px]" />
+                <span className="whitespace-nowrap text-[13px] font-semibold tracking-[-0.01em]">Obol</span>
+              </span>
+              <span className="h-4 w-px bg-hairline max-[760px]:hidden" />
+              <span className="inline-flex items-center gap-1.5 whitespace-nowrap text-[11px] text-muted max-[760px]:hidden">
+                <Icon path={CLOCK} className="h-3 w-3 shrink-0" />
+                Local data · {summary.agents.length} active today
+              </span>
             </div>
-            <button
-              className="rounded-full border border-hairline bg-transparent px-3 py-2 text-[11px] font-semibold text-ink transition hover:bg-wash focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink max-[520px]:px-2"
-              onClick={() => setSettingsOpen(true)}
-              aria-label="Open settings"
-            >
-              ⚙ <span className="max-[520px]:hidden">Settings</span>
-            </button>
-            <button
-              className="rounded-full border border-hairline bg-transparent px-3 py-2 text-[11px] font-semibold text-muted transition hover:bg-wash hover:text-ink focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink disabled:cursor-default disabled:opacity-50 max-[440px]:px-2.5"
-              onClick={() => void doRefresh()}
-              disabled={refreshing}
-              aria-label="Refresh usage"
-            >
-              ↻ <span className="max-[440px]:hidden">{refreshing ? "Refreshing" : "Refresh"}</span>
-            </button>
-            <button
-              className="inline-flex items-center gap-1.5 rounded-full border border-ink bg-ink px-3 py-2 text-[11px] font-semibold text-surface transition hover:opacity-90 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink max-[520px]:px-2"
-              onClick={() => setShareOpen(true)}
-              aria-label="Share usage"
-            >
-              <span aria-hidden="true">↗</span>
-              <span className="max-[520px]:hidden">Share</span>
-            </button>
+            <div className="flex items-center gap-2 max-[440px]:gap-1.5">
+              <StatusPill stale={summary.stale} />
+              <ThemeToggle />
+              <button
+                className={buttonIcon}
+                onClick={() => setSettingsOpen(true)}
+                title="Settings"
+                aria-label="Open settings"
+              >
+                <Icon path={SLIDERS} />
+              </button>
+              <button
+                className={buttonIcon}
+                onClick={() => void doRefresh()}
+                disabled={refreshing}
+                title={refreshing ? "Refreshing…" : "Refresh usage"}
+                aria-label="Refresh usage"
+              >
+                <Icon path={REFRESH} className={`h-3.5 w-3.5 shrink-0 ${refreshing ? "animate-spin" : ""}`} />
+              </button>
+              <button className={buttonPrimary} onClick={() => setShareOpen(true)} aria-label="Share usage">
+                <Icon path={SHARE} className="h-3.5 w-3.5 shrink-0" />
+                <span className="max-[520px]:hidden">Share</span>
+              </button>
+            </div>
           </div>
+          <nav
+            className="-mx-1 flex w-full items-center gap-0.5 overflow-x-auto"
+            aria-label="Dashboard sections"
+          >
+            {[
+              ["Week", "#week-leaders"],
+              ["Activity", "#activity"],
+              ["History", "#history"],
+              ["Providers", "#providers"],
+              ["Models", "#models"],
+              ["Projects", "#projects"],
+            ].map(([label, href]) => (
+              <a
+                className="shrink-0 rounded-full px-2.5 py-1 text-[11px] text-muted transition hover:bg-wash hover:text-ink"
+                href={href}
+                key={href}
+              >
+                {label}
+              </a>
+            ))}
+          </nav>
         </div>
-        <nav
-          className="flex w-full items-center gap-1 overflow-x-auto border-t border-hairline pt-2"
-          aria-label="Dashboard sections"
-        >
-          {[
-            ["Week", "#week-leaders"],
-            ["Activity", "#activity"],
-            ["History", "#history"],
-            ["Providers", "#providers"],
-            ["Models", "#models"],
-            ["Projects", "#projects"],
-          ].map(([label, href]) => (
-            <a
-              className="shrink-0 rounded-full px-3 py-1 text-[11px] text-muted transition hover:bg-wash hover:text-ink"
-              href={href}
-              key={href}
-            >
-              {label}
-            </a>
-          ))}
-        </nav>
       </header>
       <main
-        className="mx-auto max-w-[1180px] px-8 pb-28 pt-8 max-[760px]:px-[18px] max-[760px]:pt-[26px]"
+        className="mx-auto max-w-[1180px] px-8 pb-24 pt-10 max-[760px]:px-[18px] max-[760px]:pt-7"
         aria-busy={loading}
       >
-        <div className="mb-5">
-          <h1 className="text-[44px] font-bold leading-none tracking-[-0.05em] max-[760px]:text-[38px] max-[440px]:text-[34px]">
+        <div className="mb-8">
+          <h1 className="text-[40px] font-semibold leading-none tracking-[-0.04em] max-[760px]:text-[34px] max-[440px]:text-[30px]">
             Token cost
           </h1>
-          <p className="mt-2.5 text-xs text-muted">
-            ◷{" "}
+          <p className="mt-3 inline-flex items-center gap-1.5 text-[11px] text-muted">
+            <Icon path={CLOCK} className="h-3 w-3 shrink-0" />
             {summary.updatedAt
-              ? `Usage updated ${formatUpdatedAt(summary.updatedAt)} · ${Intl.DateTimeFormat().resolvedOptions().timeZone}`
-              : "Usage waiting for first refresh"}
+              ? `Updated ${formatUpdatedAt(summary.updatedAt)} · ${Intl.DateTimeFormat().resolvedOptions().timeZone}`
+              : "Waiting for first refresh"}
           </p>
         </div>
         {error && (
-          <div className="mb-[18px] rounded-xl border border-warn/20 bg-warn-soft px-3.5 py-2.5 text-xs text-warn-strong">
-            <strong>Daemon notice:</strong> {error}.{" "}
+          <div className="mb-6 rounded-control border border-warn/25 bg-warn-soft px-3.5 py-2.5 text-[11px] text-warn-strong">
+            <strong className="font-semibold">Daemon notice:</strong> {error}.{" "}
             {summary.updatedAt ? "Showing the last good snapshot." : "Start the daemon to load usage."}
           </div>
         )}
 
-        <div className="grid grid-cols-[minmax(0,1.35fr)_minmax(280px,.65fr)] gap-8 pb-5 max-[760px]:grid-cols-1 max-[760px]:gap-0">
+        <div className="grid grid-cols-[minmax(0,1.35fr)_minmax(280px,.65fr)] gap-5 max-[760px]:grid-cols-1">
           <TodayCard summary={summary} week={weekSummary} trend={dailyTrend} />
           <TotalsCard
             report={report}
@@ -427,168 +445,118 @@ export default function App() {
           />
         </div>
 
-        <Ticker summary={summary} />
+        <div className="pt-5">
+          <Ticker summary={summary} />
+        </div>
         <WeeklyLeaders report={report} />
 
         <ContributionChart rows={report?.daily || []} />
 
-        <section className="border-t border-dashed py-12" id="history" aria-labelledby="history-heading">
-          <div className="mb-[22px] flex items-start justify-between gap-[18px] max-[760px]:flex-wrap">
-            <div>
-              <div
-                className="text-[10px] font-semibold uppercase tracking-[0.13em] leading-tight text-muted"
-                id="history-heading"
-              >
-                History
-              </div>
-              <h2 className="mt-1.5 text-[17px] font-bold tracking-[-0.025em]">Spend over time</h2>
-              <p className="mt-1 text-[11px] text-muted">
-                {rows.length} {period} periods in the current view
-              </p>
-            </div>
-            <div className="flex flex-wrap items-center justify-end gap-2 max-[760px]:w-full max-[760px]:justify-start">
-              <div
-                className="flex gap-0.5 rounded-full border border-hairline bg-panel p-[3px]"
-                aria-label="History period"
-              >
-                {(["daily", "weekly", "monthly"] as HistoryPeriod[]).map((value) => {
-                  const disabled =
-                    value === "weekly" ? activeRange <= 7 : value === "monthly" ? activeRange <= 30 : false;
-                  return (
-                    <button
-                      className={`rounded-full border-0 px-2.5 py-1.5 text-[11px] ${disabled ? "cursor-not-allowed text-muted opacity-35" : period === value ? "bg-card font-semibold text-ink shadow-[0_1px_3px_rgba(0,0,0,.08)]" : "bg-transparent text-muted"}`}
-                      key={value}
-                      type="button"
-                      onClick={() => setPeriod(value)}
-                      aria-pressed={period === value}
-                      disabled={disabled}
-                    >
-                      {value}
-                    </button>
-                  );
-                })}
-              </div>
-              <div
-                className="flex gap-0.5 rounded-full border border-hairline bg-panel p-[3px]"
-                aria-label="History range"
-              >
-                {availableRanges.map((value) => (
+        <section className={sectionShell} id="history" aria-labelledby="history-heading">
+          <SectionHeader
+            eyebrow="History"
+            id="history-heading"
+            title="Spend over time"
+            description={`${rows.length} ${period} periods in the current view`}
+            actions={
+              <>
+                <Segmented
+                  label="History period"
+                  value={period}
+                  onChange={setPeriod}
+                  options={[
+                    { value: "daily", label: "Daily" },
+                    { value: "weekly", label: "Weekly", disabled: activeRange <= 7 },
+                    { value: "monthly", label: "Monthly", disabled: activeRange <= 30 },
+                  ]}
+                />
+                <Segmented
+                  label="History range"
+                  value={String(activeRange)}
+                  onChange={(value) => setRange(Number(value) as HistoryRange)}
+                  options={availableRanges.map((value) => ({ value: String(value), label: `${value}d` }))}
+                />
+                <Segmented
+                  label="Chart metric"
+                  value={metric}
+                  onChange={setMetric}
+                  options={[
+                    { value: "cost", label: "Cost" },
+                    { value: "tokens", label: "Tokens" },
+                  ]}
+                />
+                <div className="relative">
                   <button
-                    className={`rounded-full border-0 px-2.5 py-1.5 text-[11px] ${activeRange === value ? "bg-card font-semibold text-ink shadow-[0_1px_3px_rgba(0,0,0,.08)]" : "bg-transparent text-muted"}`}
-                    key={value}
+                    className={buttonGhost}
                     type="button"
-                    onClick={() => setRange(value)}
-                    aria-pressed={activeRange === value}
+                    aria-haspopup="menu"
+                    aria-expanded={exportOpen}
+                    onClick={() => setExportOpen((value) => !value)}
                   >
-                    {value}d
+                    <Icon path={DOWNLOAD} className="h-3.5 w-3.5 shrink-0" />
+                    Export
+                    <Icon path={CHEVRON_DOWN} className="h-3 w-3 shrink-0 opacity-60" />
                   </button>
-                ))}
-              </div>
-              <div
-                className="flex gap-0.5 rounded-full border border-hairline bg-panel p-[3px]"
-                aria-label="Chart metric"
-              >
-                {(["cost", "tokens"] as ChartMetric[]).map((value) => (
-                  <button
-                    className={`rounded-full border-0 px-2.5 py-1.5 text-[11px] ${metric === value ? "bg-card font-semibold text-ink shadow-[0_1px_3px_rgba(0,0,0,.08)]" : "bg-transparent text-muted"}`}
-                    key={value}
-                    type="button"
-                    onClick={() => setMetric(value)}
-                    aria-pressed={metric === value}
-                  >
-                    {value === "cost" ? "Cost" : "Tokens"}
-                  </button>
-                ))}
-              </div>
-              <div className="relative">
-                <button
-                  className="inline-flex h-8 items-center gap-1.5 rounded-full border border-hairline bg-transparent px-3 text-[11px] font-medium text-muted transition hover:bg-wash hover:text-ink"
-                  type="button"
-                  aria-haspopup="menu"
-                  aria-expanded={exportOpen}
-                  onClick={() => setExportOpen((value) => !value)}
-                >
-                  <span aria-hidden="true" className="text-sm leading-none">
-                    ↓
-                  </span>{" "}
-                  Export{" "}
-                  <span aria-hidden="true" className="ml-0.5 text-[10px]">
-                    ▾
-                  </span>
-                </button>
-                {exportOpen && (
-                  <div
-                    className="absolute right-0 top-[calc(100%+6px)] z-10 grid w-40 gap-0.5 overflow-hidden rounded-xl border border-hairline bg-card p-1.5 shadow-[0_12px_30px_rgba(0,0,0,.16)]"
-                    role="menu"
-                  >
-                    <button
-                      className="flex w-full items-center rounded-lg px-3 py-2.5 text-left text-[11px] text-ink hover:bg-wash"
-                      type="button"
-                      role="menuitem"
-                      onClick={() => {
-                        downloadCurrentCsv();
-                        setExportOpen(false);
-                      }}
+                  {exportOpen && (
+                    <div
+                      className="absolute right-0 top-[calc(100%+6px)] z-10 grid w-44 gap-0.5 overflow-hidden rounded-control border border-hairline bg-card p-1.5 shadow-pop"
+                      role="menu"
                     >
-                      Download CSV
-                    </button>
-                    <button
-                      className="flex w-full items-center rounded-lg px-3 py-2.5 text-left text-[11px] text-ink hover:bg-wash"
-                      type="button"
-                      role="menuitem"
-                      onClick={() => {
-                        downloadCurrentJson();
-                        setExportOpen(false);
-                      }}
-                    >
-                      Download JSON
-                    </button>
-                  </div>
-                )}
-              </div>
-            </div>
-          </div>
+                      <button
+                        className="flex w-full items-center rounded-lg px-3 py-2 text-left text-[11px] text-ink transition hover:bg-wash"
+                        type="button"
+                        role="menuitem"
+                        onClick={() => {
+                          downloadCurrentCsv();
+                          setExportOpen(false);
+                        }}
+                      >
+                        Download CSV
+                      </button>
+                      <button
+                        className="flex w-full items-center rounded-lg px-3 py-2 text-left text-[11px] text-ink transition hover:bg-wash"
+                        type="button"
+                        role="menuitem"
+                        onClick={() => {
+                          downloadCurrentJson();
+                          setExportOpen(false);
+                        }}
+                      >
+                        Download JSON
+                      </button>
+                    </div>
+                  )}
+                </div>
+              </>
+            }
+          />
           <CostChart rows={rows} metric={metric} />
         </section>
 
-        <div className="border-y border-hairline" id="providers">
+        <div id="providers">
           <ProviderTable providers={summary.agents} total={summary.today.totalCost} />
         </div>
         <ModelTable report={report} period={period} />
         {projects.length > 0 && (
           <>
-            <section
-              className="border-t border-hairline py-8"
-              id="projects"
-              aria-labelledby="project-chart-heading"
-            >
-              <div className="mb-[22px]">
-                <div
-                  className="text-[10px] font-semibold uppercase tracking-[0.13em] leading-tight text-muted"
-                  id="project-chart-heading"
-                >
-                  Project history
-                </div>
-                <h2 className="mt-1.5 flex flex-wrap items-center gap-2 text-[17px] font-bold tracking-[-0.025em]">
-                  Cost by Claude project
-                  <span className="rounded-full bg-wash px-2 py-0.5 text-[10px] font-semibold text-subtle">
-                    Claude only
-                  </span>
-                </h2>
-                <p className="mt-1 text-[11px] text-muted">
-                  Last {activeRange} days · of {formatCurrency(projectTotal)} Claude spend
-                </p>
-              </div>
+            <section className={sectionShell} id="projects" aria-labelledby="project-chart-heading">
+              <SectionHeader
+                eyebrow="Project history"
+                id="project-chart-heading"
+                title={
+                  <>
+                    Cost by Claude project
+                    <HeaderBadge>Claude only</HeaderBadge>
+                  </>
+                }
+                description={`Last ${activeRange} days · of ${formatCurrency(projectTotal)} Claude spend`}
+              />
               <CostChart rows={rangeRows(projects, activeRange)} metric="cost" groupBy="project" />
             </section>
             <ProjectTable projects={projects} />
           </>
         )}
-        {!config && (
-          <div className="grid min-h-[110px] place-items-center border-t border-hairline py-8 text-center text-xs text-muted">
-            Budget configuration is unavailable.
-          </div>
-        )}
+        {!config && <div className={emptyState}>Budget configuration is unavailable.</div>}
 
         <ErrorBoundary label="The task list">
           <JournalCard
@@ -600,8 +568,8 @@ export default function App() {
           />
         </ErrorBoundary>
 
-        <footer className="mt-3 text-center text-[10px] text-muted">
-          Costs are estimates from pricing table, not invoices. <span className="px-1.5">•</span> Data stays
+        <footer className="border-t border-hairline pt-6 text-center text-[10px] leading-relaxed text-muted">
+          Costs are estimates from a pricing table, not invoices. <span className="px-1.5">•</span> Data stays
           on this Mac.
           {money.code !== USD.code && (
             <>
@@ -615,34 +583,37 @@ export default function App() {
       </main>
       {settingsOpen && config && (
         <div
-          className="fixed inset-0 z-50 grid place-items-center overflow-y-auto bg-ink/30 px-4 py-8 backdrop-blur-sm max-[760px]:py-5"
+          className="fixed inset-0 z-50 grid place-items-center overflow-y-auto bg-ink/40 px-4 py-8 backdrop-blur-sm max-[760px]:py-5"
           role="presentation"
           onMouseDown={(event) => {
             if (event.target === event.currentTarget) setSettingsOpen(false);
           }}
         >
           <div
-            className="w-full max-w-[760px] overflow-hidden rounded-2xl border border-hairline bg-card text-ink shadow-[0_24px_70px_rgba(0,0,0,.22)]"
+            className="w-full max-w-[720px] overflow-hidden rounded-card border border-hairline bg-card text-ink shadow-dialog"
             role="dialog"
             aria-modal="true"
             aria-labelledby="settings-dialog-title"
           >
             <div className="flex items-center justify-between gap-4 border-b border-hairline px-6 py-4">
               <div>
-                <p className="text-[10px] font-semibold uppercase tracking-[0.13em] text-muted">
+                <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-muted">
                   Preferences
                 </p>
-                <h2 className="mt-1 text-lg font-bold tracking-[-0.03em]" id="settings-dialog-title">
+                <h2
+                  className="mt-1.5 text-[15px] font-semibold tracking-[-0.02em]"
+                  id="settings-dialog-title"
+                >
                   Budget and data settings
                 </h2>
               </div>
               <button
-                className="grid h-8 w-8 place-items-center rounded-full border border-hairline text-muted transition hover:bg-wash hover:text-ink"
+                className={buttonIcon}
                 type="button"
                 onClick={() => setSettingsOpen(false)}
                 aria-label="Close settings"
               >
-                ×
+                <Icon path={CLOSE} />
               </button>
             </div>
             <div className="px-6 pb-6">

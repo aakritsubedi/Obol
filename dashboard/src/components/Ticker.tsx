@@ -54,10 +54,10 @@ export default function Ticker({ summary }: Props) {
 
   return (
     <aside
-      className="mx-auto flex min-h-11 w-full min-w-[240px] max-w-[1180px] items-center gap-3.5 overflow-hidden rounded-full bg-ink px-3.5 py-2 text-surface shadow-[0_12px_30px_rgba(0,0,0,.12)]"
+      className="mx-auto flex h-10 w-full min-w-[240px] max-w-[1180px] items-center gap-3.5 overflow-hidden rounded-full bg-ink px-4 text-surface"
       aria-label="Today's provider spend"
     >
-      <span className="flex h-full shrink-0 items-center border-r border-surface/20 pr-3.5 text-[10px] font-semibold uppercase text-surface/70">
+      <span className="flex h-full shrink-0 items-center border-r border-surface/20 pr-3.5 text-[10px] font-semibold uppercase tracking-[0.1em] text-surface/60">
         Today
       </span>
       <div ref={trackRef} className="flex min-w-0 flex-1 items-center overflow-hidden">

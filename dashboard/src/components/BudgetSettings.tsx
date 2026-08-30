@@ -1,6 +1,8 @@
 import { useEffect, useState } from "react";
 import { updateConfig, type WidgetConfig } from "../api";
 import { formatCurrency, numberValue } from "./format";
+import SectionHeader from "./SectionHeader";
+import { buttonPrimary, sectionShell } from "./ui";
 
 interface Props {
   config: WidgetConfig;
@@ -43,29 +45,25 @@ export default function BudgetSettings({ config, onSaved, inDialog = false }: Pr
     }
   }
 
+  // Wider than the shared `inputControl`: these are the dialog's primary
+  // targets, so they get a full-size hit area and a 12px value.
   const inputClass =
-    "w-full rounded-[10px] border border-hairline bg-card px-3 py-2.5 text-ink outline-none tabular-nums focus:border-ink focus:ring-4 focus:ring-wash";
+    "w-full rounded-control border border-hairline bg-card px-3 py-2.5 text-xs text-ink outline-none tabular-nums transition focus:border-subtle focus:ring-4 focus:ring-wash";
   return (
     <section
-      className={inDialog ? "py-5" : "border-t border-hairline py-8"}
+      className={inDialog ? "py-5" : sectionShell}
       aria-labelledby={inDialog ? "settings-dialog-title" : "settings-heading"}
     >
       {!inDialog && (
-        <div className="mb-[22px] flex items-start justify-between gap-[18px]">
-          <div>
-            <div
-              className="text-[10px] font-semibold uppercase tracking-[0.13em] leading-tight text-muted"
-              id="settings-heading"
-            >
-              Guardrails
-            </div>
-            <h2 className="mt-1.5 text-[17px] font-bold tracking-[-0.025em]">Budget and data settings</h2>
-          </div>
-          <span className="text-[11px] text-muted">Currency: USD</span>
-        </div>
+        <SectionHeader
+          eyebrow="Guardrails"
+          id="settings-heading"
+          title="Budget and data settings"
+          actions={<span className="text-[11px] text-muted">Currency: USD</span>}
+        />
       )}
-      <form className="grid max-w-[760px] grid-cols-2 gap-[22px] max-[760px]:grid-cols-1" onSubmit={submit}>
-        <label className="grid gap-2 text-xs text-subtle">
+      <form className="grid max-w-[720px] grid-cols-2 gap-5 max-[760px]:grid-cols-1" onSubmit={submit}>
+        <label className="grid gap-2 text-[11px] font-medium text-subtle">
           Daily cap
           <input
             className={inputClass}
@@ -78,7 +76,7 @@ export default function BudgetSettings({ config, onSaved, inDialog = false }: Pr
           />
           <small className="text-[10px] text-muted">{daily ? formatCurrency(daily) : "Disabled"}</small>
         </label>
-        <label className="grid gap-2 text-xs text-subtle">
+        <label className="grid gap-2 text-[11px] font-medium text-subtle">
           Monthly cap
           <input
             className={inputClass}
@@ -91,7 +89,7 @@ export default function BudgetSettings({ config, onSaved, inDialog = false }: Pr
           />
           <small className="text-[10px] text-muted">{monthly ? formatCurrency(monthly) : "Disabled"}</small>
         </label>
-        <label className="grid gap-2 text-xs text-subtle">
+        <label className="grid gap-2 text-[11px] font-medium text-subtle">
           History window
           <select
             className={inputClass}
@@ -105,7 +103,7 @@ export default function BudgetSettings({ config, onSaved, inDialog = false }: Pr
           </select>
           <small className="text-[10px] text-muted">Bounds the daemon’s log parsing on refresh.</small>
         </label>
-        <label className="col-span-full grid gap-2 text-xs text-subtle max-[760px]:col-span-1">
+        <label className="col-span-full grid gap-2 text-[11px] font-medium text-subtle max-[760px]:col-span-1">
           Warn at <span className="font-semibold text-ink">{threshold}%</span>
           <input
             className="w-full accent-ink"
@@ -119,15 +117,11 @@ export default function BudgetSettings({ config, onSaved, inDialog = false }: Pr
             Used to tint budget status in the dashboard and menu bar.
           </small>
         </label>
-        <button
-          className="w-max rounded-full border-0 bg-ink px-3.5 py-2 text-xs font-semibold text-surface transition hover:opacity-85 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink disabled:cursor-default disabled:opacity-50"
-          type="submit"
-          disabled={saving}
-        >
+        <button className={`w-max ${buttonPrimary}`} type="submit" disabled={saving}>
           {saving ? "Saving…" : "Save settings"}
         </button>
       </form>
-      {message && <div className="mt-[18px] text-[11px] text-ok-strong">{message}</div>}
+      {message && <div className="mt-5 text-[11px] text-ok-strong">{message}</div>}
     </section>
   );
 }

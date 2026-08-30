@@ -2,6 +2,7 @@ import { useMemo } from "react";
 import type { Report, Summary, WidgetConfig } from "../api";
 import { formatCurrency, formatPeriod, formatTokens, heroFontSize } from "./format";
 import { aggregateByProvider, aggregateModels, estimateCacheSavings, modelName, totalsFrom } from "./totals";
+import { cardSurface } from "./ui";
 
 interface Comparison {
   delta: number;
@@ -43,27 +44,27 @@ export default function TotalsCard({ report, summary, config }: Props) {
 
   return (
     <section
-      className="min-w-0 rounded-[24px] border border-hairline bg-card p-6 shadow-[0_1px_2px_rgba(0,0,0,.04),0_14px_36px_rgba(0,0,0,.035)] [container-type:inline-size] max-[760px]:rounded-[20px] max-[760px]:p-[22px]"
+      className={`min-w-0 p-7 [container-type:inline-size] max-[760px]:p-5 ${cardSurface}`}
       aria-labelledby="total-spend-heading"
     >
-      <div className="flex items-center justify-between gap-4">
+      <div className="flex items-baseline justify-between gap-4">
         <div
-          className="text-[10px] font-semibold uppercase tracking-[0.13em] leading-tight text-muted"
+          className="text-[10px] font-semibold uppercase leading-tight tracking-[0.14em] text-muted"
           id="total-spend-heading"
         >
           History total
         </div>
         <span className="text-right text-[11px] text-muted max-[440px]:max-w-[120px]">
-          history window · since {since ? formatPeriod(since) : "usage began"}
+          since {since ? formatPeriod(since) : "usage began"}
         </span>
       </div>
       <div
-        className="mt-4 font-bold tabular-nums leading-[0.98] tracking-[-0.05em]"
-        style={{ fontSize: heroFontSize(formatCurrency(totals.totalCost), 64) }}
+        className="mt-4 font-semibold tabular-nums leading-[0.98] tracking-[-0.04em]"
+        style={{ fontSize: heroFontSize(formatCurrency(totals.totalCost), 52) }}
       >
         {formatCurrency(totals.totalCost)}
       </div>
-      <p className="mt-3 text-xs leading-5 text-muted">
+      <p className="mt-3 text-[11px] leading-5 text-muted">
         {formatTokens(totals.totalTokens)} tokens across the selected history
         {cacheSavings.cacheShare !== null && cacheSavings.cacheShare > 0 && (
           <>
@@ -76,23 +77,23 @@ export default function TotalsCard({ report, summary, config }: Props) {
         )}
       </p>
 
-      <div className="mt-6 grid grid-cols-2 gap-x-5 gap-y-4 border-t border-hairline py-4">
+      <div className="mt-6 grid grid-cols-2 gap-x-5 gap-y-4 border-t border-hairline pt-5">
         <div className="min-w-0">
-          <span className="block text-[10px] text-muted">Input tokens</span>
-          <strong className="mt-1.5 block text-lg font-semibold tabular-nums tracking-[-0.035em]">
+          <span className="block text-[10px] uppercase tracking-[0.06em] text-muted">Input tokens</span>
+          <strong className="mt-1.5 block text-[15px] font-semibold tabular-nums tracking-[-0.02em]">
             {formatTokens(totals.inputTokens)}
           </strong>
         </div>
         <div className="min-w-0">
-          <span className="block text-[10px] text-muted">Output tokens</span>
-          <strong className="mt-1.5 block text-lg font-semibold tabular-nums tracking-[-0.035em]">
+          <span className="block text-[10px] uppercase tracking-[0.06em] text-muted">Output tokens</span>
+          <strong className="mt-1.5 block text-[15px] font-semibold tabular-nums tracking-[-0.02em]">
             {formatTokens(totals.outputTokens)}
           </strong>
         </div>
         <div className="min-w-0">
-          <span className="block text-[10px] text-muted">Cache read</span>
+          <span className="block text-[10px] uppercase tracking-[0.06em] text-muted">Cache read</span>
           <span title={savingsTooltip}>
-            <strong className="mt-1.5 block text-lg font-semibold tabular-nums tracking-[-0.035em]">
+            <strong className="mt-1.5 block text-[15px] font-semibold tabular-nums tracking-[-0.02em]">
               {formatTokens(cacheSavings.cacheReadTokens)}
             </strong>
             <small className="mt-1 block cursor-help text-[10px] text-ok-strong">
@@ -102,28 +103,30 @@ export default function TotalsCard({ report, summary, config }: Props) {
           </span>
         </div>
         <div className="min-w-0">
-          <span className="block text-[10px] text-muted">Models · providers</span>
-          <strong className="mt-1.5 block text-lg font-semibold tabular-nums tracking-[-0.035em]">
+          <span className="block text-[10px] uppercase tracking-[0.06em] text-muted">Models · providers</span>
+          <strong className="mt-1.5 block text-[15px] font-semibold tabular-nums tracking-[-0.02em]">
             {modelCount} · {providerCount}
           </strong>
         </div>
       </div>
-      <div className="mt-1 grid grid-cols-2 gap-3 border-t border-hairline pt-4">
+      <div className="mt-5 grid grid-cols-2 gap-3 border-t border-hairline pt-5">
         <div>
-          <span className="block text-[10px] text-muted">Projected month-end</span>
-          <strong className="mt-1 block text-sm font-semibold tabular-nums">
+          <span className="block text-[10px] uppercase tracking-[0.06em] text-muted">
+            Projected month-end
+          </span>
+          <strong className="mt-1.5 block text-[15px] font-semibold tabular-nums tracking-[-0.02em]">
             {formatCurrency(projectedMonthEnd)}
           </strong>
         </div>
         <div>
-          <span className="block text-[10px] text-muted">Burn rate</span>
-          <strong className="mt-1 block text-sm font-semibold tabular-nums">
+          <span className="block text-[10px] uppercase tracking-[0.06em] text-muted">Burn rate</span>
+          <strong className="mt-1.5 block text-[15px] font-semibold tabular-nums tracking-[-0.02em]">
             {formatCurrency(summary.burnRate.costPerHour)}/hr
           </strong>
         </div>
       </div>
       <p
-        className={`mt-3 text-[10px] ${summary.budgetStatus === "over" ? "text-over-strong" : summary.budgetStatus === "warn" ? "text-warn-strong" : "text-muted"}`}
+        className={`mt-4 text-[10px] leading-relaxed ${summary.budgetStatus === "over" ? "text-over-strong" : summary.budgetStatus === "warn" ? "text-warn-strong" : "text-muted"}`}
       >
         {config?.monthlyBudget
           ? `${formatCurrency(projectedMonthEnd)} projected vs ${formatCurrency(config.monthlyBudget)} monthly budget`

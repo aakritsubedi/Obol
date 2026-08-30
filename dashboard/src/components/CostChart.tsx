@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import type { ProjectUsageRow, UsageRow } from "../api";
 import { ProviderLogo, projectColor, providerColor, providerName } from "../providers";
 import { formatCurrency, formatPeriod, formatTokens, numberValue, projectName } from "./format";
+import { emptyState } from "./ui";
 
 interface Props {
   rows: UsageRow[];
@@ -180,9 +181,7 @@ export default function CostChart({ rows, metric, groupBy = "agent" }: Props) {
   return (
     <div className="min-h-[280px]">
       {points.length === 0 ? (
-        <div className="grid min-h-[130px] place-items-center text-center text-xs text-muted">
-          No history available yet.
-        </div>
+        <div className={emptyState}>No history available yet.</div>
       ) : (
         <>
           <div className="relative">
@@ -308,7 +307,7 @@ export default function CostChart({ rows, metric, groupBy = "agent" }: Props) {
             </svg>
             {hoveredPoint && (
               <div
-                className="pointer-events-none absolute top-2 z-10 w-[190px] -translate-x-1/2 rounded-[10px] border border-hairline bg-card px-3 py-2 text-[10px] text-ink shadow-[0_10px_28px_rgba(0,0,0,.14)]"
+                className="pointer-events-none absolute top-2 z-10 w-[190px] -translate-x-1/2 rounded-control border border-hairline bg-card px-3 py-2 text-[10px] text-ink shadow-pop"
                 style={{ left: `${Math.min(94, Math.max(12, (hoveredX / width) * 100))}%` }}
               >
                 <div className="mb-1 font-semibold text-muted">{formatPeriod(hoveredPoint.period)}</div>
@@ -331,7 +330,7 @@ export default function CostChart({ rows, metric, groupBy = "agent" }: Props) {
             )}
           </div>
           <div
-            className="flex flex-wrap items-center gap-x-4 gap-y-2 pt-3 text-[10px] text-muted"
+            className="mt-5 flex flex-wrap items-center gap-2 border-t border-hairline pt-4 text-[10px] text-muted"
             aria-label="Chart legend"
           >
             {groupKeys.map((key) => {
@@ -349,7 +348,7 @@ export default function CostChart({ rows, metric, groupBy = "agent" }: Props) {
               const hidden = hiddenGroups.has(key);
               return (
                 <button
-                  className={`inline-flex items-center gap-2 rounded-full border border-hairline px-2.5 py-1.5 transition ${hidden ? "bg-transparent opacity-45" : "bg-wash"}`}
+                  className={`inline-flex items-center gap-2 rounded-full border border-hairline px-2.5 py-1 transition hover:border-subtle ${hidden ? "bg-transparent opacity-40" : "bg-card"}`}
                   key={key}
                   type="button"
                   aria-pressed={!hidden}

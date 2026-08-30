@@ -2,6 +2,9 @@ import { useMemo, useState } from "react";
 import type { Report } from "../api";
 import { ProviderLogo, projectColor, providerColor, providerName } from "../providers";
 import { displayName, formatCurrency, formatPercent, formatTokens } from "./format";
+import SectionHeader, { HeaderBadge } from "./SectionHeader";
+import Segmented from "./Segmented";
+import { cardSurface, emptyState, sectionShell, tableHead } from "./ui";
 import {
   aggregateModels,
   aggregateProjects,
@@ -62,46 +65,32 @@ function LeaderPanel({ datasets }: { datasets: Record<LeaderKind, LeaderRow[]> }
   const top = rows.slice(0, TOP_COUNT);
   const rest = rows.slice(TOP_COUNT);
   return (
-    <div className="min-h-[300px] min-w-0 rounded-[20px] border border-hairline bg-card p-5 shadow-[0_1px_2px_rgba(0,0,0,.04),0_10px_28px_rgba(0,0,0,.04)]">
+    <div className={`min-h-[290px] min-w-0 p-5 ${cardSurface}`}>
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <div
-          className="flex gap-1 rounded-full border border-hairline bg-panel p-1"
-          aria-label="Week ranking dimension"
-        >
-          {(["models", "projects", "providers"] as LeaderKind[]).map((kind) => (
-            <button
-              className={`rounded-full px-3 py-1.5 text-[11px] transition ${selected === kind ? "bg-card font-semibold text-ink shadow-[0_1px_3px_rgba(0,0,0,.08)]" : "text-muted hover:text-ink"}`}
-              key={kind}
-              type="button"
-              aria-pressed={selected === kind}
-              onClick={() => setSelected(kind)}
-            >
-              {kind[0].toUpperCase() + kind.slice(1)}
-            </button>
-          ))}
-        </div>
+        <Segmented
+          label="Week ranking dimension"
+          value={selected}
+          onChange={setSelected}
+          options={[
+            { value: "models", label: "Models" },
+            { value: "projects", label: "Projects" },
+            { value: "providers", label: "Providers" },
+          ]}
+        />
         <span className="whitespace-nowrap text-[10px] text-muted">
           {rows.length} {rows.length === 1 ? "entry" : "entries"} this week
         </span>
       </div>
       {rows.length === 0 ? (
-        <p className="grid min-h-[110px] place-items-center text-center text-xs text-muted">
-          No usage in this period.
-        </p>
+        <p className={emptyState}>No usage in this period.</p>
       ) : (
         <>
-          <table className="mt-4 w-full table-fixed border-collapse text-xs">
+          <table className="mt-5 w-full table-fixed border-collapse text-[11px]">
             <thead>
               <tr>
-                <th className="w-[46%] pb-2 text-left text-[10px] font-semibold uppercase tracking-[0.07em] text-muted">
-                  Name
-                </th>
-                <th className="px-2 pb-2 text-right text-[10px] font-semibold uppercase tracking-[0.07em] text-muted">
-                  Cost
-                </th>
-                <th className="pb-2 text-right text-[10px] font-semibold uppercase tracking-[0.07em] text-muted">
-                  Tokens
-                </th>
+                <th className={`w-[46%] text-left ${tableHead}`}>Name</th>
+                <th className={`px-2 text-right ${tableHead}`}>Cost</th>
+                <th className={`text-right ${tableHead}`}>Tokens</th>
               </tr>
             </thead>
             <tbody>
@@ -141,7 +130,7 @@ function LeaderPanel({ datasets }: { datasets: Record<LeaderKind, LeaderRow[]> }
             </tbody>
           </table>
           {rest.length > 0 && (
-            <div className="mt-3 flex flex-wrap gap-1.5 border-t border-dashed border-hairline pt-3">
+            <div className="mt-4 flex flex-wrap gap-1.5 border-t border-hairline pt-4">
               {rest.map((row) => (
                 <span
                   className="inline-flex max-w-full items-center gap-1.5 rounded-full bg-panel px-2 py-1 text-[10px]"
@@ -206,33 +195,20 @@ export default function WeeklyLeaders({ report }: Props) {
   }
 
   return (
-    <section
-      className="border-t border-hairline py-12"
-      id="week-leaders"
-      aria-labelledby="week-leaders-heading"
-    >
-      <div className="mb-[22px] flex items-start justify-between gap-[18px] max-[760px]:flex-wrap">
-        <div>
-          <div
-            className="text-[10px] font-semibold uppercase tracking-[0.13em] leading-tight text-muted"
-            id="week-leaders-heading"
-          >
-            Week to date · Sun – Sat
-          </div>
-          <h2 className="mt-1.5 flex flex-wrap items-center gap-2.5 text-[17px] font-bold tracking-[-0.025em]">
+    <section className={sectionShell} id="week-leaders" aria-labelledby="week-leaders-heading">
+      <SectionHeader
+        eyebrow="Week to date · Sun – Sat"
+        id="week-leaders-heading"
+        title={
+          <>
             Week of {formatWeekRange(weeks.current)}
-            <span
-              className="rounded-full bg-wash px-2 py-0.5 text-[10px] font-semibold text-subtle"
-              title="Only the elapsed days of this calendar week are counted, and the comparison covers those same weekdays last week."
-            >
+            <HeaderBadge title="Only the elapsed days of this calendar week are counted, and the comparison covers those same weekdays last week.">
               Day {weeks.dayIndex + 1} of 7
-            </span>
-          </h2>
-          <p className="mt-1 text-[11px] text-muted">
-            Ranked by cost vs {formatWeekRange(weeks.previous)} (same days)
-          </p>
-        </div>
-      </div>
+            </HeaderBadge>
+          </>
+        }
+        description={`Ranked by cost vs ${formatWeekRange(weeks.previous)} (same days)`}
+      />
       <LeaderPanel datasets={{ models, projects, providers }} />
     </section>
   );

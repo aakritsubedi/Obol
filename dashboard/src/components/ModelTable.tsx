@@ -2,6 +2,8 @@ import { useEffect, useMemo, useState } from "react";
 import type { Report } from "../api";
 import { ProviderLogo, providerColor, providerName } from "../providers";
 import { displayName, formatCurrency, formatTokens } from "./format";
+import { CHEVRON_DOWN, CHEVRON_RIGHT, Icon } from "./icons";
+import SectionHeader from "./SectionHeader";
 import {
   type AggregatedModel,
   aggregateByProvider,
@@ -12,6 +14,7 @@ import {
   periodHasModelData,
   type ReportPeriod,
 } from "./totals";
+import { emptyState, inputControl, sectionShell, tableHead } from "./ui";
 
 interface Props {
   report: Report | null;
@@ -52,14 +55,17 @@ function SortButton({
 }) {
   return (
     <button
-      className="inline-flex items-center gap-1 text-[10px] font-semibold uppercase tracking-[0.07em] text-muted hover:text-ink"
+      className={`inline-flex items-center gap-1 whitespace-nowrap text-[10px] font-semibold uppercase tracking-[0.08em] transition ${active ? "text-ink" : "text-muted hover:text-ink"}`}
       type="button"
       onClick={() => onSort(sortKey)}
       aria-label={`Sort by ${label}`}
       aria-sort={active ? (direction === "asc" ? "ascending" : "descending") : "none"}
     >
       {label}
-      <span aria-hidden="true">{active ? (direction === "asc" ? "↑" : "↓") : "↕"}</span>
+      <Icon
+        path={CHEVRON_DOWN}
+        className={`h-2.5 w-2.5 shrink-0 transition ${active ? (direction === "asc" ? "rotate-180 opacity-100" : "opacity-100") : "opacity-0"}`}
+      />
     </button>
   );
 }
@@ -118,45 +124,39 @@ export default function ModelTable({ report, period }: Props) {
   }
 
   return (
-    <section className="border-t border-hairline py-8" id="models" aria-labelledby="models-heading">
-      <div className="mb-5 flex items-start justify-between gap-4 max-[760px]:flex-wrap">
-        <div>
-          <div
-            className="text-[10px] font-semibold uppercase tracking-[0.13em] leading-tight text-muted"
-            id="models-heading"
-          >
-            Usage by provider & model
-          </div>
-          <h2 className="mt-1.5 text-[17px] font-bold tracking-[-0.025em]">
-            {visibleModels.length} of {allModels.length} {visibleModels.length === 1 ? "model" : "models"}{" "}
-            <span className="text-[11px] font-medium tracking-normal text-muted">{periodLabel}</span>
-          </h2>
-        </div>
-        {allModels.length > 0 && (
-          <div className="flex items-center gap-2.5 max-[760px]:w-full max-[760px]:justify-between">
+    <section className={sectionShell} id="models" aria-labelledby="models-heading">
+      <SectionHeader
+        eyebrow="Usage by provider & model"
+        id="models-heading"
+        title={
+          <>
+            {visibleModels.length} of {allModels.length} {visibleModels.length === 1 ? "model" : "models"}
+            <span className="text-[11px] font-normal tracking-normal text-muted">{periodLabel}</span>
+          </>
+        }
+        actions={
+          allModels.length > 0 ? (
             <label className="block w-[190px] max-[440px]:w-[150px]">
               <span className="sr-only">Search models</span>
               <input
-                className="w-full rounded-full border border-hairline bg-card px-3 py-2 text-[11px] text-ink outline-none placeholder:text-muted focus:border-subtle focus:ring-4 focus:ring-wash"
+                className={inputControl}
                 value={query}
                 onChange={(event) => setQuery(event.target.value)}
                 placeholder="Search models"
                 type="search"
               />
             </label>
-          </div>
-        )}
-      </div>
+          ) : undefined
+        }
+      />
       {allModels.length === 0 ? (
-        <div className="grid min-h-[130px] place-items-center text-center text-xs text-muted">
-          No model detail is available for this report.
-        </div>
+        <div className={emptyState}>No model detail is available for this report.</div>
       ) : (
         <div className="max-w-full overflow-x-auto">
-          <table className="w-full min-w-[860px] border-collapse text-xs text-ink">
+          <table className="w-full min-w-[860px] border-collapse text-[11px] text-ink">
             <thead>
               <tr>
-                <th className="pb-3 text-left">
+                <th className={`text-left ${tableHead}`}>
                   <SortButton
                     label="Model"
                     sortKey="name"
@@ -165,7 +165,7 @@ export default function ModelTable({ report, period }: Props) {
                     onSort={changeSort}
                   />
                 </th>
-                <th className="px-3 pb-3 text-right">
+                <th className={`px-3 text-right ${tableHead}`}>
                   <SortButton
                     label="Cost"
                     sortKey="totalCost"
@@ -174,7 +174,7 @@ export default function ModelTable({ report, period }: Props) {
                     onSort={changeSort}
                   />
                 </th>
-                <th className="px-3 pb-3 text-right">
+                <th className={`px-3 text-right ${tableHead}`}>
                   <SortButton
                     label="Input"
                     sortKey="inputTokens"
@@ -183,7 +183,7 @@ export default function ModelTable({ report, period }: Props) {
                     onSort={changeSort}
                   />
                 </th>
-                <th className="px-3 pb-3 text-right">
+                <th className={`px-3 text-right ${tableHead}`}>
                   <SortButton
                     label="Output"
                     sortKey="outputTokens"
@@ -192,7 +192,7 @@ export default function ModelTable({ report, period }: Props) {
                     onSort={changeSort}
                   />
                 </th>
-                <th className="px-3 pb-3 text-right">
+                <th className={`px-3 text-right ${tableHead}`}>
                   <SortButton
                     label="Cache read"
                     sortKey="cacheReadTokens"
@@ -201,7 +201,7 @@ export default function ModelTable({ report, period }: Props) {
                     onSort={changeSort}
                   />
                 </th>
-                <th className="px-3 pb-3 text-right">
+                <th className={`px-3 text-right ${tableHead}`}>
                   <SortButton
                     label="Total tokens"
                     sortKey="totalTokens"
@@ -210,9 +210,7 @@ export default function ModelTable({ report, period }: Props) {
                     onSort={changeSort}
                   />
                 </th>
-                <th className="pb-3 text-right text-[10px] font-semibold uppercase tracking-[0.07em] text-muted">
-                  Share
-                </th>
+                <th className={`text-right ${tableHead}`}>Share</th>
               </tr>
             </thead>
             <tbody>
@@ -238,7 +236,10 @@ export default function ModelTable({ report, period }: Props) {
                   ))}
               {search && visibleModels.length === 0 && (
                 <tr>
-                  <td className="border-t border-hairline py-6 text-center text-muted" colSpan={7}>
+                  <td
+                    className="border-t border-hairline py-8 text-center text-[11px] text-muted"
+                    colSpan={7}
+                  >
                     No models match “{query}”.
                   </td>
                 </tr>
@@ -281,12 +282,10 @@ function ProviderGroupRows({
             onClick={onToggle}
             aria-expanded={expanded}
           >
-            <span className="w-[15px] text-center text-lg leading-none text-muted" aria-hidden="true">
-              {expanded ? "⌄" : "›"}
-            </span>
+            <Icon path={expanded ? CHEVRON_DOWN : CHEVRON_RIGHT} className="h-3 w-3 shrink-0 text-muted" />
             <span className="flex min-w-0 items-center gap-2">
               <ProviderLogo agent={group.agent} size={16} />
-              <strong className="text-xs font-semibold">{providerName(group.agent)}</strong>
+              <strong className="text-[11px] font-semibold">{providerName(group.agent)}</strong>
             </span>
             <small className="text-[10px] text-muted">
               {models.length} {models.length === 1 ? "model" : "models"}
@@ -326,7 +325,7 @@ function ModelRow({ model, totalCost }: { model: AggregatedModel; totalCost: num
     <tr>
       <td className="border-t border-hairline py-3 text-left">
         <div className="grid min-w-[150px] gap-1">
-          <strong className="text-xs font-semibold">{displayName(modelName(model))}</strong>
+          <strong className="text-[11px] font-semibold">{displayName(modelName(model))}</strong>
           <span className="text-[10px]" style={{ color: providerColor(agent) }}>
             {providerName(agent)}
           </span>

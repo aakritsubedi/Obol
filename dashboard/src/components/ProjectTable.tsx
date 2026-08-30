@@ -2,6 +2,8 @@ import { useEffect, useMemo, useState } from "react";
 import type { ProjectUsageRow } from "../api";
 import { projectColor } from "../providers";
 import { formatCurrency, formatTokens, projectName } from "./format";
+import SectionHeader from "./SectionHeader";
+import { buttonGhost, emptyState, inputControl, sectionShell, tableHead } from "./ui";
 
 interface Props {
   projects: ProjectUsageRow[];
@@ -48,62 +50,43 @@ export default function ProjectTable({ projects }: Props) {
   }, [projects, query]);
 
   return (
-    <section className="border-t border-hairline py-8" aria-labelledby="projects-heading">
-      <div className="mb-5 flex items-start justify-between gap-4 max-[760px]:flex-wrap">
-        <div>
-          <div
-            className="text-[10px] font-semibold uppercase tracking-[0.13em] leading-tight text-muted"
-            id="projects-heading"
-          >
-            Projects
-          </div>
-          <h2 className="mt-1.5 text-[17px] font-bold tracking-[-0.025em]">Claude projects</h2>
-          <p className="mt-1 text-[11px] text-muted">
-            Claude-scoped · of {formatCurrency(total)} Claude spend ·{" "}
-            {filtered.length > 5 && !showAll
-              ? `showing top 5 of ${filtered.length}`
-              : `${filtered.length} shown`}
-          </p>
-        </div>
-        {projects.length > 0 && (
-          <label className="block w-[190px] max-[760px]:w-full">
-            <span className="sr-only">Search projects</span>
-            <input
-              className="w-full rounded-full border border-hairline bg-card px-3 py-2 text-[11px] text-ink outline-none placeholder:text-muted focus:border-subtle focus:ring-4 focus:ring-wash"
-              value={query}
-              onChange={(event) => setQuery(event.target.value)}
-              placeholder="Search projects"
-              type="search"
-            />
-          </label>
-        )}
-      </div>
+    <section className={sectionShell} aria-labelledby="projects-heading">
+      <SectionHeader
+        eyebrow="Projects"
+        id="projects-heading"
+        title="Claude projects"
+        description={`Claude-scoped · of ${formatCurrency(total)} Claude spend · ${
+          filtered.length > 5 && !showAll ? `showing top 5 of ${filtered.length}` : `${filtered.length} shown`
+        }`}
+        actions={
+          projects.length > 0 ? (
+            <label className="block w-[190px] max-[760px]:w-full">
+              <span className="sr-only">Search projects</span>
+              <input
+                className={inputControl}
+                value={query}
+                onChange={(event) => setQuery(event.target.value)}
+                placeholder="Search projects"
+                type="search"
+              />
+            </label>
+          ) : undefined
+        }
+      />
       {projects.length === 0 ? (
-        <div className="grid min-h-[130px] place-items-center text-center text-xs text-muted">
-          No Claude project data is available.
-        </div>
+        <div className={emptyState}>No Claude project data is available.</div>
       ) : visible.length === 0 ? (
-        <div className="grid min-h-[110px] place-items-center text-center text-xs text-muted">
-          No projects match “{query}”.
-        </div>
+        <div className={emptyState}>No projects match “{query}”.</div>
       ) : (
         <>
           <div className="max-w-full overflow-x-auto">
-            <table className="w-full min-w-[560px] border-collapse text-xs text-ink">
+            <table className="w-full min-w-[560px] border-collapse text-[11px] text-ink">
               <thead>
                 <tr>
-                  <th className="pb-3 text-left text-[10px] font-semibold uppercase tracking-[0.07em] text-muted">
-                    Project
-                  </th>
-                  <th className="px-3 pb-3 text-right text-[10px] font-semibold uppercase tracking-[0.07em] text-muted">
-                    Share
-                  </th>
-                  <th className="px-3 pb-3 text-right text-[10px] font-semibold uppercase tracking-[0.07em] text-muted">
-                    Tokens
-                  </th>
-                  <th className="pb-3 text-right text-[10px] font-semibold uppercase tracking-[0.07em] text-muted">
-                    Cost
-                  </th>
+                  <th className={`text-left ${tableHead}`}>Project</th>
+                  <th className={`px-3 text-right ${tableHead}`}>Share</th>
+                  <th className={`px-3 text-right ${tableHead}`}>Tokens</th>
+                  <th className={`text-right ${tableHead}`}>Cost</th>
                 </tr>
               </thead>
               <tbody>
@@ -138,7 +121,7 @@ export default function ProjectTable({ projects }: Props) {
           </div>
           {filtered.length > 5 && (
             <button
-              className="mt-4 rounded-full border border-hairline bg-transparent px-3 py-2 text-[11px] font-semibold text-ink transition hover:bg-wash"
+              className={`mt-4 ${buttonGhost}`}
               type="button"
               onClick={() => setShowAll((value) => !value)}
             >

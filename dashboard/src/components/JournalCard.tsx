@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import type { DayJournal } from "../api";
 import { formatCurrency, formatDuration } from "./format";
+import { BRANCH, CHECK, CHEVRON_DOWN, CHEVRON_UP, CLOCK, COPY, FOLDER, Icon } from "./icons";
 import {
   clipboardSummary,
   type DayOption,
@@ -13,6 +14,8 @@ import {
   toolShares,
   workTags,
 } from "./journal";
+import SectionHeader from "./SectionHeader";
+import { buttonGhost, sectionShell } from "./ui";
 
 const VISIBLE_FILES = 4;
 
@@ -23,34 +26,6 @@ interface Props {
   onDateChange: (date: string) => void;
   loading?: boolean;
 }
-
-function Icon({ path, label }: { path: string; label?: string }) {
-  return (
-    <svg
-      viewBox="0 0 16 16"
-      className="h-3 w-3 shrink-0 opacity-70"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.4"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      {...(label ? { role: "img", "aria-label": label } : { "aria-hidden": true })}
-    >
-      <path d={path} />
-    </svg>
-  );
-}
-
-const FOLDER =
-  "M1.9 4.1A1.2 1.2 0 0 1 3.1 3h2.6l1.3 1.6h5.9A1.2 1.2 0 0 1 14.1 5.8v5.4a1.2 1.2 0 0 1-1.2 1.2H3.1a1.2 1.2 0 0 1-1.2-1.2Z";
-const BRANCH =
-  "M4.5 3.6v8.8M4.5 3.6a1.4 1.4 0 1 0 0-.1ZM4.5 12.4a1.4 1.4 0 1 0 0 .1ZM11.5 5a1.4 1.4 0 1 0 0-.1ZM11.5 6.4v.9a2.6 2.6 0 0 1-2.6 2.6H4.5";
-const CLOCK = "M8 4.2V8l2.4 1.5M14 8A6 6 0 1 1 2 8a6 6 0 0 1 12 0Z";
-const COPY =
-  "M11.1 3.9H4.9A1.4 1.4 0 0 0 3.5 5.3v6.2M4.9 6.1h6.2a1.4 1.4 0 0 1 1.4 1.4v6.2a1.4 1.4 0 0 1-1.4 1.4H4.9a1.4 1.4 0 0 1-1.4-1.4V7.5a1.4 1.4 0 0 1 1.4-1.4Z";
-const CHECK = "M3.2 8.4 6.4 11.5 12.8 4.9";
-const CHEVRON_DOWN = "M4.5 6.2 8 9.7l3.5-3.5";
-const CHEVRON_UP = "M4.5 9.7 8 6.2l3.5 3.5";
 
 // Apple Notes marks a completed checklist item with a filled amber circle and a
 // check. Every task listed here is work already done, so they all read as ticked.
@@ -99,7 +74,7 @@ function TaskRow({ task }: { task: Task }) {
           <span className="ml-auto inline-flex shrink-0 items-center gap-1.5 text-[13px] font-medium tabular-nums text-note-subtle transition-colors group-hover:text-note-ink">
             {formatDuration(task.activeMinutes)}
             <span className="inline-flex transition-transform" data-open={open}>
-              <Icon path={open ? CHEVRON_UP : CHEVRON_DOWN} />
+              <Icon path={open ? CHEVRON_UP : CHEVRON_DOWN} className="h-3 w-3 shrink-0 opacity-70" />
             </span>
           </span>
         </button>
@@ -114,17 +89,17 @@ function TaskRow({ task }: { task: Task }) {
             </span>
           ))}
           <span className="inline-flex items-center gap-1">
-            <Icon path={FOLDER} label="Project" />
+            <Icon path={FOLDER} label="Project" className="h-3 w-3 shrink-0 opacity-70" />
             {task.project}
           </span>
           {task.gitBranch && (
             <span className="inline-flex items-center gap-1">
-              <Icon path={BRANCH} label="Branch" />
+              <Icon path={BRANCH} label="Branch" className="h-3 w-3 shrink-0 opacity-70" />
               {task.gitBranch}
             </span>
           )}
           <span className="inline-flex items-center gap-1">
-            <Icon path={CLOCK} label="Time" />
+            <Icon path={CLOCK} label="Time" className="h-3 w-3 shrink-0 opacity-70" />
             {sessionRange(task)}
           </span>
         </div>
@@ -226,55 +201,47 @@ export default function JournalCard({ journal, options, date, onDateChange, load
     .slice(0, 5);
 
   return (
-    <section className="border-t border-dashed border-hairline pb-12 pt-10" aria-labelledby="journal-heading">
-      <div className="mb-5 flex items-start justify-between gap-4 max-[560px]:flex-wrap max-[560px]:gap-y-3">
-        <div>
-          <div
-            className="text-[10px] font-semibold uppercase tracking-[0.13em] leading-tight text-muted"
-            id="journal-heading"
-          >
-            Tasks
-          </div>
-          <h2 className="mt-1.5 text-[17px] font-bold tracking-[-0.025em]">
-            {options.find((option) => option.value === (journal?.date ?? date))?.weekday ??
-              journal?.date ??
-              date}
-          </h2>
-        </div>
-        <div className="flex items-center gap-2 max-[560px]:w-full max-[560px]:justify-between">
-          <button
-            type="button"
-            className={`inline-flex cursor-pointer items-center gap-1.5 rounded-full border border-hairline bg-card py-2 pr-3 pl-2.5 text-[11px] font-medium outline-none transition-colors hover:text-ink focus-visible:border-subtle focus-visible:ring-4 focus-visible:ring-wash disabled:pointer-events-none disabled:opacity-50 ${
-              copied ? "text-ink" : "text-subtle"
-            }`}
-            onClick={() => void handleCopy()}
-            disabled={!journal}
-            title={copied ? "Copied" : "Copy tasks grouped by project"}
-          >
-            <Icon path={copied ? CHECK : COPY} />
-            {copied ? "Copied" : "Copy"}
-          </button>
-          <span className="relative inline-flex items-center">
-            <select
-              className="cursor-pointer appearance-none truncate rounded-full border border-hairline bg-card py-2 pr-8 pl-3 text-[11px] text-ink outline-none transition-colors hover:border-subtle focus-visible:border-subtle focus-visible:ring-4 focus-visible:ring-wash"
-              value={date}
-              onChange={(event) => onDateChange(event.target.value)}
-              aria-label="Show tasks for"
+    <section className={sectionShell} aria-labelledby="journal-heading">
+      <SectionHeader
+        eyebrow="Tasks"
+        id="journal-heading"
+        title={
+          options.find((option) => option.value === (journal?.date ?? date))?.weekday ?? journal?.date ?? date
+        }
+        actions={
+          <>
+            <button
+              type="button"
+              className={buttonGhost}
+              onClick={() => void handleCopy()}
+              disabled={!journal}
+              title={copied ? "Copied" : "Copy tasks grouped by project"}
             >
-              {options.map((option) => (
-                <option key={option.value} value={option.value}>
-                  {option.label}
-                </option>
-              ))}
-            </select>
-            <span className="pointer-events-none absolute right-3 inline-flex text-muted">
-              <Icon path={CHEVRON_DOWN} />
+              <Icon path={copied ? CHECK : COPY} className="h-3 w-3 shrink-0" />
+              {copied ? "Copied" : "Copy"}
+            </button>
+            <span className="relative inline-flex items-center">
+              <select
+                className="h-8 cursor-pointer appearance-none truncate rounded-full border border-hairline bg-card pl-3 pr-8 text-[11px] text-ink outline-none transition hover:border-subtle focus-visible:border-subtle focus-visible:ring-4 focus-visible:ring-wash"
+                value={date}
+                onChange={(event) => onDateChange(event.target.value)}
+                aria-label="Show tasks for"
+              >
+                {options.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+              <span className="pointer-events-none absolute right-3 inline-flex text-muted">
+                <Icon path={CHEVRON_DOWN} className="h-3 w-3 shrink-0 opacity-70" />
+              </span>
             </span>
-          </span>
-        </div>
-      </div>
+          </>
+        }
+      />
 
-      <div className="mx-auto overflow-hidden rounded-[10px] border border-note-edge bg-note-paper shadow-[0_1px_2px_rgba(0,0,0,.05),0_18px_44px_-16px_rgba(0,0,0,.22)]">
+      <div className="mx-auto overflow-hidden rounded-card border border-note-edge bg-note-paper shadow-pop">
         <div className="px-8 pb-8 pt-6 max-[560px]:px-5 max-[560px]:pb-6">
           {!journal ? (
             <p className="py-6 text-center text-[14px] text-note-muted">

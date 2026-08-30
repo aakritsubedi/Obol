@@ -3,7 +3,9 @@ import type { ModelBreakdown, Report, Summary, UsageRow } from "../api";
 import { ProviderLogo, providerColor, providerConfig, providerName } from "../providers";
 import { buildContributionCalendar, type ContributionCalendar, trimFutureContribution } from "./contribution";
 import { formatCurrency, formatPeriod, formatTokens, heroFontSize, numberValue } from "./format";
+import { CLOSE, DOWNLOAD, Icon } from "./icons";
 import { modelName } from "./totals";
+import { buttonGhost, buttonIcon, buttonPrimary } from "./ui";
 
 type ShareRange = "today" | "week" | "month" | "total";
 
@@ -838,38 +840,34 @@ export default function ShareDialog({ report, summary, onClose }: Props) {
       onMouseDown={(event) => event.target === event.currentTarget && onClose()}
     >
       <div
-        className="w-full max-w-[980px] overflow-hidden rounded-[24px] border border-hairline bg-card text-ink shadow-[0_24px_80px_rgba(0,0,0,.24)]"
+        className="w-full max-w-[980px] overflow-hidden rounded-card border border-hairline bg-card text-ink shadow-dialog"
         role="dialog"
         aria-modal="true"
         aria-labelledby="share-dialog-title"
       >
         <div className="flex items-center justify-between gap-4 border-b border-hairline px-6 py-4">
           <div>
-            <p className="text-[10px] font-semibold uppercase tracking-[0.13em] text-muted">Share usage</p>
-            <h2 className="mt-1 text-lg font-bold tracking-[-0.03em]" id="share-dialog-title">
+            <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-muted">Share usage</p>
+            <h2 className="mt-1.5 text-[15px] font-semibold tracking-[-0.02em]" id="share-dialog-title">
               Create a social card
             </h2>
           </div>
-          <div className="flex item-center gap-3">
+          <div className="flex items-center gap-2">
             <button
-              className="inline-flex h-8 items-center justify-center gap-2 rounded-xl border border-hairline px-4 text-xs font-semibold text-ink transition hover:bg-wash"
+              className={buttonGhost}
               type="button"
               onClick={() => void exportContributionImage(data.dailyRows)}
             >
-              <span aria-hidden="true">↓</span> Download contribution graph
+              <Icon path={DOWNLOAD} className="h-3.5 w-3.5 shrink-0" />
+              Contribution graph
             </button>
-            <button
-              className="grid h-8 w-8 place-items-center rounded-full border border-hairline text-muted transition hover:bg-wash hover:text-ink"
-              type="button"
-              onClick={onClose}
-              aria-label="Close share dialog"
-            >
-              ×
+            <button className={buttonIcon} type="button" onClick={onClose} aria-label="Close share dialog">
+              <Icon path={CLOSE} />
             </button>
           </div>
         </div>
         <div className="grid gap-10 p-6 lg:grid-cols-[minmax(0,1fr)_250px]">
-          <div className="overflow-hidden rounded-[14px] bg-[#111216] font-mono text-[#f5f6f8] shadow-[0_18px_40px_rgba(0,0,0,.18)]">
+          <div className="overflow-hidden rounded-card bg-[#111216] font-mono text-[#f5f6f8] shadow-pop">
             <div className="flex h-11 items-center gap-2 bg-[#1d1f25] px-4">
               <span className="h-2.5 w-2.5 rounded-full bg-[#f06b60]" />
               <span className="h-2.5 w-2.5 rounded-full bg-[#f1bd4a]" />
@@ -938,7 +936,7 @@ export default function ShareDialog({ report, summary, onClose }: Props) {
           </div>
           <aside className="flex flex-col gap-4">
             <div>
-              <p className="text-xs font-semibold">Choose a window</p>
+              <p className="text-[13px] font-semibold tracking-[-0.01em]">Choose a window</p>
               <p className="mt-1 text-[11px] leading-5 text-muted">
                 Pick the story you want to share. The image stays local until you download it.
               </p>
@@ -946,7 +944,7 @@ export default function ShareDialog({ report, summary, onClose }: Props) {
             <div className="grid grid-cols-2 gap-2 lg:grid-cols-1">
               {ranges.map((item) => (
                 <button
-                  className={`rounded-xl border px-3 py-2.5 text-left text-xs transition ${range === item.value ? "border-ink bg-ink font-semibold text-surface" : "border-hairline text-muted hover:bg-wash hover:text-ink"}`}
+                  className={`rounded-control border px-3 py-2.5 text-left text-[11px] transition ${range === item.value ? "border-ink bg-ink font-semibold text-surface" : "border-hairline text-subtle hover:border-subtle hover:text-ink"}`}
                   type="button"
                   key={item.value}
                   onClick={() => setRange(item.value)}
@@ -957,11 +955,12 @@ export default function ShareDialog({ report, summary, onClose }: Props) {
             </div>
             <div className="mt-4 grid gap-2">
               <button
-                className="inline-flex h-10 items-center justify-center gap-2 rounded-xl bg-ink px-4 text-xs font-semibold text-surface transition hover:opacity-90"
+                className={`h-10 justify-center ${buttonPrimary}`}
                 type="button"
                 onClick={() => void exportShareImage(data)}
               >
-                <span aria-hidden="true">↓</span> Download PNG
+                <Icon path={DOWNLOAD} className="h-3.5 w-3.5 shrink-0" />
+                Download PNG
               </button>
             </div>
           </aside>

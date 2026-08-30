@@ -1,6 +1,8 @@
 import type { ProviderSummary } from "../api";
 import { ProviderLogo, providerColor, providerName } from "../providers";
 import { formatCurrency, formatTokens } from "./format";
+import SectionHeader from "./SectionHeader";
+import { emptyState, sectionShell } from "./ui";
 
 interface Props {
   providers: ProviderSummary[];
@@ -9,30 +11,23 @@ interface Props {
 
 export default function ProviderTable({ providers, total }: Props) {
   return (
-    <section
-      className="min-w-0 py-8 pr-8 max-[760px]:border-b max-[760px]:border-hairline max-[760px]:pr-0"
-      aria-labelledby="providers-heading"
-    >
-      <div className="mb-[22px] flex items-start justify-between gap-[18px]">
-        <div>
-          <div
-            className="text-[10px] font-semibold uppercase tracking-[0.13em] leading-tight text-muted"
-            id="providers-heading"
-          >
-            By provider
-          </div>
-          <h2 className="mt-1.5 text-[17px] font-bold tracking-[-0.025em]">Where today’s spend went</h2>
-        </div>
-        <span className="text-sm font-semibold tabular-nums">{formatCurrency(total)}</span>
-      </div>
+    <section className={`min-w-0 ${sectionShell}`} aria-labelledby="providers-heading">
+      <SectionHeader
+        eyebrow="By provider"
+        id="providers-heading"
+        title="Where today’s spend went"
+        actions={
+          <span className="text-[15px] font-semibold tabular-nums tracking-[-0.02em]">
+            {formatCurrency(total)}
+          </span>
+        }
+      />
       {providers.length === 0 ? (
-        <div className="grid min-h-[130px] place-items-center text-center text-xs text-muted">
-          No provider activity today.
-        </div>
+        <div className={emptyState}>No provider activity today.</div>
       ) : (
-        <div className="grid gap-[19px]">
+        <div className="grid gap-5">
           {providers.length === 1 ? (
-            <div className="flex items-center gap-2 text-xs text-muted">
+            <div className="flex items-center gap-2 text-[11px] text-muted">
               <ProviderLogo agent={providers[0].agent} size={22} />
               <strong className="font-semibold text-ink">{providerName(providers[0].agent)}</strong>
               {providers[0].totalCost === 0 && (
@@ -53,12 +48,12 @@ export default function ProviderTable({ providers, total }: Props) {
               const color = providerColor(provider.agent);
               return (
                 <div
-                  className="grid grid-cols-[30px_minmax(0,1fr)_auto] items-center gap-[11px]"
+                  className="grid grid-cols-[28px_minmax(0,1fr)_auto] items-center gap-3"
                   key={provider.agent}
                 >
-                  <ProviderLogo agent={provider.agent} size={30} />
+                  <ProviderLogo agent={provider.agent} size={28} />
                   <div className="min-w-0">
-                    <div className="flex items-center justify-between gap-3.5 text-xs">
+                    <div className="flex items-center justify-between gap-3.5 text-[11px]">
                       <span className="flex items-center gap-2">
                         <strong className="font-semibold">{providerName(provider.agent)}</strong>
                         {free && (
@@ -85,7 +80,7 @@ export default function ProviderTable({ providers, total }: Props) {
                       {formatTokens(provider.outputTokens)} out
                     </div>
                   </div>
-                  <div className="text-[13px] font-semibold tabular-nums">
+                  <div className="text-[13px] font-semibold tabular-nums tracking-[-0.01em]">
                     {formatCurrency(provider.totalCost)}
                   </div>
                 </div>
