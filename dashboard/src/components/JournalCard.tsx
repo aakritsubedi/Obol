@@ -20,9 +20,7 @@ import { buttonGhost, sectionShell } from "./ui";
 
 const VISIBLE_FILES = 4;
 
-type TimelineEntry =
-  | { kind: "task"; task: Task }
-  | { kind: "gap"; id: string; minutes: number };
+type TimelineEntry = { kind: "task"; task: Task } | { kind: "gap"; id: string; minutes: number };
 
 function taskStart(task: Task): number {
   const value = Date.parse(task.startedAt);
@@ -222,9 +220,7 @@ function TimelineGap({ minutes, last }: { minutes: number; last: boolean }) {
         …
       </span>
 
-      <span className="min-w-0 text-[11px] italic text-warn">
-        Idle · {formatDuration(minutes)}
-      </span>
+      <span className="min-w-0 text-[11px] italic text-warn">Idle · {formatDuration(minutes)}</span>
     </li>
   );
 }
@@ -316,7 +312,9 @@ export default function JournalCard({ journal, options, date, onDateChange, load
                 <span className="min-w-0">{noteStamp(journal)}</span>
                 <span className="shrink-0 text-right tabular-nums">
                   {formatDuration(journal.activeMinutes)} active
-                  {journal.blocks > 0 ? ` · ${journal.blocks} ${journal.blocks === 1 ? "sitting" : "sittings"}` : ""}
+                  {journal.blocks > 0
+                    ? ` · ${journal.blocks} ${journal.blocks === 1 ? "sitting" : "sittings"}`
+                    : ""}
                 </span>
               </div>
 
@@ -338,7 +336,11 @@ export default function JournalCard({ journal, options, date, onDateChange, load
                       entry.kind === "task" ? (
                         <TaskRow key={entry.task.id} task={entry.task} last={index === timeline.length - 1} />
                       ) : (
-                        <TimelineGap key={entry.id} minutes={entry.minutes} last={index === timeline.length - 1} />
+                        <TimelineGap
+                          key={entry.id}
+                          minutes={entry.minutes}
+                          last={index === timeline.length - 1}
+                        />
                       ),
                     )}
                   </ol>

@@ -48,7 +48,6 @@
     --shadow-raised: 0 1px 2px rgba(15, 17, 21, 0.06);
     --shadow-pop: 0 8px 24px -6px rgba(15, 17, 21, 0.14), 0 2px 6px rgba(15, 17, 21, 0.06);
     --shadow-dialog: 0 24px 60px -12px rgba(15, 17, 21, 0.28);
-
   }
 
   @media (prefers-color-scheme: dark) {
@@ -84,7 +83,6 @@
       --shadow-raised: 0 1px 2px rgba(0, 0, 0, 0.4);
       --shadow-pop: 0 8px 24px -6px rgba(0, 0, 0, 0.6), 0 2px 6px rgba(0, 0, 0, 0.4);
       --shadow-dialog: 0 24px 60px -12px rgba(0, 0, 0, 0.7);
-
     }
   }
 
@@ -120,7 +118,6 @@
     --shadow-raised: 0 1px 2px rgba(0, 0, 0, 0.4);
     --shadow-pop: 0 8px 24px -6px rgba(0, 0, 0, 0.6), 0 2px 6px rgba(0, 0, 0, 0.4);
     --shadow-dialog: 0 24px 60px -12px rgba(0, 0, 0, 0.7);
-
   }
 
   html {
