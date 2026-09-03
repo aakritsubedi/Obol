@@ -18,11 +18,38 @@ export interface LeaderRow extends UsageTotals {
   name: string;
   costDelta: number;
   costRatio: number | null;
+  /** Same weekdays last week, so the UI can name what a runaway ratio grew from. */
+  costBaseline: number;
   tokenDelta: number;
   tokenRatio: number | null;
+  tokenBaseline: number;
 }
 
 export type LeaderMetric = "cost" | "tokens";
+
+/**
+ * Above this the percentage stops carrying information. A model that cost NPR
+ * 63 last week and NPR 2,000 this week is "+3,041%", which says nothing that
+ * "barely used last week" does not - and printed in the same column as "+15%"
+ * it drags the eye to the least meaningful row on the page.
+ */
+export const RATIO_CAP = 9.995;
+
+export type DeltaKind =
+  /** No usage at all in the comparison window. */
+  | "first-week"
+  /** A baseline so small the ratio is noise; report the baseline instead. */
+  | "negligible"
+  | "unchanged"
+  | "up"
+  | "down";
+
+export function deltaKind(ratio: number | null): DeltaKind {
+  if (ratio === null) return "first-week";
+  if (ratio > RATIO_CAP) return "negligible";
+  if (Math.abs(ratio) < 0.0005) return "unchanged";
+  return ratio > 0 ? "up" : "down";
+}
 
 const MODEL_NAME_MAP: Record<string, string> = {
   xpreviewffree: "X Preview (free)",
@@ -221,8 +248,10 @@ export function leaderRows(current: TotalsMap, last: TotalsMap, metric: LeaderMe
       cacheReadTokens: usage.cacheReadTokens,
       costDelta: usage.cost - before.cost,
       costRatio: before.cost > 0 ? (usage.cost - before.cost) / before.cost : null,
+      costBaseline: before.cost,
       tokenDelta: usage.tokens - before.tokens,
       tokenRatio: before.tokens > 0 ? (usage.tokens - before.tokens) / before.tokens : null,
+      tokenBaseline: before.tokens,
     });
   }
   rows.sort((left, right) => right[metric] - left[metric] || left.name.localeCompare(right.name));

@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import type { Report } from "../api";
 import { ProviderLogo, projectColor, providerColor, providerName } from "../providers";
-import { displayName, formatCurrency, formatPercent, formatTokens } from "./format";
+import { displayName, formatCurrency, formatPercentMagnitude, formatTokens } from "./format";
 import SectionHeader, { HeaderBadge } from "./SectionHeader";
 import Segmented from "./Segmented";
 import { cardSurface, emptyState, sectionShell, tableHead } from "./ui";
@@ -9,6 +9,7 @@ import {
   aggregateModels,
   aggregateProjects,
   aggregateProviders,
+  deltaKind,
   formatWeekRange,
   type LeaderRow,
   leaderRows,
@@ -31,16 +32,48 @@ function limitName(value: string): string {
   return `${value.slice(0, NAME_LIMIT - 1).trimEnd()}…`;
 }
 
-function Delta({ ratio }: { ratio: number | null }) {
-  if (ratio === null) {
-    return <span className="text-[10px] font-medium text-muted">new</span>;
+/**
+ * Spending more is not an error, so a rise is plain gray with an arrow to
+ * carry the direction; only a fall is colored, in the green that means money
+ * saved. Red belongs to the budget bar on the totals card - a column of red
+ * four-digit percentages here made every row look like an alarm.
+ *
+ * `baseline` is the same-days figure from last week, formatted by the caller
+ * because this renders both money and token counts.
+ */
+function Delta({
+  ratio,
+  baseline,
+  format,
+}: {
+  ratio: number | null;
+  baseline: number;
+  format: (value: number) => string;
+}) {
+  const kind = deltaKind(ratio);
+  if (kind === "first-week") {
+    return (
+      <span className="text-[10px] font-medium text-muted" title="Nothing in the same days last week">
+        new
+      </span>
+    );
   }
-  if (Math.abs(ratio) < 0.0005) {
+  if (kind === "negligible") {
+    return (
+      <span
+        className="text-[10px] font-medium text-muted"
+        title={`Up from ${format(baseline)} in the same days last week — too small a base for a useful percentage`}
+      >
+        ▲ from ~0
+      </span>
+    );
+  }
+  if (kind === "unchanged") {
     return <span className="text-[10px] font-medium text-muted">±0%</span>;
   }
   return (
-    <span className={`text-[10px] font-semibold ${ratio > 0 ? "text-over-strong" : "text-ok-strong"}`}>
-      {formatPercent(ratio, 1)}
+    <span className={`text-[10px] font-semibold ${kind === "down" ? "text-ok-strong" : "text-muted"}`}>
+      {kind === "down" ? "▼" : "▲"} {formatPercentMagnitude(ratio, 1)}
     </span>
   );
 }
@@ -116,14 +149,16 @@ function LeaderPanel({ datasets }: { datasets: Record<LeaderKind, LeaderRow[]> }
                   </td>
                   <td className="px-2 py-2.5 text-right">
                     <span className="block whitespace-nowrap tabular-nums">{formatCurrency(row.cost)}</span>
-                    <Delta ratio={row.costRatio} />
+                    <Delta ratio={row.costRatio} baseline={row.costBaseline} format={formatCurrency} />
                   </td>
                   <td
                     className="py-2.5 text-right"
                     title={`${formatTokens(row.inputTokens)} input · ${formatTokens(row.outputTokens)} output · ${formatTokens(row.cacheReadTokens)} cache read`}
                   >
                     <span className="block whitespace-nowrap tabular-nums">{formatTokens(row.tokens)}</span>
-                    {row.costRatio !== null && <Delta ratio={row.tokenRatio} />}
+                    {row.costRatio !== null && (
+                      <Delta ratio={row.tokenRatio} baseline={row.tokenBaseline} format={formatTokens} />
+                    )}
                   </td>
                 </tr>
               ))}

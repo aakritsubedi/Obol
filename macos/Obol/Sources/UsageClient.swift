@@ -81,6 +81,20 @@ struct ActiveSession: Decodable, Identifiable {
     }
 }
 
+/// The small subset of today's journal needed by the popover's activity strip.
+struct TodayJournal: Decodable {
+    let date: String
+    let activeMinutes: Double
+    let firstEventAt: String?
+    let sessions: [JournalSession]
+}
+
+struct JournalSession: Decodable {
+    let startedAt: String
+    let endedAt: String
+    let activeMinutes: Double
+}
+
 struct BurnRate: Decodable {
     let costPerHour: Double
 
@@ -277,6 +291,10 @@ struct UsageClient {
 
     func activeSessions(baseURL: URL, token: String) async throws -> [ActiveSession] {
         try await get(path: "api/sessions/active", baseURL: baseURL, token: token)
+    }
+
+    func todayJournal(baseURL: URL, token: String) async throws -> TodayJournal {
+        try await get(path: "api/journal", baseURL: baseURL, token: token)
     }
 
     func refresh(baseURL: URL, token: String) async throws -> UsageSummary {

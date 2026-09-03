@@ -4,6 +4,7 @@ import {
   aggregateModels,
   aggregateProjects,
   aggregateProviders,
+  deltaKind,
   formatWeekRange,
   inWeek,
   leaderRows,
@@ -183,6 +184,26 @@ describe("aggregateProjects", () => {
   });
 });
 
+describe("deltaKind", () => {
+  it("names the ordinary directions", () => {
+    expect(deltaKind(0.154)).toBe("up");
+    expect(deltaKind(-0.08)).toBe("down");
+    expect(deltaKind(0)).toBe("unchanged");
+  });
+
+  it("separates a first week from a baseline too small to divide by", () => {
+    expect(deltaKind(null)).toBe("first-week");
+    // +3,041% against NPR 63 last week: arithmetically true, informationally empty.
+    expect(deltaKind(30.411)).toBe("negligible");
+    expect(deltaKind(16.799)).toBe("negligible");
+    expect(deltaKind(9.5)).toBe("up");
+  });
+
+  it("never calls a fall negligible, however steep", () => {
+    expect(deltaKind(-0.999)).toBe("down");
+  });
+});
+
 describe("leaderRows", () => {
   const current = new Map([
     ["a", usage(10, 200)],
@@ -206,8 +227,10 @@ describe("leaderRows", () => {
       cacheReadTokens: 0,
       costDelta: 20,
       costRatio: null,
+      costBaseline: 0,
       tokenDelta: 0,
       tokenRatio: 0,
+      tokenBaseline: 100,
     });
     expect(rows[1].costRatio).toBe(1);
     expect(rows[1].tokenRatio).toBe(-0.5);
@@ -215,6 +238,12 @@ describe("leaderRows", () => {
 
   it("ranks by tokens when requested", () => {
     expect(leaderRows(current, last, "tokens").map((entry) => entry.name)).toEqual(["c", "a", "b"]);
+  });
+
+  it("reports a baseline alongside every ratio", () => {
+    const rows = leaderRows(current, last, "cost");
+    expect(rows.find((entry) => entry.name === "a")?.costBaseline).toBe(5);
+    expect(rows.find((entry) => entry.name === "c")?.costBaseline).toBe(0);
   });
 
   it("drops entries that were inactive this week and ties break alphabetically", () => {

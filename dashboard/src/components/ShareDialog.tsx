@@ -260,12 +260,14 @@ function drawModelComment(
   context.fillText(metrics, textX, y + 15);
 }
 
+// The dark-theme contribution ramp from index.css, inlined because the share
+// image is painted on a canvas that never sees the stylesheet.
 const exportContributionColors: Record<0 | 1 | 2 | 3 | 4, string> = {
   0: "#24272d",
-  1: "#033a16",
-  2: "#196c2e",
-  3: "#2ea043",
-  4: "#56d364",
+  1: "#2f3847",
+  2: "#475468",
+  3: "#67758f",
+  4: "#94a2bb",
 };
 
 interface ContributionGraphLayout {

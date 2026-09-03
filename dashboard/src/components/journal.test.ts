@@ -2,8 +2,10 @@ import { describe, expect, it } from "vitest";
 import type { DayJournal, JournalSession } from "../api";
 import {
   clipboardSummary,
+  dayShape,
   efficiency,
   formatClock,
+  formatHourLabel,
   groupTasks,
   narrative,
   noteStamp,
@@ -466,5 +468,105 @@ describe("toolShares", () => {
   it("returns nothing for an empty mix", () => {
     expect(toolShares({})).toEqual([]);
     expect(toolShares({ Bash: 0 })).toEqual([]);
+  });
+});
+
+// Times are built from local components rather than written as UTC strings so
+// these assertions hold in whatever timezone the suite runs in.
+const at = (hour: number, minute = 0) => new Date(2026, 7, 25, hour, minute).toISOString();
+
+describe("dayShape", () => {
+  it("spreads a session's active minutes across the hours it spans", () => {
+    const shape = dayShape(
+      journal({
+        activeMinutes: 90,
+        sessions: [session({ startedAt: at(9), endedAt: at(12), activeMinutes: 90 })],
+      }),
+    );
+    // Three hours covered equally, so 30 active minutes land in each.
+    expect(shape.hours[9].minutes).toBeCloseTo(30);
+    expect(shape.hours[10].minutes).toBeCloseTo(30);
+    expect(shape.hours[11].minutes).toBeCloseTo(30);
+    expect(shape.hours[8].minutes).toBe(0);
+    expect(shape.hours[12].minutes).toBe(0);
+  });
+
+  it("weights partial hours by how much of them the session covered", () => {
+    const shape = dayShape(
+      journal({
+        sessions: [session({ startedAt: at(9, 45), endedAt: at(10, 15), activeMinutes: 30 })],
+      }),
+    );
+    expect(shape.hours[9].minutes).toBeCloseTo(15);
+    expect(shape.hours[10].minutes).toBeCloseTo(15);
+  });
+
+  it("puts a session with no measurable span in the hour it started", () => {
+    const shape = dayShape(
+      journal({ sessions: [session({ startedAt: at(14), endedAt: at(14), activeMinutes: 20 })] }),
+    );
+    expect(shape.hours[14].minutes).toBe(20);
+  });
+
+  it("never claims more than sixty active minutes in one hour", () => {
+    const shape = dayShape(
+      journal({
+        sessions: [
+          session({ id: "a", startedAt: at(9), endedAt: at(10), activeMinutes: 55 }),
+          session({ id: "b", startedAt: at(9), endedAt: at(10), activeMinutes: 55 }),
+        ],
+      }),
+    );
+    expect(shape.hours[9].minutes).toBe(60);
+    expect(shape.hours[9].level).toBe(4);
+  });
+
+  it("grades an hour by how much of it was active", () => {
+    const levelFor = (minutes: number) =>
+      dayShape(journal({ sessions: [session({ startedAt: at(9), endedAt: at(9), activeMinutes: minutes })] }))
+        .hours[9].level;
+    expect(levelFor(0)).toBe(0);
+    expect(levelFor(10)).toBe(1);
+    expect(levelFor(25)).toBe(2);
+    expect(levelFor(40)).toBe(3);
+    expect(levelFor(58)).toBe(4);
+  });
+
+  it("names the busiest hour and carries the day's own start and end", () => {
+    const shape = dayShape(
+      journal({
+        firstEventAt: at(9),
+        lastEventAt: at(17),
+        sessions: [
+          session({ id: "a", startedAt: at(9), endedAt: at(9), activeMinutes: 10 }),
+          session({ id: "b", startedAt: at(15), endedAt: at(15), activeMinutes: 50 }),
+        ],
+      }),
+    );
+    expect(shape.peakHour).toBe(15);
+    expect(shape.startedAt).toBe(at(9));
+    expect(shape.endedAt).toBe(at(17));
+  });
+
+  it("returns a flat, idle day for missing or unparseable journals", () => {
+    expect(dayShape(null).hours).toHaveLength(24);
+    expect(dayShape(null).peakHour).toBeNull();
+    expect(dayShape(journal({ date: "not-a-date" })).peakHour).toBeNull();
+    expect(dayShape(journal({ sessions: [] })).hours.every((entry) => entry.level === 0)).toBe(true);
+  });
+
+  it("ignores sessions that recorded no active time", () => {
+    const shape = dayShape(
+      journal({ sessions: [session({ startedAt: at(9), endedAt: at(11), activeMinutes: 0 })] }),
+    );
+    expect(shape.hours.every((entry) => entry.minutes === 0)).toBe(true);
+  });
+});
+
+describe("formatHourLabel", () => {
+  it("names an hour of the clock", () => {
+    expect(formatHourLabel(0, "en-US")).toBe("12 AM");
+    expect(formatHourLabel(9, "en-US")).toBe("9 AM");
+    expect(formatHourLabel(18, "en-US")).toBe("6 PM");
   });
 });

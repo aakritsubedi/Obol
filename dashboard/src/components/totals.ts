@@ -187,6 +187,69 @@ export function aggregateByProvider(report: Report, period?: ReportPeriod): Prov
     .sort((a, b) => b.totalCost - a.totalCost);
 }
 
+export interface MonthProjection {
+  /** Spend booked so far this calendar month. */
+  monthToDate: number;
+  /** Month-to-date extrapolated to the full month at the current daily pace. */
+  projected: number;
+  dayOfMonth: number;
+  daysInMonth: number;
+}
+
+// A straight-line extrapolation, which is the honest one: the dashboard has no
+// idea what the rest of the month holds, so it says "at this pace" and leaves
+// it there.
+export function monthProjection(report: Report | null, todayPeriod: string): MonthProjection {
+  const month = todayPeriod.slice(0, 7);
+  const monthToDate = report?.monthly.find((row) => row.period.startsWith(month))?.totalCost || 0;
+  const dayOfMonth = Number(todayPeriod.slice(8, 10)) || 0;
+  const daysInMonth = dayOfMonth
+    ? new Date(Number(month.slice(0, 4)), Number(month.slice(5, 7)), 0).getDate()
+    : 0;
+  return {
+    monthToDate,
+    dayOfMonth,
+    daysInMonth,
+    projected: dayOfMonth && daysInMonth ? (monthToDate / dayOfMonth) * daysInMonth : 0,
+  };
+}
+
+export type BudgetLevel = "ok" | "warn" | "over";
+
+export interface BudgetOutlook {
+  budget: number;
+  projected: number;
+  /** Projected spend as a share of the budget; above 1 the pace overshoots. */
+  ratio: number;
+  level: BudgetLevel;
+  /** How far past the budget the pace lands, 0 while inside it. */
+  overage: number;
+}
+
+/**
+ * Whether this month's pace clears the monthly budget.
+ *
+ * This is the one place on the dashboard entitled to red: over means the
+ * current pace ends the month past the budget. `warningThreshold` is the same
+ * fraction the daemon and the menu bar use (config.warningThreshold, 0.8 by
+ * default), so the page turns amber at the moment the tray icon does.
+ */
+export function budgetOutlook(
+  projected: number,
+  budget: number | null | undefined,
+  warningThreshold = 0.8,
+): BudgetOutlook | null {
+  if (!budget || !Number.isFinite(budget) || budget <= 0) return null;
+  const ratio = projected / budget;
+  return {
+    budget,
+    projected,
+    ratio,
+    level: ratio > 1 ? "over" : ratio >= warningThreshold ? "warn" : "ok",
+    overage: Math.max(0, projected - budget),
+  };
+}
+
 // Cache reads bill at ~10% of the base input rate on every major provider, so
 // each cached token saves roughly 90% of its uncached price. Per-model input
 // prices are approximated by family; the estimate is labeled as such in the UI

@@ -15,6 +15,7 @@ import {
 import BudgetSettings from "./components/BudgetSettings";
 import ContributionChart from "./components/ContributionChart";
 import CostChart from "./components/CostChart";
+import DayStrip from "./components/DayStrip";
 import ErrorBoundary from "./components/ErrorBoundary";
 import {
   formatCurrency,
@@ -149,13 +150,16 @@ function download(name: string, body: string, type: string): void {
   URL.revokeObjectURL(url);
 }
 
+// Live is the ordinary state, not good news, so it stays neutral; green on
+// this page means money saved and nothing else. Cached is genuinely worth
+// noticing - the numbers may be behind - so it keeps the amber.
 function StatusPill({ stale }: { stale: boolean }) {
   return (
     <span
-      className={`inline-flex h-8 items-center gap-1.5 whitespace-nowrap rounded-full px-2.5 text-[11px] font-medium max-[520px]:hidden ${stale ? "bg-warn-soft text-warn-strong" : "bg-ok-soft text-ok-strong"}`}
+      className={`inline-flex h-8 items-center gap-1.5 whitespace-nowrap rounded-full px-2.5 text-[11px] font-medium max-[520px]:hidden ${stale ? "bg-warn-soft text-warn-strong" : "bg-wash text-subtle"}`}
       title={stale ? "Showing the last cached snapshot" : "Reading live usage from the daemon"}
     >
-      <span className={`h-1.5 w-1.5 rounded-full ${stale ? "bg-warn" : "bg-ok"}`} />
+      <span className={`h-1.5 w-1.5 rounded-full ${stale ? "bg-warn" : "bg-subtle"}`} />
       {stale ? "Cached" : "Live"}
     </span>
   );
@@ -170,10 +174,12 @@ export default function App() {
   const [journal, setJournal] = useState<DayJournal | null>(null);
   // The picker spans this week, Sunday through today, and opens on today.
   const journalOptions = useMemo(() => weekOptions(new Date()), []);
-  const [journalDate, setJournalDate] = useState(
-    () => journalOptions[journalOptions.length - 1]?.value || "",
-  );
+  const todayJournalDate = journalOptions[journalOptions.length - 1]?.value || "";
+  const [journalDate, setJournalDate] = useState(() => todayJournalDate);
   const [journalLoading, setJournalLoading] = useState(true);
+  // The header strip always shows today, so it is held apart from `journal`,
+  // which follows whichever day the task picker is parked on.
+  const [todayJournal, setTodayJournal] = useState<DayJournal | null>(null);
   const [config, setConfig] = useState<WidgetConfig | null>(null);
   // Held in state purely to re-render on change; formatCurrency reads the
   // module-level setting that the effect below installs.
@@ -264,7 +270,9 @@ export default function App() {
     setJournalLoading(true);
     getJournal(journalDate)
       .then((next) => {
-        if (active) setJournal(next);
+        if (!active) return;
+        setJournal(next);
+        if (journalDate === todayJournalDate) setTodayJournal(next);
       })
       .catch(() => {
         if (active) setJournal(null);
@@ -275,7 +283,7 @@ export default function App() {
     return () => {
       active = false;
     };
-  }, [journalDate]);
+  }, [journalDate, todayJournalDate]);
 
   async function doRefresh() {
     setRefreshing(true);
@@ -289,7 +297,10 @@ export default function App() {
       ]);
       setSummary(next);
       setReport(nextReport);
-      if (nextJournal) setJournal(nextJournal);
+      if (nextJournal) {
+        setJournal(nextJournal);
+        if (journalDate === todayJournalDate) setTodayJournal(nextJournal);
+      }
       setError(next.stale ? next.error : null);
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : "Refresh failed");
@@ -416,16 +427,19 @@ export default function App() {
         className="mx-auto max-w-[1180px] px-8 pb-24 pt-10 max-[760px]:px-[18px] max-[760px]:pt-7"
         aria-busy={loading}
       >
-        <div className="mb-8">
-          <h1 className="text-[40px] font-semibold leading-none tracking-[-0.04em] max-[760px]:text-[34px] max-[440px]:text-[30px]">
-            Token cost
-          </h1>
-          <p className="mt-3 inline-flex items-center gap-1.5 text-[11px] text-muted">
-            <Icon path={CLOCK} className="h-3 w-3 shrink-0" />
-            {summary.updatedAt
-              ? `Updated ${formatUpdatedAt(summary.updatedAt)} · ${Intl.DateTimeFormat().resolvedOptions().timeZone}`
-              : "Waiting for first refresh"}
-          </p>
+        <div className="mb-8 flex items-end justify-between gap-8 max-[860px]:flex-col max-[860px]:items-start max-[860px]:gap-5">
+          <div className="min-w-0">
+            <h1 className="text-[40px] font-semibold leading-none tracking-[-0.04em] max-[760px]:text-[34px] max-[440px]:text-[30px]">
+              Token cost
+            </h1>
+            <p className="mt-3 inline-flex items-center gap-1.5 text-[11px] text-muted">
+              <Icon path={CLOCK} className="h-3 w-3 shrink-0" />
+              {summary.updatedAt
+                ? `Updated ${formatUpdatedAt(summary.updatedAt)} · ${Intl.DateTimeFormat().resolvedOptions().timeZone}`
+                : "Waiting for first refresh"}
+            </p>
+          </div>
+          <DayStrip journal={todayJournal} />
         </div>
         {error && (
           <div className="mb-6 rounded-control border border-warn/25 bg-warn-soft px-3.5 py-2.5 text-[11px] text-warn-strong">

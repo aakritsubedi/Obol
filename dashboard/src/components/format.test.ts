@@ -4,6 +4,7 @@ import {
   formatCurrency,
   formatDuration,
   formatPercent,
+  formatPercentMagnitude,
   formatPeriod,
   formatRelativeTime,
   formatSignedCurrency,
@@ -87,6 +88,14 @@ describe("formatSignedCurrency", () => {
   it("signs positive and negative deltas", () => {
     expect(formatSignedCurrency(3.25, "en-US")).toBe("+$3.25");
     expect(formatSignedCurrency(-3.25, "en-US")).toBe("−$3.25");
+  });
+});
+
+describe("formatPercentMagnitude", () => {
+  it("drops the sign so an arrow can carry the direction alone", () => {
+    expect(formatPercentMagnitude(0.154, 1, "en-US")).toBe("15.4%");
+    expect(formatPercentMagnitude(-0.154, 1, "en-US")).toBe("15.4%");
+    expect(formatPercentMagnitude("not a number", 1, "en-US")).toBe("0.0%");
   });
 });
 

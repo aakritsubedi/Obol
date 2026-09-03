@@ -72,11 +72,14 @@ export default function TodayCard({ summary, week, trend }: Props) {
           {summary.agents.length} {summary.agents.length === 1 ? "provider" : "providers"} active today ·{" "}
           {modelCount} {modelCount === 1 ? "model" : "models"}
         </span>
+        {/* Spending above your own average is not a warning - only the budget
+            can say that - so the up case is neutral and only a cheaper day
+            earns the green. */}
         {trend.comparison && trend.comparison.ratio !== null && (
           <span
-            className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${trend.comparison.ratio < 0 ? "bg-ok-soft text-ok-strong" : "bg-warn-soft text-warn-strong"}`}
+            className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${trend.comparison.ratio < 0 ? "bg-ok-soft text-ok-strong" : "bg-wash text-subtle"}`}
           >
-            {trend.comparison.ratio < 0 ? "−" : "+"}
+            {trend.comparison.ratio < 0 ? "▼ " : "▲ "}
             {Math.abs(trend.comparison.ratio * 100).toFixed(0)}% vs 30d avg
           </span>
         )}

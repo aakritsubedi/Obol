@@ -32,11 +32,15 @@
     --color-over: #dc2626;
     --color-over-strong: #b91c1c;
 
+    /* The heatmap measures intensity, not virtue. GitHub's greens made a busy
+       day look approved of, and green is spoken for elsewhere on this page as
+       "money saved", so the ramp climbs through the slate the provider palette
+       is built on instead. */
     --contribution-level-0: var(--color-wash);
-    --contribution-level-1: #9be9a8;
-    --contribution-level-2: #40c463;
-    --contribution-level-3: #30a14e;
-    --contribution-level-4: #216e39;
+    --contribution-level-1: #c9d1de;
+    --contribution-level-2: #9aa7bd;
+    --contribution-level-3: #6a7a96;
+    --contribution-level-4: #3f4c63;
 
     /* Cards are defined by their hairline, not by a drop shadow; the shadows
        below only lift things that float above the page. */
@@ -81,10 +85,10 @@
       --color-over-strong: #fca5a5;
 
       --contribution-level-0: rgba(255, 255, 255, 0.05);
-      --contribution-level-1: #033a16;
-      --contribution-level-2: #196c2e;
-      --contribution-level-3: #2ea043;
-      --contribution-level-4: #56d364;
+      --contribution-level-1: #2b3341;
+      --contribution-level-2: #445065;
+      --contribution-level-3: #66748f;
+      --contribution-level-4: #93a1ba;
 
       --shadow-card: none;
       --shadow-raised: 0 1px 2px rgba(0, 0, 0, 0.4);
@@ -125,10 +129,10 @@
     --color-over-strong: #fca5a5;
 
     --contribution-level-0: rgba(255, 255, 255, 0.05);
-    --contribution-level-1: #033a16;
-    --contribution-level-2: #196c2e;
-    --contribution-level-3: #2ea043;
-    --contribution-level-4: #56d364;
+    --contribution-level-1: #2b3341;
+    --contribution-level-2: #445065;
+    --contribution-level-3: #66748f;
+    --contribution-level-4: #93a1ba;
 
     --shadow-card: none;
     --shadow-raised: 0 1px 2px rgba(0, 0, 0, 0.4);

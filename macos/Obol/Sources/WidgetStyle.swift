@@ -7,6 +7,9 @@ enum WidgetStyle {
 
     static let popoverWidth: CGFloat = 340
     static let inset: CGFloat = 18
+    /// Keep a busy day from pushing the shape strip and footer below the
+    /// popover's useful reading area. Short lists still size to their content.
+    static let activeSessionsMaxHeight: CGFloat = 184
 
     /// The panel the popover is drawn in: the card, and the arrow that points
     /// it at the menu bar item. Shared by the shape that draws the chrome and

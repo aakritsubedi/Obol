@@ -3,10 +3,12 @@ import type { ProviderSummary, Report, UsageRow } from "../api";
 import {
   aggregateByProvider,
   aggregateModels,
+  budgetOutlook,
   estimateCacheSavings,
   inputPriceForModel,
   modelName,
   modelRowsFor,
+  monthProjection,
   totalsFrom,
 } from "./totals";
 
@@ -252,5 +254,58 @@ describe("estimateCacheSavings", () => {
     expect(inputPriceForModel("gpt-5-codex")).toBe(1.25);
     expect(inputPriceForModel("gemini-3-pro")).toBe(1.25);
     expect(inputPriceForModel("totally-unknown-model")).toBe(3);
+  });
+});
+
+describe("monthProjection", () => {
+  const report = {
+    daily: [],
+    weekly: [],
+    monthly: [row({ period: "2026-08", totalCost: 120 })],
+    session: [],
+    projects: [],
+  } as unknown as Report;
+
+  it("extrapolates month-to-date over the whole month at the current pace", () => {
+    // 120 booked over the first 12 days of a 31-day August.
+    const projection = monthProjection(report, "2026-08-12");
+    expect(projection.monthToDate).toBe(120);
+    expect(projection.dayOfMonth).toBe(12);
+    expect(projection.daysInMonth).toBe(31);
+    expect(projection.projected).toBeCloseTo(310);
+  });
+
+  it("knows how long February is", () => {
+    expect(monthProjection(report, "2028-02-10").daysInMonth).toBe(29);
+    expect(monthProjection(report, "2027-02-10").daysInMonth).toBe(28);
+  });
+
+  it("projects nothing without a report or a dated today", () => {
+    expect(monthProjection(null, "2026-08-12").projected).toBe(0);
+    expect(monthProjection(report, "").projected).toBe(0);
+  });
+});
+
+describe("budgetOutlook", () => {
+  it("turns amber at the configured threshold and red past the budget", () => {
+    expect(budgetOutlook(200, 1000)?.level).toBe("ok");
+    expect(budgetOutlook(800, 1000)?.level).toBe("warn");
+    expect(budgetOutlook(1001, 1000)?.level).toBe("over");
+  });
+
+  it("honors a threshold other than the 0.8 default", () => {
+    expect(budgetOutlook(650, 1000, 0.6)?.level).toBe("warn");
+    expect(budgetOutlook(650, 1000, 0.9)?.level).toBe("ok");
+  });
+
+  it("reports the overage only once the pace overshoots", () => {
+    expect(budgetOutlook(1250, 1000)?.overage).toBe(250);
+    expect(budgetOutlook(900, 1000)?.overage).toBe(0);
+  });
+
+  it("says nothing at all when no budget is set", () => {
+    expect(budgetOutlook(500, null)).toBeNull();
+    expect(budgetOutlook(500, 0)).toBeNull();
+    expect(budgetOutlook(500, Number.NaN)).toBeNull();
   });
 });

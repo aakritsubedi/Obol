@@ -48,6 +48,14 @@ struct PopoverView: View {
             hairline
                 .padding(.top, 18)
 
+            todayShapeSection
+                .padding(.top, 14)
+
+            if todayShape.activeMinutes > 0 {
+                hairline
+                    .padding(.top, 14)
+            }
+
             activeSessionsSection
                 .padding(.top, 14)
 
@@ -187,24 +195,158 @@ struct PopoverView: View {
     /// inside the daemon's idle window.
     private var activeSessionsSection: some View {
         VStack(alignment: .leading, spacing: 10) {
-            Text("Active now")
-                .font(WidgetStyle.TypeScale.sectionLabel)
-                .tracking(WidgetStyle.TypeScale.sectionLabelTracking)
-                .foregroundStyle(.secondary)
+            HStack(spacing: 7) {
+                Text("Active now")
+                    .font(WidgetStyle.TypeScale.sectionLabel)
+                    .tracking(WidgetStyle.TypeScale.sectionLabelTracking)
+                    .foregroundStyle(.secondary)
+
+                if !controller.activeSessions.isEmpty {
+                    Text("\(controller.activeSessions.count)")
+                        .font(.system(size: 10, weight: .medium))
+                        .monospacedDigit()
+                        .foregroundStyle(.secondary)
+                        .padding(.horizontal, 5)
+                        .padding(.vertical, 1)
+                        .background(
+                            Capsule(style: .continuous)
+                                .fill(Color.primary.opacity(0.08))
+                        )
+                        .accessibilityLabel("\(controller.activeSessions.count) active sessions")
+                }
+
+                Spacer(minLength: 0)
+            }
 
             if controller.activeSessions.isEmpty {
                 Text("No agent is running right now.")
                     .font(WidgetStyle.TypeScale.row)
                     .foregroundStyle(.secondary)
             } else {
-                VStack(alignment: .leading, spacing: 9) {
-                    ForEach(controller.activeSessions) { session in
-                        activeSessionRow(session)
+                ScrollView(.vertical) {
+                    LazyVStack(alignment: .leading, spacing: 9) {
+                        ForEach(controller.activeSessions) { session in
+                            activeSessionRow(session)
+                        }
                     }
                 }
+                .frame(maxHeight: WidgetStyle.activeSessionsMaxHeight)
+                .clipped()
+                .accessibilityLabel("Active sessions")
             }
         }
         .animation(.easeOut(duration: 0.2), value: controller.activeSessions.map(\.id))
+    }
+
+    /// A compact copy of the dashboard's Today’s shape strip. The journal is
+    /// fetched after the active-session list so this remains useful even when
+    /// there is no session running right now.
+    private var todayShapeSection: some View {
+        let shape = todayShape
+        return Group {
+            if shape.activeMinutes > 0 {
+                VStack(alignment: .leading, spacing: 8) {
+                    HStack {
+                        Text("Today’s shape")
+                            .font(WidgetStyle.TypeScale.sectionLabel)
+                            .tracking(WidgetStyle.TypeScale.sectionLabelTracking)
+                            .foregroundStyle(.secondary)
+                        Spacer(minLength: 8)
+                        Text("\(Self.duration(shape.activeMinutes)) active")
+                            .font(WidgetStyle.TypeScale.footnote)
+                            .monospacedDigit()
+                            .foregroundStyle(.secondary)
+                    }
+
+                    HStack(spacing: 3) {
+                        ForEach(0 ..< 24, id: \.self) { hour in
+                            RoundedRectangle(cornerRadius: 2, style: .continuous)
+                                .fill(Self.shapeColor(level: shape.levels[hour]))
+                                .frame(maxWidth: .infinity, minHeight: 18, maxHeight: 18)
+                        }
+                    }
+                    .accessibilityElement(children: .ignore)
+                    .accessibilityLabel(Self.shapeLabel(shape))
+
+                    HStack(spacing: 3) {
+                        ForEach(0 ..< 24, id: \.self) { hour in
+                            Text([0, 6, 12, 18].contains(hour) ? Self.hourLabel(hour) : "")
+                                .font(.system(size: 9))
+                                .lineLimit(1)
+                                .fixedSize(horizontal: true, vertical: false)
+                                .foregroundStyle(.secondary)
+                                .frame(maxWidth: .infinity)
+                        }
+                    }
+
+                    Text("Started \(Self.clock(shape.startedAt))" +
+                        (shape.peakHour.map { " · busiest \(Self.hourLabel($0))" } ?? ""))
+                        .font(WidgetStyle.TypeScale.footnote)
+                        .monospacedDigit()
+                        .foregroundStyle(.secondary)
+                }
+            }
+        }
+    }
+
+    private var todayShape: ShapeData {
+        guard let journal = controller.todayJournal else { return ShapeData() }
+        var minutes = Array(repeating: 0.0, count: 24)
+        let calendar = Calendar.current
+        guard let first = Self.parseDate(journal.firstEventAt),
+              let midnight = calendar.date(from: calendar.dateComponents([.year, .month, .day], from: first)) else {
+            return ShapeData()
+        }
+        let bounds = (0 ... 24).map { calendar.date(byAdding: .hour, value: $0, to: midnight)! }
+        for session in journal.sessions {
+            guard let start = Self.parseDate(session.startedAt) else { continue }
+            let end = Self.parseDate(session.endedAt) ?? start
+            let spans = (0 ..< 24).map { hour in
+                max(0, min(end.timeIntervalSince1970, bounds[hour + 1].timeIntervalSince1970) - max(start.timeIntervalSince1970, bounds[hour].timeIntervalSince1970))
+            }
+            let covered = spans.reduce(0, +)
+            if covered > 0 {
+                for hour in 0 ..< 24 { minutes[hour] += session.activeMinutes * spans[hour] / covered }
+            }
+        }
+        let peak = minutes.enumerated().max(by: { $0.element < $1.element })
+        let levels: [Int] = minutes.map { Self.shapeLevel($0) }
+        let peakHour: Int? = peak?.offset
+        return ShapeData(
+            activeMinutes: journal.activeMinutes,
+            levels: levels,
+            startedAt: journal.firstEventAt,
+            peakHour: peakHour
+        )
+    }
+
+    private struct ShapeData {
+        var activeMinutes: Double = 0
+        var levels: [Int] = Array(repeating: 0, count: 24)
+        var startedAt: String? = nil
+        var peakHour: Int? = nil
+    }
+
+    private static func shapeLevel(_ minutes: Double) -> Int { minutes < 1 ? 0 : minutes <= 15 ? 1 : minutes <= 30 ? 2 : minutes <= 45 ? 3 : 4 }
+    private static func shapeColor(level: Int) -> Color { Color.primary.opacity([0.07, 0.16, 0.3, 0.52, 0.75][min(4, max(0, level))]) }
+    private static func duration(_ minutes: Double) -> String { "\(Int(minutes) / 60)h \(Int(minutes) % 60)m" }
+    private static func hourLabel(_ hour: Int) -> String { hour == 0 ? "12" : hour > 12 ? "\(hour - 12)" : "\(hour)" }
+    private static func clock(_ iso: String?) -> String {
+        guard let date = parseDate(iso) else { return "—" }
+        return date.formatted(.dateTime.hour().minute())
+    }
+    private static func parseDate(_ iso: String?) -> Date? {
+        guard let iso else { return nil }
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        return formatter.date(from: iso) ?? {
+            formatter.formatOptions = [.withInternetDateTime]
+            return formatter.date(from: iso)
+        }()
+    }
+    private static func shapeLabel(_ shape: ShapeData) -> String {
+        "Work started at \(clock(shape.startedAt)), \(duration(shape.activeMinutes)) active today"
+            + (shape.peakHour.map { ", busiest around \(hourLabel($0))" } ?? "")
     }
 
     /// The project leads — it is what the row is about — with the agent and the

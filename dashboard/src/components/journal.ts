@@ -157,6 +157,110 @@ export function groupTasks(journal: DayJournal): Task[] {
 // A file reads best relative to the project it belongs to. Anything outside the
 // project falls back to its last two segments so the row never shows an
 // absolute path stretching off the card.
+export interface HourLoad {
+  /** 0-23 in the viewer's own timezone. */
+  hour: number;
+  /** Apportioned active minutes in that hour, never above 60. */
+  minutes: number;
+  /** Zero is an idle hour; one through four are the same ramp the calendar uses. */
+  level: 0 | 1 | 2 | 3 | 4;
+}
+
+export interface DayShape {
+  hours: HourLoad[];
+  activeMinutes: number;
+  /** Timestamp of the first recorded event, or null on a day with no work. */
+  startedAt: string | null;
+  endedAt: string | null;
+  /** The busiest hour of the day, or null when nothing was recorded. */
+  peakHour: number | null;
+}
+
+function hourLevel(minutes: number): 0 | 1 | 2 | 3 | 4 {
+  if (minutes < 1) return 0;
+  if (minutes <= 15) return 1;
+  if (minutes <= 30) return 2;
+  if (minutes <= 45) return 3;
+  return 4;
+}
+
+/**
+ * Where today's work actually fell across the 24 hours of the day.
+ *
+ * A session reports how long it ran and how many of those minutes were active,
+ * but not where inside the run the activity sat. So a session's active minutes
+ * are spread over the hours it spans in proportion to how much of each hour it
+ * covered — an apportionment, the same caveat the per-project costs carry, not
+ * a minute-by-minute measurement.
+ *
+ * Hour boundaries are built by walking the local clock from the journal's own
+ * date, so a day containing a DST change still has exactly 24 buckets that
+ * line up with the times shown everywhere else on the page.
+ */
+export function dayShape(journal: DayJournal | null): DayShape {
+  const minutes = Array.from({ length: 24 }, () => 0);
+  const empty: DayShape = {
+    hours: minutes.map((_, hour) => ({ hour, minutes: 0, level: 0 as const })),
+    activeMinutes: 0,
+    startedAt: null,
+    endedAt: null,
+    peakHour: null,
+  };
+  if (!journal) return empty;
+
+  const midnight = new Date(`${journal.date}T00:00:00`);
+  if (Number.isNaN(midnight.valueOf())) return empty;
+  const bounds = Array.from({ length: 25 }, (_, hour) => {
+    const edge = new Date(midnight);
+    edge.setHours(hour, 0, 0, 0);
+    return edge.valueOf();
+  });
+
+  for (const session of journal.sessions ?? []) {
+    const active = Math.max(0, session.activeMinutes ?? 0);
+    if (active <= 0) continue;
+    const start = Date.parse(session.startedAt);
+    if (!Number.isFinite(start)) continue;
+    const parsedEnd = Date.parse(session.endedAt);
+    const end = Number.isFinite(parsedEnd) && parsedEnd > start ? parsedEnd : start;
+
+    const overlaps = bounds.slice(0, 24).map((from, hour) => {
+      const to = bounds[hour + 1];
+      return Math.max(0, Math.min(end, to) - Math.max(start, from));
+    });
+    const covered = overlaps.reduce((sum, span) => sum + span, 0);
+    if (covered <= 0) {
+      // A session with no measurable span — everything it did lands in the
+      // hour it started, clamped into the day the journal covers.
+      const hour = Math.min(23, Math.max(0, new Date(start).getHours()));
+      minutes[hour] += active;
+      continue;
+    }
+    for (let hour = 0; hour < 24; hour++) {
+      if (overlaps[hour] > 0) minutes[hour] += active * (overlaps[hour] / covered);
+    }
+  }
+
+  const hours = minutes.map((value, hour) => {
+    const capped = Math.min(60, value);
+    return { hour, minutes: capped, level: hourLevel(capped) };
+  });
+  const busiest = hours.reduce((best, entry) => (entry.minutes > best.minutes ? entry : best), hours[0]);
+
+  return {
+    hours,
+    activeMinutes: journal.activeMinutes ?? 0,
+    startedAt: journal.firstEventAt,
+    endedAt: journal.lastEventAt,
+    peakHour: busiest.minutes > 0 ? busiest.hour : null,
+  };
+}
+
+export function formatHourLabel(hour: number, locale?: string): string {
+  const date = new Date(2000, 0, 1, hour);
+  return new Intl.DateTimeFormat(locale, { hour: "numeric" }).format(date);
+}
+
 export function relativeFile(path: string, projectPath?: string): string {
   if (projectPath && path.startsWith(`${projectPath}/`)) return path.slice(projectPath.length + 1);
   const parts = path.split("/").filter(Boolean);

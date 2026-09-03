@@ -67,6 +67,18 @@ export function formatPercent(value: unknown, digits = 2, locale?: string): stri
   return `${number < 0 ? "−" : "+"}${formatted}`;
 }
 
+/**
+ * Magnitude only, no sign. Used where an arrow or an adjacent word already
+ * carries the direction, so the reader is not told twice.
+ */
+export function formatPercentMagnitude(value: unknown, digits = 1, locale?: string): string {
+  return new Intl.NumberFormat(locale, {
+    style: "percent",
+    minimumFractionDigits: digits,
+    maximumFractionDigits: digits,
+  }).format(Math.abs(numberValue(value)));
+}
+
 export function formatTokens(value: unknown, locale?: string): string {
   const number = numberValue(value);
   if (number >= 1_000_000_000) return `${(number / 1_000_000_000).toFixed(1)}B`;

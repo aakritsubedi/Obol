@@ -15,6 +15,7 @@ final class DaemonController: ObservableObject {
     @Published private(set) var isPopoverPresented = false
     @Published private(set) var notificationsDenied = false
     @Published private(set) var activeSessions: [ActiveSession] = []
+    @Published private(set) var todayJournal: TodayJournal?
     /// Whether the sleep assertion is actually held right now, as opposed to
     /// merely switched on. Settings shows the difference.
     @Published private(set) var keepAwakeHolding = false
@@ -101,6 +102,7 @@ final class DaemonController: ObservableObject {
             let next = try await client.refresh(baseURL: baseURL, token: token)
             apply(next)
             await loadActiveSessions()
+            await loadTodayJournal()
         } catch {
             statusMessage = "Refresh unavailable; showing the last good snapshot."
         }
@@ -121,6 +123,13 @@ final class DaemonController: ObservableObject {
         guard let next = try? await client.activeSessions(baseURL: baseURL, token: token) else { return }
         activeSessions = next
         syncKeepAwake()
+    }
+
+    private func loadTodayJournal() async {
+        guard isPopoverPresented else { return }
+        guard let baseURL, !token.isEmpty else { return }
+        guard let next = try? await client.todayJournal(baseURL: baseURL, token: token) else { return }
+        todayJournal = next
     }
 
     func openDashboard() {
@@ -167,6 +176,7 @@ final class DaemonController: ObservableObject {
             // can hold anything. The write follows; a failed one costs the
             // setting only its persistence, which `saveConfig` reports.
             await loadActiveSessions()
+            await loadTodayJournal()
             await saveConfig()
         }
     }
