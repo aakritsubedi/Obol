@@ -49,16 +49,6 @@
     --shadow-pop: 0 8px 24px -6px rgba(15, 17, 21, 0.14), 0 2px 6px rgba(15, 17, 21, 0.06);
     --shadow-dialog: 0 24px 60px -12px rgba(15, 17, 21, 0.28);
 
-    /* The journal is styled as a paper note, so it keeps a warm palette of its
-       own rather than inheriting the cool grays the rest of the dashboard uses. */
-    --note-paper: #fffdf6;
-    --note-edge: rgba(17, 17, 20, 0.09);
-    --note-rule: rgba(17, 17, 20, 0.07);
-    --note-ink: #1f1f22;
-    --note-subtle: #55555b;
-    --note-muted: #8a8a8e;
-    --note-accent: #eab000;
-    --note-accent-soft: #fff3c9;
   }
 
   @media (prefers-color-scheme: dark) {
@@ -95,14 +85,6 @@
       --shadow-pop: 0 8px 24px -6px rgba(0, 0, 0, 0.6), 0 2px 6px rgba(0, 0, 0, 0.4);
       --shadow-dialog: 0 24px 60px -12px rgba(0, 0, 0, 0.7);
 
-      --note-paper: #1a1a1c;
-      --note-edge: rgba(255, 255, 255, 0.1);
-      --note-rule: rgba(255, 255, 255, 0.07);
-      --note-ink: #f2f2f7;
-      --note-subtle: #c7c7cc;
-      --note-muted: #98989f;
-      --note-accent: #ffd60a;
-      --note-accent-soft: rgba(255, 214, 10, 0.16);
     }
   }
 
@@ -139,14 +121,6 @@
     --shadow-pop: 0 8px 24px -6px rgba(0, 0, 0, 0.6), 0 2px 6px rgba(0, 0, 0, 0.4);
     --shadow-dialog: 0 24px 60px -12px rgba(0, 0, 0, 0.7);
 
-    --note-paper: #1a1a1c;
-    --note-edge: rgba(255, 255, 255, 0.1);
-    --note-rule: rgba(255, 255, 255, 0.07);
-    --note-ink: #f2f2f7;
-    --note-subtle: #c7c7cc;
-    --note-muted: #98989f;
-    --note-accent: #ffd60a;
-    --note-accent-soft: rgba(255, 214, 10, 0.16);
   }
 
   html {

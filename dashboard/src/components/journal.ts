@@ -328,15 +328,16 @@ function noteDate(journal: DayJournal): Date | null {
   return Number.isNaN(date.valueOf()) ? null : date;
 }
 
-// The weekday alone titles the note, the way a hand-written entry would.
+// The weekday alone titles the journal section, keeping the day selector easy
+// to scan without repeating the full date in the page heading.
 export function noteTitle(journal: DayJournal, locale?: string): string {
   const date = noteDate(journal);
   if (!date) return journal.date;
   return new Intl.DateTimeFormat(locale, { weekday: "long" }).format(date);
 }
 
-// Apple Notes stamps each note with when it was last touched, not when it was
-// created, so this follows the day's last recorded event.
+// The timeline stamp follows the day's last recorded event, which gives a
+// useful endpoint even when the viewer opens an earlier day.
 export function noteStamp(journal: DayJournal, locale?: string): string {
   const date = noteDate(journal);
   const day = date ? new Intl.DateTimeFormat(locale, { dateStyle: "long" }).format(date) : journal.date;
