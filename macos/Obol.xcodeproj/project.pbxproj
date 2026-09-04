@@ -7,19 +7,6 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
-		A10000010000000000000001 /* ObolApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000010000000000000001 /* ObolApp.swift */; };
-		A10000010000000000000002 /* DaemonController.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000010000000000000002 /* DaemonController.swift */; };
-		A10000010000000000000003 /* UsageClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000010000000000000003 /* UsageClient.swift */; };
-		A10000010000000000000004 /* PopoverView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000010000000000000004 /* PopoverView.swift */; };
-		A10000010000000000000016 /* MenuBarPanel.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000010000000000000016 /* MenuBarPanel.swift */; };
-		A10000010000000000000013 /* ProviderCatalog.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000010000000000000013 /* ProviderCatalog.swift */; };
-		A10000010000000000000014 /* CurrencyController.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000010000000000000014 /* CurrencyController.swift */; };
-		A10000010000000000000015 /* KeepAwakeController.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000010000000000000015 /* KeepAwakeController.swift */; };
-		A10000010000000000000017 /* LidWakeController.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000010000000000000017 /* LidWakeController.swift */; };
-		A10000010000000000000009 /* WidgetStyle.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000010000000000000009 /* WidgetStyle.swift */; };
-		A10000010000000000000005 /* Notifier.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000010000000000000005 /* Notifier.swift */; };
-		A10000010000000000000011 /* UpdateController.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000010000000000000011 /* UpdateController.swift */; };
-		A10000010000000000000012 /* UpdateInstaller.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000010000000000000012 /* UpdateInstaller.swift */; };
 		A10000010000000000000010 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = A20000010000000000000010 /* Assets.xcassets */; };
 		AB0000000000000000000001 /* ObolUpdateCore in Frameworks */ = {isa = PBXBuildFile; productRef = AA0000000000000000000002 /* ObolUpdateCore */; };
 		AB0000000000000000000002 /* ReleaseClientTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000010000000000000021 /* ReleaseClientTests.swift */; };
@@ -28,25 +15,14 @@
 		AB0000000000000000000005 /* BundleModule.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000010000000000000025 /* BundleModule.swift */; };
 		AB0000000000000000000006 /* Fixtures in Resources */ = {isa = PBXBuildFile; fileRef = A20000010000000000000024 /* Fixtures */; };
 		AB0000000000000000000007 /* ObolUpdateCore in Frameworks */ = {isa = PBXBuildFile; productRef = AA0000000000000000000003 /* ObolUpdateCore */; };
+		AB0000000000000000000008 /* ObolCore in Frameworks */ = {isa = PBXBuildFile; productRef = AA0000000000000000000004 /* ObolCore */; };
+		AB0000000000000000000009 /* ObolCore in Frameworks */ = {isa = PBXBuildFile; productRef = AA0000000000000000000005 /* ObolCore */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
 		A20000010000000000000000 /* Obol.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Obol.app; sourceTree = BUILT_PRODUCTS_DIR; };
-		A20000010000000000000001 /* ObolApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ObolApp.swift; sourceTree = "<group>"; };
-		A20000010000000000000002 /* DaemonController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DaemonController.swift; sourceTree = "<group>"; };
-		A20000010000000000000003 /* UsageClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UsageClient.swift; sourceTree = "<group>"; };
-		A20000010000000000000004 /* PopoverView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PopoverView.swift; sourceTree = "<group>"; };
-		A20000010000000000000016 /* MenuBarPanel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MenuBarPanel.swift; sourceTree = "<group>"; };
-		A20000010000000000000013 /* ProviderCatalog.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProviderCatalog.swift; sourceTree = "<group>"; };
-		A20000010000000000000014 /* CurrencyController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CurrencyController.swift; sourceTree = "<group>"; };
-		A20000010000000000000015 /* KeepAwakeController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeepAwakeController.swift; sourceTree = "<group>"; };
-		A20000010000000000000017 /* LidWakeController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LidWakeController.swift; sourceTree = "<group>"; };
-		A20000010000000000000009 /* WidgetStyle.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WidgetStyle.swift; sourceTree = "<group>"; };
-		A20000010000000000000005 /* Notifier.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Notifier.swift; sourceTree = "<group>"; };
 		A20000010000000000000006 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		A20000010000000000000010 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
-		A20000010000000000000011 /* UpdateController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UpdateController.swift; sourceTree = "<group>"; };
-		A20000010000000000000012 /* UpdateInstaller.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UpdateInstaller.swift; sourceTree = "<group>"; };
 		A20000010000000000000020 /* ObolUpdateCoreTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = ObolUpdateCoreTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		A20000010000000000000021 /* ReleaseClientTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReleaseClientTests.swift; sourceTree = "<group>"; };
 		A20000010000000000000022 /* ReleaseFeedTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReleaseFeedTests.swift; sourceTree = "<group>"; };
@@ -61,6 +37,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				AB0000000000000000000001 /* ObolUpdateCore in Frameworks */,
+				AB0000000000000000000008 /* ObolCore in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -69,10 +46,19 @@
 			buildActionMask = 2147483647;
 			files = (
 				AB0000000000000000000007 /* ObolUpdateCore in Frameworks */,
+				AB0000000000000000000009 /* ObolCore in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXFileSystemSynchronizedRootGroup section */
+		A40000010000000000000001 /* Sources */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = Obol/Sources;
+			sourceTree = "<group>";
+		};
+/* End PBXFileSystemSynchronizedRootGroup section */
 
 /* Begin PBXGroup section */
 		A40000010000000000000000 = {
@@ -83,26 +69,6 @@
 				A40000010000000000000005 /* Tests */,
 				A40000010000000000000003 /* Products */,
 			);
-			sourceTree = "<group>";
-		};
-		A40000010000000000000001 /* Sources */ = {
-			isa = PBXGroup;
-			children = (
-				A20000010000000000000001 /* ObolApp.swift */,
-				A20000010000000000000002 /* DaemonController.swift */,
-				A20000010000000000000003 /* UsageClient.swift */,
-				A20000010000000000000004 /* PopoverView.swift */,
-				A20000010000000000000016 /* MenuBarPanel.swift */,
-				A20000010000000000000013 /* ProviderCatalog.swift */,
-				A20000010000000000000014 /* CurrencyController.swift */,
-				A20000010000000000000015 /* KeepAwakeController.swift */,
-				A20000010000000000000017 /* LidWakeController.swift */,
-				A20000010000000000000009 /* WidgetStyle.swift */,
-				A20000010000000000000005 /* Notifier.swift */,
-				A20000010000000000000011 /* UpdateController.swift */,
-				A20000010000000000000012 /* UpdateInstaller.swift */,
-			);
-			path = Obol/Sources;
 			sourceTree = "<group>";
 		};
 		A40000010000000000000002 /* Resources */ = {
@@ -153,6 +119,14 @@
 			isa = XCSwiftPackageProductDependency;
 			productName = ObolUpdateCore;
 		};
+		AA0000000000000000000004 /* ObolCore */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = ObolCore;
+		};
+		AA0000000000000000000005 /* ObolCore */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = ObolCore;
+		};
 /* End XCSwiftPackageProductDependency section */
 
 /* Begin PBXNativeTarget section */
@@ -175,6 +149,10 @@
 			productType = "com.apple.product-type.application";
 			packageProductDependencies = (
 				AA0000000000000000000002 /* ObolUpdateCore */,
+				AA0000000000000000000004 /* ObolCore */,
+			);
+			fileSystemSynchronizedGroups = (
+				A40000010000000000000001 /* Sources */,
 			);
 		};
 		A50000010000000000000002 /* ObolUpdateCoreTests */ = {
@@ -195,6 +173,7 @@
 			productType = "com.apple.product-type.bundle.unit-test";
 			packageProductDependencies = (
 				AA0000000000000000000003 /* ObolUpdateCore */,
+				AA0000000000000000000005 /* ObolCore */,
 			);
 		};
 /* End PBXNativeTarget section */
@@ -276,19 +255,6 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				A10000010000000000000001 /* ObolApp.swift in Sources */,
-				A10000010000000000000002 /* DaemonController.swift in Sources */,
-				A10000010000000000000003 /* UsageClient.swift in Sources */,
-				A10000010000000000000004 /* PopoverView.swift in Sources */,
-				A10000010000000000000016 /* MenuBarPanel.swift in Sources */,
-				A10000010000000000000013 /* ProviderCatalog.swift in Sources */,
-				A10000010000000000000014 /* CurrencyController.swift in Sources */,
-				A10000010000000000000015 /* KeepAwakeController.swift in Sources */,
-				A10000010000000000000017 /* LidWakeController.swift in Sources */,
-				A10000010000000000000009 /* WidgetStyle.swift in Sources */,
-				A10000010000000000000005 /* Notifier.swift in Sources */,
-				A10000010000000000000011 /* UpdateController.swift in Sources */,
-				A10000010000000000000012 /* UpdateInstaller.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

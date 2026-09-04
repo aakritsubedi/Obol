@@ -1,5 +1,8 @@
+/* biome-ignore lint/suspicious/noUnknownAtRules: These directives are expanded by Tailwind before the browser sees CSS. */
 @tailwind base;
+/* biome-ignore lint/suspicious/noUnknownAtRules: These directives are expanded by Tailwind before the browser sees CSS. */
 @tailwind components;
+/* biome-ignore lint/suspicious/noUnknownAtRules: These directives are expanded by Tailwind before the browser sees CSS. */
 @tailwind utilities;
 
 /* Theme tokens are declared three times on purpose:
@@ -159,6 +162,7 @@
     border-color 180ms ease,
     color 180ms ease,
     fill 180ms ease,
+    /* biome-ignore lint/complexity/noImportantStyles: The transition must win over utility classes during a theme flip. */
     stroke 180ms ease !important;
 }
 
@@ -237,6 +241,7 @@
   .theme-switching *,
   .theme-switching *::before,
   .theme-switching *::after {
+    /* biome-ignore lint/complexity/noImportantStyles: Reduced-motion must disable transitions unconditionally. */
     transition: none !important;
   }
 }

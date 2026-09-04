@@ -2,15 +2,22 @@
 import PackageDescription
 
 let package = Package(
-    name: "ObolUpdateCore",
+    name: "ObolCore",
     platforms: [.macOS(.v13)],
     products: [
+        .library(name: "ObolCore", targets: ["ObolCore"]),
         .library(name: "ObolUpdateCore", targets: ["ObolUpdateCore"]),
     ],
     targets: [
+        .target(name: "ObolCore"),
         .target(
-            name: "ObolUpdateCore",
-            path: "Obol/Sources/Update"
+            name: "ObolUpdateCore"
+        ),
+        .testTarget(
+            name: "ObolCoreTests",
+            dependencies: ["ObolCore"],
+            path: "Tests/ObolCoreTests",
+            resources: [.copy("Fixtures")]
         ),
         .testTarget(
             name: "ObolUpdateCoreTests",

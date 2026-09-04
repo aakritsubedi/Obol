@@ -21,6 +21,8 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run lint
+      - run: node scripts/check-boundaries.mjs
+      - run: npm run check-contract-fixtures
       - run: npm run typecheck
       - run: npm test
       - run: ./scripts/check-version.sh --no-tag
@@ -38,10 +40,14 @@ jobs:
           cache: npm
       - name: Install SwiftFormat
         run: brew install swiftformat
+      - name: Install SwiftLint
+        run: brew install swiftlint
       - run: swiftformat --lint macos
+      - run: swiftlint lint --config .swiftlint.yml --path macos
       - run: swift test --package-path macos
       - run: npm ci
       - run: npm run build
+      - run: npm run check-contract-fixtures
       - run: ./scripts/check-version.sh --no-tag
       - name: Build universal Release app
         run: |

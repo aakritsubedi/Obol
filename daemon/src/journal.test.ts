@@ -2,7 +2,7 @@ import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { activeSessions, activeSpan, projectName, promptText, readDayJournal } from "./journal.js";
+import { activeSessions, activeSpan, projectName, promptText, readDayJournal } from "./data/journal.js";
 import { claudeAdapter } from "./providers/claude.js";
 import type { DayJournal, JournalSession } from "./types.js";
 

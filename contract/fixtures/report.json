@@ -1,0 +1,20 @@
+{
+  "daily": [{
+    "period": "2026-09-04",
+    "agents": [{"agent": "codex", "totalCost": 12.5, "totalTokens": 12500, "inputTokens": 5000, "outputTokens": 4000, "cacheCreationTokens": 1000, "cacheReadTokens": 2500}],
+    "modelBreakdowns": [{"model": "gpt-5", "totalCost": 12.5, "totalTokens": 12500}],
+    "modelsUsed": ["gpt-5"],
+    "inputTokens": 5000,
+    "outputTokens": 4000,
+    "cacheCreationTokens": 1000,
+    "cacheReadTokens": 2500,
+    "totalCost": 12.5,
+    "totalTokens": 12500,
+    "metadata": {}
+  }],
+  "weekly": [],
+  "monthly": [],
+  "session": [],
+  "projects": [],
+  "totals": {"inputTokens": 5000, "outputTokens": 4000, "cacheCreationTokens": 1000, "cacheReadTokens": 2500, "totalCost": 12.5, "totalTokens": 12500}
+}

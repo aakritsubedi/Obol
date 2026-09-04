@@ -1,4 +1,4 @@
-import { asRecord, stringValue } from "../types.js";
+import { asRecord, stringValue } from "../shared/coerce.js";
 
 export const MAX_PROMPTS_PER_SESSION = 6;
 const MAX_PROMPT_LENGTH = 180;

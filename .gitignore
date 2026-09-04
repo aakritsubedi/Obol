@@ -44,3 +44,7 @@ xcuserdata/
 
 # Cache
 .cache/
+
+# Docs
+docs/*
+!docs/*.md

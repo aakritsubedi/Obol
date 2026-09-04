@@ -5,7 +5,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { promisify } from "node:util";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { readDayJournal } from "../journal.js";
+import { readDayJournal } from "../data/journal.js";
 import { opencodeAdapter } from "./opencode.js";
 
 const TZ = "UTC";
@@ -85,47 +85,47 @@ function dayStatements(): string[] {
     // An archived session whose activity would otherwise land on the day.
     `INSERT INTO session (id, directory, title, time_created, time_updated, time_archived) VALUES ('ses_archived000000000x', '${DIRECTORY}', 'Archived', ${at("02:00:00")}, ${at("02:10:00")}, ${at("03:00:00")})`,
 
-    message(PARENT + "m1", PARENT, at("01:00:00"), { role: "user" }),
-    part(PARENT + "m1p1", PARENT + "m1", PARENT, at("01:00:01"), {
+    message(`${PARENT}m1`, PARENT, at("01:00:00"), { role: "user" }),
+    part(`${PARENT}m1p1`, `${PARENT}m1`, PARENT, at("01:00:01"), {
       type: "text",
       text: "<ide_opened_file>The user opened /a.ts</ide_opened_file>\nFix the login redirect",
     }),
-    message(PARENT + "m2", PARENT, at("01:01:00"), {
+    message(`${PARENT}m2`, PARENT, at("01:01:00"), {
       role: "assistant",
       modelID: "x-preview-f-free",
       tokens: { input: 900, output: 120 },
     }),
-    part(PARENT + "m2p1", PARENT + "m2", PARENT, at("01:01:30"), {
+    part(`${PARENT}m2p1`, `${PARENT}m2`, PARENT, at("01:01:30"), {
       type: "tool",
       tool: "edit",
       state: { input: { filePath: "/Users/dev/site/src/auth.ts" } },
     }),
-    part(PARENT + "m2p2", PARENT + "m2", PARENT, at("01:02:00"), {
+    part(`${PARENT}m2p2`, `${PARENT}m2`, PARENT, at("01:02:00"), {
       type: "patch",
       files: ["/Users/dev/site/src/auth.ts", "/Users/dev/site/src/router.ts"],
     }),
-    part(PARENT + "m2p3", PARENT + "m2", PARENT, at("01:03:00"), {
+    part(`${PARENT}m2p3`, `${PARENT}m2`, PARENT, at("01:03:00"), {
       type: "tool",
       tool: "bash",
       state: { input: { command: "npm test" } },
     }),
-    part(PARENT + "m2p4", PARENT + "m2", PARENT, at("01:04:00"), {
+    part(`${PARENT}m2p4`, `${PARENT}m2`, PARENT, at("01:04:00"), {
       type: "reasoning",
     }),
 
     // The child run's turn and tool call attribute to the parent session; its
     // user message is the agent delegating, not a person typing.
-    message(CHILD + "m1", CHILD, at("01:05:00"), { role: "user" }),
-    part(CHILD + "m1p1", CHILD + "m1", CHILD, at("01:05:01"), {
+    message(`${CHILD}m1`, CHILD, at("01:05:00"), { role: "user" }),
+    part(`${CHILD}m1p1`, `${CHILD}m1`, CHILD, at("01:05:01"), {
       type: "text",
       text: "Map the auth structure",
     }),
-    message(CHILD + "m2", CHILD, at("01:05:10"), {
+    message(`${CHILD}m2`, CHILD, at("01:05:10"), {
       role: "assistant",
       modelID: "x-preview-f-free",
       tokens: { output: 30 },
     }),
-    part(CHILD + "m2p1", CHILD + "m2", CHILD, at("01:05:20"), {
+    part(`${CHILD}m2p1`, `${CHILD}m2`, CHILD, at("01:05:20"), {
       type: "tool",
       tool: "glob",
       state: { metadata: { count: 4 } },

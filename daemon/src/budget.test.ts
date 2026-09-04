@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { evaluateBudget } from "./budget.js";
+import { evaluateBudget } from "./domain/budget.js";
 import type { BudgetConfig } from "./types.js";
 
 const noBudget: BudgetConfig = {

@@ -2,7 +2,7 @@ import { defineConfig, type Plugin } from "vite";
 import react from "@vitejs/plugin-react";
 import { homedir } from "node:os";
 import { readFileSync } from "node:fs";
-import { join } from "node:path";
+import { join, resolve } from "node:path";
 
 interface RuntimeState {
   port: number;
@@ -38,6 +38,14 @@ const runtime = runtimeState();
 
 export default defineConfig({
   plugins: [react(), injectDaemonToken(runtime.token)],
+  resolve: {
+    alias: {
+      "@app": resolve("src/app"),
+      "@features": resolve("src/features"),
+      "@shared": resolve("src/shared"),
+      "@contract": resolve("../contract/src/index.ts"),
+    },
+  },
   server: {
     port: 5173,
     strictPort: false,

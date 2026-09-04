@@ -1,0 +1,17 @@
+only_rules:
+  - file_length
+  - type_body_length
+  - cyclomatic_complexity
+
+# These thresholds keep the current app build green while making oversized
+# files and controllers visible in CI. The remaining warnings are the next
+# extraction targets, not a reason to change runtime behavior during this move.
+file_length:
+  warning: 400
+  error: 1200
+type_body_length:
+  warning: 300
+  error: 800
+cyclomatic_complexity:
+  warning: 10
+  error: 30

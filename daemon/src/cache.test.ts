@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { buildSummary } from "./cache.js";
+import { systemTime } from "./domain/time.js";
 import type { WidgetConfig } from "./types.js";
 import { emptyBlocks, normalizeReport } from "./types.js";
 
@@ -15,6 +16,7 @@ const config: WidgetConfig = {
   historyDays: 90,
   journalIdleMinutes: 15,
   currency: "USD",
+  currencyRate: null,
 };
 
 function todayKey(): string {
@@ -29,13 +31,24 @@ function todayKey(): string {
 }
 
 describe("buildSummary", () => {
+  it("accepts an injected clock for deterministic domain evaluation", () => {
+    const time = {
+      now: () => new Date("2026-01-02T12:00:00.000Z"),
+      timeZone: () => "UTC",
+    };
+    const report = normalizeReport({ daily: [{ period: "2026-01-02", totalCost: 3 }] });
+    expect(buildSummary(report, emptyBlocks(), config, null, false, null, time).today.totalCost).toBe(3);
+  });
+
   it.each(["2026-01-01", "20260101", "2026-01-01T00:00:00.000Z"])(
     "recognizes today period format %s",
     (period) => {
       const formattedPeriod =
         period === "20260101" ? todayKey().replace(/-/g, "") : period.replace("2026-01-01", todayKey());
       const report = normalizeReport({ daily: [{ period: formattedPeriod, totalCost: 2 }] });
-      expect(buildSummary(report, emptyBlocks(), config, null, false, null).today.totalCost).toBe(2);
+      expect(buildSummary(report, emptyBlocks(), config, null, false, null, systemTime).today.totalCost).toBe(
+        2,
+      );
     },
   );
 
@@ -47,6 +60,7 @@ describe("buildSummary", () => {
       null,
       true,
       null,
+      systemTime,
     );
     expect(summary.today.totalCost).toBe(0);
     expect(summary.today.period).toBe(todayKey());
@@ -68,7 +82,9 @@ describe("buildSummary", () => {
       ],
     });
     expect(
-      buildSummary(report, emptyBlocks(), config, null, false, null).agents.map((agent) => agent.agent),
+      buildSummary(report, emptyBlocks(), config, null, false, null, systemTime).agents.map(
+        (agent) => agent.agent,
+      ),
     ).toEqual(["claude", "codex", "cursor", "provider-4"]);
   });
 });

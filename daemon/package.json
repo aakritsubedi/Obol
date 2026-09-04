@@ -13,6 +13,7 @@
     "test": "vitest run"
   },
   "dependencies": {
+    "@obol/contract": "*",
     "ccusage": "20.0.20"
   },
   "devDependencies": {

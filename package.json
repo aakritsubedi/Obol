@@ -17,11 +17,12 @@
   },
   "packageManager": "npm@10.9.0",
   "workspaces": [
+    "contract",
     "daemon",
     "dashboard"
   ],
   "scripts": {
-    "build": "npm run build --workspaces && npm run bundle:daemon",
+    "build": "npm run build --workspaces --if-present && npm run bundle:daemon",
     "build:daemon": "npm run build -w daemon",
     "bundle:daemon": "npm run bundle -w daemon",
     "build:dashboard": "npm run build -w dashboard",
@@ -29,11 +30,12 @@
     "dev:fake-release": "node scripts/dev/fake-release-server.mjs",
     "dev:daemon": "npm run dev -w daemon",
     "dev:dashboard": "npm run dev -w dashboard",
-    "typecheck": "npm run typecheck --workspaces",
+    "typecheck": "npm run typecheck --workspaces --if-present",
     "test": "npm run test --workspaces --if-present",
-    "lint": "biome check daemon/src dashboard/src scripts",
-    "format": "biome format --write daemon/src dashboard/src scripts",
-    "format:check": "biome format daemon/src dashboard/src scripts",
+    "lint": "biome check contract/src daemon/src dashboard/src scripts",
+    "format": "biome format --write contract/src daemon/src dashboard/src scripts",
+    "format:check": "biome format contract/src daemon/src dashboard/src scripts",
+    "check-contract-fixtures": "node scripts/check-contract-fixtures.mjs",
     "check-version": "scripts/check-version.sh --no-tag"
   },
   "devDependencies": {

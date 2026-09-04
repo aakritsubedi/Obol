@@ -10,7 +10,10 @@
   "linter": {
     "enabled": true,
     "rules": {
-      "recommended": false
+      "recommended": true,
+      "correctness": {
+        "noPrivateImports": "error"
+      }
     }
   },
   "javascript": {

@@ -2,7 +2,7 @@ import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { readDayJournal } from "../journal.js";
+import { readDayJournal } from "../data/journal.js";
 import { codexAdapter } from "./codex.js";
 
 const TZ = "UTC";

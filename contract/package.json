@@ -1,0 +1,7 @@
+{
+  "name": "@obol/contract",
+  "private": true,
+  "version": "0.15.0",
+  "type": "module",
+  "types": "./src/index.ts"
+}

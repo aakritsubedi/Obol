@@ -8,14 +8,16 @@ if [ "${1:-}" = "--no-tag" ]; then NO_TAG=1; fi
 
 cd "${ROOT}"
 ROOT_VERSION=$(node -p 'require("./package.json").version')
+CONTRACT_VERSION=$(node -p 'require("./contract/package.json").version')
 DAEMON_VERSION=$(node -p 'require("./daemon/package.json").version')
 DASHBOARD_VERSION=$(node -p 'require("./dashboard/package.json").version')
 PBX_VERSION=$(grep -m 1 'MARKETING_VERSION' macos/Obol.xcodeproj/project.pbxproj | sed -E 's/.*= ([^;]+);/\1/')
 
-if [ "${ROOT_VERSION}" != "${DAEMON_VERSION}" ] ||
+if [ "${ROOT_VERSION}" != "${CONTRACT_VERSION}" ] ||
+   [ "${ROOT_VERSION}" != "${DAEMON_VERSION}" ] ||
    [ "${ROOT_VERSION}" != "${DASHBOARD_VERSION}" ] ||
    [ "${ROOT_VERSION}" != "${PBX_VERSION}" ]; then
-  echo "error: version drift (root=${ROOT_VERSION}, daemon=${DAEMON_VERSION}, dashboard=${DASHBOARD_VERSION}, xcode=${PBX_VERSION})" >&2
+  echo "error: version drift (root=${ROOT_VERSION}, contract=${CONTRACT_VERSION}, daemon=${DAEMON_VERSION}, dashboard=${DASHBOARD_VERSION}, xcode=${PBX_VERSION})" >&2
   exit 1
 fi
 

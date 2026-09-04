@@ -2,16 +2,14 @@ import type { Dirent } from "node:fs";
 import { readdir } from "node:fs/promises";
 import { homedir } from "node:os";
 import { basename, join } from "node:path";
-import { asRecord, stringValue } from "../types.js";
+import { asRecord, stringValue } from "../shared/coerce.js";
 import { keepRecent } from "./claude.js";
 import {
   addPrompt,
   countTool,
-  type DayCounters,
   type ProviderAdapter,
   promptText,
   recordFile,
-  type SessionAccumulator,
   TEST_COMMAND,
   type TranscriptFile,
 } from "./types.js";
