@@ -1,7 +1,7 @@
 {
   "name": "obol",
   "private": true,
-  "version": "0.15.0",
+  "version": "0.16.0",
   "description": "A macOS menu bar widget and local dashboard for AI coding-agent spend.",
   "license": "MIT",
   "repository": {
