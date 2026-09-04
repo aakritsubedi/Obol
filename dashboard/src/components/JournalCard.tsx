@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import type { DayJournal } from "../api";
 import { formatCurrency, formatDuration } from "./format";
-import { BRANCH, CHECK, CHEVRON_DOWN, CHEVRON_UP, CLOCK, COPY, FOLDER, Icon } from "./icons";
+import { BRANCH, CHECK, CHEVRON_DOWN, CHEVRON_UP, CLOCK, COPY, FOLDER, Icon, LAYERS } from "./icons";
 import {
   clipboardSummary,
   type DayOption,
@@ -127,6 +127,15 @@ function TaskRow({ task, last }: { task: Task; last: boolean }) {
             <span className="inline-flex items-center gap-1">
               <Icon path={BRANCH} label="Branch" className="h-3 w-3 shrink-0 opacity-70" />
               {task.gitBranch}
+            </span>
+          )}
+          {task.sessionCount > 1 && (
+            <span
+              className="inline-flex items-center gap-1 tabular-nums"
+              title="Separate agent sessions merged into one task because they continued the same work in this project"
+            >
+              <Icon path={LAYERS} label="Sessions" className="h-3 w-3 shrink-0 opacity-70" />
+              {task.sessionCount} sessions
             </span>
           )}
         </div>

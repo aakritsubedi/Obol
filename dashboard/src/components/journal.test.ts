@@ -271,7 +271,7 @@ describe("clipboardSummary", () => {
 describe("groupTasks", () => {
   it("merges a handoff where one session picks up as another ends", () => {
     // A real morning: a named Codex session ends at 7:59 and a fresh rollout
-    // continues the same install under a different checkout until 8:18.
+    // continues the same install in the same checkout until 8:18.
     const day = journal({
       sessions: [
         session({
@@ -290,8 +290,8 @@ describe("groupTasks", () => {
         session({
           id: "codex:rollout-1",
           provider: "codex",
-          project: "the-chatcut-plugin-installation-or-authorization",
-          projectPath: "/Users/dev/the-chatcut-plugin-installation-or-authorization",
+          project: "rea",
+          projectPath: "/Users/dev/rea",
           startedAt: "2026-08-25T07:59:00.000Z",
           endedAt: "2026-08-25T08:18:00.000Z",
           activeMinutes: 19,
@@ -303,8 +303,8 @@ describe("groupTasks", () => {
     const tasks = groupTasks(day);
     expect(tasks).toHaveLength(1);
     expect(tasks[0]).toMatchObject({
-      // The named session titles the task; the untitled successor's checkout
-      // does not rename it.
+      // The named session titles the task; the untitled successor does not
+      // rename it.
       title: "Read chatcut.io/chatgpt to install the ChatCut plugin",
       project: "rea",
       startedAt: "2026-08-25T07:55:00.000Z",
@@ -313,7 +313,67 @@ describe("groupTasks", () => {
       toolCalls: 75,
       toolMix: { Bash: 71, Wait: 4 },
       providers: ["codex"],
+      sessionCount: 2,
     });
+  });
+
+  it("keeps a handoff apart when the next session is a different project", () => {
+    // Switching checkouts is new work, however fast it followed. Merged, the
+    // task would label the second session's prompts with the first's project.
+    const day = journal({
+      sessions: [
+        session({
+          id: "claude:abc",
+          title: "Generated samples review",
+          project: "dossier-poc",
+          projectPath: "/Users/dev/dossier-poc",
+          startedAt: "2026-08-25T07:33:00.000Z",
+          endedAt: "2026-08-25T07:40:00.000Z",
+          prompts: ["Continue."],
+        }),
+        session({
+          id: "claude:def",
+          title: "Chart polish",
+          project: "obol",
+          projectPath: "/Users/dev/obol",
+          startedAt: "2026-08-25T07:41:00.000Z",
+          endedAt: "2026-08-25T07:53:00.000Z",
+          prompts: ["In dashboard; the avg value we show looks so off"],
+        }),
+      ],
+    });
+    const tasks = groupTasks(day);
+    expect(tasks).toHaveLength(2);
+    expect(tasks.map((task) => task.project)).toEqual(["dossier-poc", "obol"]);
+    expect(tasks.map((task) => task.prompts)).toEqual([
+      ["Continue."],
+      ["In dashboard; the avg value we show looks so off"],
+    ]);
+    expect(tasks.map((task) => task.sessionCount)).toEqual([1, 1]);
+  });
+
+  it("still merges a handoff when a session records no project at all", () => {
+    // An unrecorded project is unknown, not a second project.
+    const tasks = groupTasks(
+      journal({
+        sessions: [
+          session({
+            id: "a",
+            startedAt: "2026-08-25T03:00:00.000Z",
+            endedAt: "2026-08-25T03:30:00.000Z",
+          }),
+          session({
+            id: "b",
+            project: "",
+            projectPath: "",
+            startedAt: "2026-08-25T03:31:00.000Z",
+            endedAt: "2026-08-25T03:50:00.000Z",
+          }),
+        ],
+      }),
+    );
+    expect(tasks).toHaveLength(1);
+    expect(tasks[0].sessionCount).toBe(2);
   });
 
   it("keeps sessions apart when the gap exceeds the idle threshold", () => {

@@ -187,6 +187,12 @@ export function aggregateByProvider(report: Report, period?: ReportPeriod): Prov
     .sort((a, b) => b.totalCost - a.totalCost);
 }
 
+export interface MonthProviderSpend {
+  agent: string;
+  totalCost: number;
+  totalTokens: number;
+}
+
 export interface MonthProjection {
   /** Spend booked so far this calendar month. */
   monthToDate: number;
@@ -194,14 +200,20 @@ export interface MonthProjection {
   projected: number;
   dayOfMonth: number;
   daysInMonth: number;
+  /** What the month has actually booked, all zero before the month has a row. */
+  actual: ReportTotals;
+  /** This month's spend per provider, dearest first. */
+  providers: MonthProviderSpend[];
 }
 
 // A straight-line extrapolation, which is the honest one: the dashboard has no
 // idea what the rest of the month holds, so it says "at this pace" and leaves
-// it there.
+// it there. The actuals it extrapolates from travel with it, so the card can
+// show what was really spent next to the guess.
 export function monthProjection(report: Report | null, todayPeriod: string): MonthProjection {
   const month = todayPeriod.slice(0, 7);
-  const monthToDate = report?.monthly.find((row) => row.period.startsWith(month))?.totalCost || 0;
+  const row = month ? report?.monthly.find((entry) => entry.period.startsWith(month)) : undefined;
+  const monthToDate = numberValue(row?.totalCost);
   const dayOfMonth = Number(todayPeriod.slice(8, 10)) || 0;
   const daysInMonth = dayOfMonth
     ? new Date(Number(month.slice(0, 4)), Number(month.slice(5, 7)), 0).getDate()
@@ -211,6 +223,26 @@ export function monthProjection(report: Report | null, todayPeriod: string): Mon
     dayOfMonth,
     daysInMonth,
     projected: dayOfMonth && daysInMonth ? (monthToDate / dayOfMonth) * daysInMonth : 0,
+    actual: row
+      ? {
+          inputTokens: numberValue(row.inputTokens),
+          outputTokens: numberValue(row.outputTokens),
+          cacheCreationTokens: numberValue(row.cacheCreationTokens),
+          cacheReadTokens: numberValue(row.cacheReadTokens),
+          totalCost: monthToDate,
+          totalTokens: numberValue(row.totalTokens),
+        }
+      : { ...zeroTotals },
+    // An agent with no spend this month is noise in a cost breakdown, so it is
+    // dropped rather than listed at zero.
+    providers: (row?.agents ?? [])
+      .map((agent) => ({
+        agent: String(agent.agent ?? "unknown"),
+        totalCost: numberValue(agent.totalCost),
+        totalTokens: numberValue(agent.totalTokens),
+      }))
+      .filter((agent) => agent.totalCost > 0 || agent.totalTokens > 0)
+      .sort((left, right) => right.totalCost - left.totalCost),
   };
 }
 

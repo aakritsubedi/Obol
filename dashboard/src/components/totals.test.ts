@@ -284,6 +284,66 @@ describe("monthProjection", () => {
     expect(monthProjection(null, "2026-08-12").projected).toBe(0);
     expect(monthProjection(report, "").projected).toBe(0);
   });
+
+  it("carries the month's real tokens and per-provider cost alongside the guess", () => {
+    const detailed = {
+      daily: [],
+      weekly: [],
+      monthly: [
+        row({
+          period: "2026-08",
+          totalCost: 120,
+          totalTokens: 4_000,
+          inputTokens: 900,
+          outputTokens: 600,
+          cacheCreationTokens: 500,
+          cacheReadTokens: 2_000,
+          agents: [provider("codex", 20, 1_000), provider("claude", 100, 3_000)],
+        }),
+      ],
+      session: [],
+      projects: [],
+    } as unknown as Report;
+
+    const projection = monthProjection(detailed, "2026-08-12");
+    expect(projection.actual).toEqual({
+      inputTokens: 900,
+      outputTokens: 600,
+      cacheCreationTokens: 500,
+      cacheReadTokens: 2_000,
+      totalCost: 120,
+      totalTokens: 4_000,
+    });
+    // Dearest first, so the breakdown reads in the order it matters.
+    expect(projection.providers).toEqual([
+      { agent: "claude", totalCost: 100, totalTokens: 3_000 },
+      { agent: "codex", totalCost: 20, totalTokens: 1_000 },
+    ]);
+  });
+
+  it("reports zeroed actuals and no providers before the month has a row", () => {
+    const projection = monthProjection(report, "2026-09-04");
+    expect(projection.monthToDate).toBe(0);
+    expect(projection.actual.totalTokens).toBe(0);
+    expect(projection.providers).toEqual([]);
+  });
+
+  it("drops providers that booked nothing this month", () => {
+    const detailed = {
+      daily: [],
+      weekly: [],
+      monthly: [
+        row({
+          period: "2026-08",
+          totalCost: 50,
+          agents: [provider("claude", 50, 1_000), provider("gemini", 0, 0)],
+        }),
+      ],
+      session: [],
+      projects: [],
+    } as unknown as Report;
+    expect(monthProjection(detailed, "2026-08-12").providers.map((entry) => entry.agent)).toEqual(["claude"]);
+  });
 });
 
 describe("budgetOutlook", () => {

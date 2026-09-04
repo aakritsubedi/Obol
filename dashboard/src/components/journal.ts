@@ -61,6 +61,8 @@ export interface Task {
   toolMix: Record<string, number>;
   totalCost: number | null;
   providers: string[];
+  /** How many agent sessions were merged into this task; 1 when none were. */
+  sessionCount: number;
 }
 
 const startMs = (session: Pick<JournalSession, "startedAt">): number => Date.parse(session.startedAt) || 0;
@@ -73,11 +75,21 @@ function sameProject(left: JournalSession, right: JournalSession): boolean {
   return Boolean(one) && one === other;
 }
 
+// Two sessions belong to different projects only when both name one and the
+// names disagree. A session that records no project is unknown, not a third
+// project, so on its own it never breaks a handoff apart.
+function differentProject(left: JournalSession, right: JournalSession): boolean {
+  const one = left.projectPath || left.project;
+  const other = right.projectPath || right.project;
+  return Boolean(one) && Boolean(other) && one !== other;
+}
+
 // Sessions merge into one task when the next picks up within the idle
-// threshold of the previous one ending — a handoff, whatever project each
-// claims — or when they overlap on the same project. Sessions that overlap on
-// different projects stay apart: parallel work in two checkouts is
-// multitasking, not one task.
+// threshold of the previous one ending — a handoff — or when they overlap on
+// the same project. A change of project always ends the task, whether the
+// sessions overlap or hand off: work in two checkouts is two pieces of work,
+// and merging them mislabels every prompt after the switch with the project
+// the task happened to start in.
 export function groupTasks(journal: DayJournal): Task[] {
   const idleMinutes = journal.idleMinutes > 0 ? journal.idleMinutes : 15;
   const idleMs = idleMinutes * 60_000;
@@ -89,7 +101,8 @@ export function groupTasks(journal: DayJournal): Task[] {
     const previous = group?.[group.length - 1];
     if (previous) {
       const gap = startMs(session) - endMs(previous);
-      const continues = gap >= 0 ? gap <= idleMs : sameProject(previous, session);
+      const continues =
+        !differentProject(previous, session) && (gap >= 0 ? gap <= idleMs : sameProject(previous, session));
       if (continues) {
         group.push(session);
         continue;
@@ -150,6 +163,7 @@ export function groupTasks(journal: DayJournal): Task[] {
       toolMix: Object.fromEntries(Object.entries(toolMix).sort((left, right) => right[1] - left[1])),
       totalCost: costKnown ? totalCost : null,
       providers,
+      sessionCount: members.length,
     };
   });
 }

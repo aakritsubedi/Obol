@@ -37,6 +37,9 @@ export const FOLDER =
 export const BRANCH =
   "M4.5 3.6v8.8M4.5 3.6a1.4 1.4 0 1 0 0-.1ZM4.5 12.4a1.4 1.4 0 1 0 0 .1ZM11.5 5a1.4 1.4 0 1 0 0-.1ZM11.5 6.4v.9a2.6 2.6 0 0 1-2.6 2.6H4.5";
 
+// A stack — one task that several agent sessions were folded into.
+export const LAYERS = "M8 2.2 2.1 5.3 8 8.4l5.9-3.1ZM2.1 8.5 8 11.6l5.9-3.1M2.1 11.4 8 14.5l5.9-3.1";
+
 export const SLIDERS =
   "M3 13.6V9.4M3 6.6V2.4M8 13.6V7.9M8 5.1V2.4M13 13.6v-2.7M13 8.1V2.4M1.4 9.4h3.2M6.4 5.1h3.2M11.4 10.9h3.2";
 export const REFRESH = "M13.9 8a5.9 5.9 0 1 1-1.73-4.17M12.2 1.1v2.8h-2.8";
