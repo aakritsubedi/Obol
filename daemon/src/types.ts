@@ -123,6 +123,10 @@ export interface WidgetConfig extends BudgetConfig {
   // Menu bar only. While true the app holds a power-management assertion so an
   // agent run is not cut short by the Mac idling into sleep.
   keepAwake: boolean;
+  // Menu bar only, and only meaningful alongside keepAwake. Clamshell sleep is
+  // the kernel's call rather than an assertion, so the app holds it off with
+  // `pmset disablesleep` under a one-time administrator grant.
+  keepAwakeWithLidClosed: boolean;
   historyDays: number;
   journalIdleMinutes: number;
   // Display only. Every cost this daemon reports — budgets and alerts included

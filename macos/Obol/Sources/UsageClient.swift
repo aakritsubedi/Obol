@@ -196,6 +196,7 @@ struct WidgetConfig: Codable {
     var warningThreshold: Double
     var launchAtLogin: Bool
     var keepAwake: Bool
+    var keepAwakeWithLidClosed: Bool
     var currency: String
 
     /// Whether the daemon actually sent `keepAwake`, as opposed to defaulting.
@@ -207,6 +208,10 @@ struct WidgetConfig: Codable {
     /// absent from CodingKeys and never encoded on a write.
     var reportedKeepAwake = true
 
+    /// The same, for the lid setting: an older daemon's silence must not read
+    /// as "off" and undo the switch on the next poll.
+    var reportedKeepAwakeWithLidClosed = true
+
     static let `default` = WidgetConfig(
         port: 4737,
         refreshIntervalMs: 300_000,
@@ -215,6 +220,7 @@ struct WidgetConfig: Codable {
         warningThreshold: 0.8,
         launchAtLogin: false,
         keepAwake: false,
+        keepAwakeWithLidClosed: false,
         currency: CurrencyOption.usd.code
     )
 
@@ -237,6 +243,9 @@ struct WidgetConfig: Codable {
         let reported = try container.decodeIfPresent(Bool.self, forKey: .keepAwake)
         reportedKeepAwake = reported != nil
         keepAwake = reported ?? fallback.keepAwake
+        let reportedLid = try container.decodeIfPresent(Bool.self, forKey: .keepAwakeWithLidClosed)
+        reportedKeepAwakeWithLidClosed = reportedLid != nil
+        keepAwakeWithLidClosed = reportedLid ?? fallback.keepAwakeWithLidClosed
         currency = try container.decodeIfPresent(String.self, forKey: .currency) ?? fallback.currency
     }
 
@@ -248,6 +257,7 @@ struct WidgetConfig: Codable {
         warningThreshold: Double,
         launchAtLogin: Bool,
         keepAwake: Bool,
+        keepAwakeWithLidClosed: Bool,
         currency: String
     ) {
         self.port = port
@@ -257,11 +267,13 @@ struct WidgetConfig: Codable {
         self.warningThreshold = warningThreshold
         self.launchAtLogin = launchAtLogin
         self.keepAwake = keepAwake
+        self.keepAwakeWithLidClosed = keepAwakeWithLidClosed
         self.currency = currency
     }
 
     private enum CodingKeys: String, CodingKey {
-        case port, refreshIntervalMs, dailyBudget, monthlyBudget, warningThreshold, launchAtLogin, keepAwake, currency
+        case port, refreshIntervalMs, dailyBudget, monthlyBudget, warningThreshold, launchAtLogin
+        case keepAwake, keepAwakeWithLidClosed, currency
     }
 }
 

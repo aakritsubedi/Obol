@@ -15,6 +15,7 @@
 		A10000010000000000000013 /* ProviderCatalog.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000010000000000000013 /* ProviderCatalog.swift */; };
 		A10000010000000000000014 /* CurrencyController.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000010000000000000014 /* CurrencyController.swift */; };
 		A10000010000000000000015 /* KeepAwakeController.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000010000000000000015 /* KeepAwakeController.swift */; };
+		A10000010000000000000017 /* LidWakeController.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000010000000000000017 /* LidWakeController.swift */; };
 		A10000010000000000000009 /* WidgetStyle.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000010000000000000009 /* WidgetStyle.swift */; };
 		A10000010000000000000005 /* Notifier.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000010000000000000005 /* Notifier.swift */; };
 		A10000010000000000000011 /* UpdateController.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000010000000000000011 /* UpdateController.swift */; };
@@ -39,6 +40,7 @@
 		A20000010000000000000013 /* ProviderCatalog.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProviderCatalog.swift; sourceTree = "<group>"; };
 		A20000010000000000000014 /* CurrencyController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CurrencyController.swift; sourceTree = "<group>"; };
 		A20000010000000000000015 /* KeepAwakeController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeepAwakeController.swift; sourceTree = "<group>"; };
+		A20000010000000000000017 /* LidWakeController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LidWakeController.swift; sourceTree = "<group>"; };
 		A20000010000000000000009 /* WidgetStyle.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WidgetStyle.swift; sourceTree = "<group>"; };
 		A20000010000000000000005 /* Notifier.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Notifier.swift; sourceTree = "<group>"; };
 		A20000010000000000000006 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
@@ -94,6 +96,7 @@
 				A20000010000000000000013 /* ProviderCatalog.swift */,
 				A20000010000000000000014 /* CurrencyController.swift */,
 				A20000010000000000000015 /* KeepAwakeController.swift */,
+				A20000010000000000000017 /* LidWakeController.swift */,
 				A20000010000000000000009 /* WidgetStyle.swift */,
 				A20000010000000000000005 /* Notifier.swift */,
 				A20000010000000000000011 /* UpdateController.swift */,
@@ -281,6 +284,7 @@
 				A10000010000000000000013 /* ProviderCatalog.swift in Sources */,
 				A10000010000000000000014 /* CurrencyController.swift in Sources */,
 				A10000010000000000000015 /* KeepAwakeController.swift in Sources */,
+				A10000010000000000000017 /* LidWakeController.swift in Sources */,
 				A10000010000000000000009 /* WidgetStyle.swift in Sources */,
 				A10000010000000000000005 /* Notifier.swift in Sources */,
 				A10000010000000000000011 /* UpdateController.swift in Sources */,

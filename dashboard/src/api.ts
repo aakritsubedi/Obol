@@ -106,6 +106,9 @@ export interface WidgetConfig {
   launchAtLogin: boolean;
   // Menu bar only: while true the app keeps the Mac from idling into sleep.
   keepAwake: boolean;
+  // Menu bar only: while true the app also holds off clamshell sleep, so the
+  // run survives a closed lid.
+  keepAwakeWithLidClosed: boolean;
   historyDays: number;
   journalIdleMinutes: number;
   // Display only, chosen in the menu bar app's settings. Every cost below is

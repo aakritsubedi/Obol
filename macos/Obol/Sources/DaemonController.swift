@@ -19,10 +19,14 @@ final class DaemonController: ObservableObject {
     /// Whether the sleep assertion is actually held right now, as opposed to
     /// merely switched on. Settings shows the difference.
     @Published private(set) var keepAwakeHolding = false
+    /// Whether clamshell sleep is held off right now. Separate from the switch
+    /// for the same reason: on and holding are not the same state.
+    @Published private(set) var lidWakeHolding = false
 
     private let client = UsageClient()
     private let notifier = Notifier()
     private let keepAwake = KeepAwakeController()
+    private let lidWake = LidWakeController()
     private var daemon: Process?
     private var runtimeTimer: Timer?
     private var pollingTimer: Timer?
@@ -43,6 +47,10 @@ final class DaemonController: ObservableObject {
         // Nothing is held yet: the first session read decides that, and idle
         // sleep is minutes away regardless.
         config.keepAwake = Self.rememberedKeepAwake
+        config.keepAwakeWithLidClosed = Self.rememberedLidWake
+        // `disablesleep` outlives whatever set it, so a previous run that was
+        // killed mid-hold is undone here rather than left on the machine.
+        lidWake.reset(settingEnabled: config.keepAwakeWithLidClosed)
         start()
     }
 
@@ -51,6 +59,13 @@ final class DaemonController: ObservableObject {
     private static var rememberedKeepAwake: Bool {
         get { UserDefaults.standard.bool(forKey: keepAwakeDefaultsKey) }
         set { UserDefaults.standard.set(newValue, forKey: keepAwakeDefaultsKey) }
+    }
+
+    private static let lidWakeDefaultsKey = "com.aakritsubedi.obol.keepAwakeWithLidClosed"
+
+    private static var rememberedLidWake: Bool {
+        get { UserDefaults.standard.bool(forKey: lidWakeDefaultsKey) }
+        set { UserDefaults.standard.set(newValue, forKey: lidWakeDefaultsKey) }
     }
 
     var liveLabel: String {
@@ -71,6 +86,10 @@ final class DaemonController: ObservableObject {
 
     var keepAwakeEnabled: Bool {
         config.keepAwake
+    }
+
+    var lidWakeEnabled: Bool {
+        config.keepAwakeWithLidClosed
     }
 
     func start() {
@@ -181,6 +200,38 @@ final class DaemonController: ObservableObject {
         }
     }
 
+    /// Clamshell sleep is an extension of Keep awake rather than a setting of
+    /// its own: it is the same hold, taken a step further, so it follows the
+    /// same switch and the same sessions.
+    ///
+    /// Turning it on is the one moment that can ask for a password, and a
+    /// dismissed prompt leaves the switch where it was rather than showing an
+    /// on state the machine will not honour. Turning it off hands the grant
+    /// back; a Mac keeps no standing permission it is not using.
+    func setKeepAwakeWithLidClosed(_ enabled: Bool) {
+        guard config.keepAwakeWithLidClosed != enabled else { return }
+        if enabled {
+            switch lidWake.authorize() {
+            case .granted:
+                break
+            case .cancelled:
+                return
+            case .failed:
+                statusMessage = "Could not get permission to keep working with the lid closed."
+                return
+            }
+        } else {
+            lidWake.revoke()
+        }
+        config.keepAwakeWithLidClosed = enabled
+        Self.rememberedLidWake = enabled
+        syncKeepAwake()
+        Task {
+            await loadActiveSessions()
+            await saveConfig()
+        }
+    }
+
     /// The switch states an intent; the running sessions decide whether it has
     /// anything to act on. With nothing running, a switch left on behaves
     /// exactly as if it were off, so a machine abandoned after the work
@@ -194,6 +245,10 @@ final class DaemonController: ObservableObject {
         let shouldHold = config.keepAwake && !activeSessions.isEmpty
         keepAwake.apply(shouldHold)
         keepAwakeHolding = shouldHold
+        // Without the administrator grant the hold cannot be taken at all, so
+        // the published state follows what the machine did, not what was asked.
+        lidWake.apply(shouldHold && config.keepAwakeWithLidClosed)
+        lidWakeHolding = lidWake.isHolding
     }
 
     func quit() {
@@ -205,6 +260,8 @@ final class DaemonController: ObservableObject {
         shuttingDown = true
         keepAwake.apply(false)
         keepAwakeHolding = false
+        lidWake.apply(false)
+        lidWakeHolding = false
         runtimeTimer?.invalidate()
         pollingTimer?.invalidate()
         runtimeTimer = nil
@@ -348,9 +405,13 @@ final class DaemonController: ObservableObject {
     /// wholesale would turn the switch off again on the very next poll; the
     /// local choice stands until a daemon that knows the field speaks.
     private func adoptingKeepAwake(from next: WidgetConfig) -> WidgetConfig {
-        guard !next.reportedKeepAwake else { return next }
         var merged = next
-        merged.keepAwake = config.keepAwake
+        if !next.reportedKeepAwake {
+            merged.keepAwake = config.keepAwake
+        }
+        if !next.reportedKeepAwakeWithLidClosed {
+            merged.keepAwakeWithLidClosed = config.keepAwakeWithLidClosed
+        }
         return merged
     }
 

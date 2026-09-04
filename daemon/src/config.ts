@@ -14,6 +14,7 @@ export const DEFAULT_CONFIG: WidgetConfig = {
   warningThreshold: 0.8,
   launchAtLogin: false,
   keepAwake: false,
+  keepAwakeWithLidClosed: false,
   historyDays: 90,
   journalIdleMinutes: 15,
   currency: "USD",
@@ -96,6 +97,7 @@ function parseConfig(value: unknown): WidgetConfig {
         : DEFAULT_CONFIG.warningThreshold,
     launchAtLogin: Boolean(input.launchAtLogin),
     keepAwake: Boolean(input.keepAwake),
+    keepAwakeWithLidClosed: Boolean(input.keepAwakeWithLidClosed),
     historyDays:
       Number.isInteger(historyDays) && historyDays >= 7 && historyDays <= 365
         ? historyDays
