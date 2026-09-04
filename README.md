@@ -2,10 +2,12 @@
 
 # Obol
 
-**Know what your AI coding agents cost — from your menu bar.**
+**See what your AI coding agents cost — right from your menu bar.**
 
-Live spend tracking for Claude Code, Codex CLI, and OpenCode.
-Local-only. No telemetry. No accounts.
+Obol is a local-first macOS app for tracking token usage and estimated spend
+from Claude Code, Codex CLI, and OpenCode.
+
+No account. No API key. No usage data uploads.
 
 [![Download the latest DMG](https://img.shields.io/badge/Download-Obol.dmg-2ea44f?style=for-the-badge&logo=apple&logoColor=white)](https://github.com/aakritsubedi/obol/releases/latest/download/Obol.dmg)
 
@@ -14,94 +16,228 @@ Local-only. No telemetry. No accounts.
 [![CI](https://github.com/aakritsubedi/obol/actions/workflows/ci.yml/badge.svg)](https://github.com/aakritsubedi/obol/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
-<img src="docs/images/menu-bar.png" width="720" alt="Obol menu bar popover showing today's AI spend, a provider split between Claude, Codex, and Opencode, and a Live indicator">
+<img src="docs/images/menu-bar.png" width="720" alt="Obol menu bar popover showing today's AI spend, a provider split, today's activity shape, and active sessions">
 
 </div>
 
 ## Why Obol
 
-AI coding tools bill by the token, and the spend is invisible until the invoice lands. Obol puts today's number one click away:
+AI coding tools make it easy to lose track of usage across projects and
+providers. Obol keeps the answer close at hand while keeping the underlying
+usage data on your Mac.
 
-- **Menu bar widget** — today's total in your menu bar at all times. Click for a compact popover: provider split with token counts, a live/cached indicator, and settings.
-- **Full dashboard** — a local web dashboard with history charts (daily/weekly/monthly), per-provider and per-model breakdowns, Claude project history, weekly rollups, and CSV/JSON export.
-- **Budgets that speak up** — set a daily budget and Obol shifts its status color as you approach it, with native notifications when thresholds are crossed.
-- **Private by design** — everything runs on your Mac. The daemon reads local agent logs, estimates cost offline via [ccusage](https://github.com/ryoppippi/ccusage), and serves the dashboard on loopback only. No telemetry, no uploads, no accounts.
-- **Self-updating** — Obol checks GitHub Releases quietly, verifies checksums and signatures, and installs updates without touching a terminal.
+- **Menu bar overview** — see today’s total, provider split, token counts, and
+  live or cached status in one click.
+- **Local dashboard** — explore daily, weekly, and monthly history; provider
+  and model breakdowns; activity intensity; and week-to-date leaders.
+- **Work journal** — review agent sessions, prompts, projects, branches, tools,
+  edited files, active minutes, and currently active work.
+- **Budgets and alerts** — set daily and monthly budgets, choose a warning
+  threshold, and receive native notifications when usage crosses it.
+- **Sharing and export** — export the current history view as CSV or JSON, or
+  create a shareable usage image from the dashboard.
+- **Display currencies** — show amounts in a supported currency while keeping
+  stored costs and budgets in USD.
+- **Mac controls** — launch at login and optionally keep the Mac awake while
+  an agent session is active, including with the lid closed when configured.
+- **Quiet updates** — check GitHub Releases in the background and verify the
+  update before installing it.
 
 <div align="center">
 
-<img src="docs/images/dashboard.png" width="860" alt="Obol dashboard showing today's spend, history totals, input and output tokens, and a daily spend-over-time chart with per-provider breakdown">
+<img src="docs/images/dashboard.png" width="860" alt="Obol dashboard showing today's spend, history, activity calendar, and provider breakdown">
 
 </div>
 
-## Download
+## Install
 
-1. Grab [`Obol.dmg`](https://github.com/aakritsubedi/obol/releases/latest/download/Obol.dmg) — that link always fetches the newest release. Prefer browsing? Head to [Releases](https://github.com/aakritsubedi/obol/releases) and download the versioned DMG.
+1. Download [`Obol.dmg`](https://github.com/aakritsubedi/obol/releases/latest/download/Obol.dmg), or choose a version from [Releases](https://github.com/aakritsubedi/obol/releases).
 2. Open the DMG and drag **Obol** to **Applications**.
-3. First launch: right-click the app → **Open** (once). The public build is ad-hoc signed — this is a free open-source project without a 99 USD/year Apple Developer account — so macOS asks for confirmation on the first launch after a download. That prompt is expected; it is not an Obol permission request.
+3. Launch Obol. On the first launch after downloading, right-click the app,
+   choose **Open**, and confirm the macOS prompt.
+
+The public build is ad-hoc signed rather than notarized. The one-time
+right-click → **Open** step is expected for this open-source project; it is not
+an Obol permission request.
 
 ### Requirements
 
 - macOS 13 or later
-- Node.js 20 or later, visible to Finder-launched apps
+- Apple silicon or Intel Mac
 
-Obol checks `/opt/homebrew/bin/node`, `/usr/local/bin/node`, `/opt/local/bin/node`, `/usr/bin/node`, and `~/.volta/bin/node`, then picks the newest interpreter from nvm (`~/.nvm`), mise, and fnm install folders.
+Downloaded releases include a universal Node.js runtime, so end users do not
+need Node.js, npm, or a shell configuration. Node.js 20 or later is required
+only for development and source builds.
 
-Finder launches do not inherit your shell PATH, so if Node works in your terminal but none of those paths exist, link it once:
+## Supported agents
 
-    sudo ln -s "$(which node)" /usr/local/bin/node
+Obol reads local records from the agents below. Missing or unused sources are
+ignored, so installing one agent is enough to get started.
 
-Use a real path and remove an existing conflicting symlink first. When the popover reports that Node is missing or that the daemon exited, the daemon's own output is in `~/.obol/daemon.log`.
+| Agent | Local source | What Obol can show |
+| --- | --- | --- |
+| Claude Code | `~/.claude/projects` | Provider totals, project history, session activity, and estimated session shares |
+| Codex CLI | `~/.codex/sessions` | Provider totals, session activity, prompts, tools, edited files, and active work |
+| OpenCode | `~/.local/share/opencode/opencode.db` | Provider totals, session activity, prompts, tools, edited files, and active work |
 
-## Updating
+Provider totals and history come from [ccusage](https://github.com/ryoppippi/ccusage)
+using its offline report. Project-level cost history is currently Claude-only;
+Codex and OpenCode still contribute to aggregate provider and daily totals.
 
-When a stable GitHub Release is available, Obol checks once after launch, when the popover opens, and every six hours. Automatic checks are quiet: there is no notification, modal, or dock bounce. A pending release adds a small dot to Settings.
+## Accuracy and privacy
 
-The Settings row can download, verify, and install the ZIP release. The updater checks the size, a SHA-256 digest or SHA256SUMS, the bundle identifier, the version, and the internal code signature before stopping the daemon and swapping the app. The replaced app is relaunched automatically. A release without a checksum is refused.
+Obol shows estimates from ccusage’s pricing table, not provider invoices. A
+session’s cost is not a billing record: ccusage reports daily cost by Claude
+project, so Obol apportions that project total across Claude sessions by output
+tokens. Codex and OpenCode session records do not include a comparable
+per-project cost source.
 
-The DMG remains the manual install path. Verify its paired artifacts with:
+Usage processing is local:
 
-    cd dist
-    shasum -c SHA256SUMS
+- The daemon reads agent logs or databases from your home directory.
+- ccusage runs with `--offline` and the daemon listens on `127.0.0.1` only.
+- Configuration and the last good snapshot stay in `~/.obol`.
+- Obol does not upload agent logs, prompts, usage snapshots, or API keys.
+
+The app can still make two kinds of optional network requests: GitHub Release
+checks for the updater and the public Frankfurter API when you select a
+non-USD display currency. Neither request receives your usage data.
+
+### Local state
+
+| File | Purpose |
+| --- | --- |
+| `~/.obol/config.json` | Budgets, refresh settings, display currency, and other preferences |
+| `~/.obol/snapshot.json` | Last successful usage snapshot used while a refresh is unavailable |
+| `~/.obol/runtime.json` | The running daemon’s loopback port and short-lived access token |
+| `~/.obol/daemon.log` | Daemon startup and runtime diagnostics |
 
 ## How it works
 
-    macOS menu-bar app
-          │ loopback HTTP + per-process token
-          ▼
-    Node daemon ── offline ccusage ── local agent logs
-          │
-          └── Vite dashboard
+```text
+  macOS menu-bar app ─────┐
+                           │ loopback HTTP + per-process token
+  local dashboard ────────┤
+                           ▼
+                    Node daemon
+                      ├── ccusage --offline
+                      ├── Claude / Codex / OpenCode adapters
+                      └── ~/.obol snapshot and configuration
+```
 
-One local daemon is the source of truth for both the native widget and the dashboard. It watches supported agent log directories, asks ccusage for offline estimates, stores the last good snapshot in `~/.obol`, and serves the dashboard over a loopback-only HTTP endpoint with a per-process token.
+The daemon is the source of truth for both the native popover and the
+dashboard. It watches supported agent data, refreshes usage on a configurable
+interval, keeps the last good snapshot, and serves the dashboard from the
+same loopback-only process.
 
-Costs are estimates from ccusage's pricing table, not invoices. Obol has no telemetry: the daemon binds to 127.0.0.1, ccusage runs offline, and snapshots/configuration remain under `~/.obol`. The app does not upload agent logs or usage snapshots.
+## Troubleshooting
 
----
+### The dashboard is empty or stale
+
+Open an agent session, click **Refresh** in the popover or dashboard, and check
+that the agent has written data to its local source path in the table above.
+Obol keeps showing the last good snapshot when a refresh fails; the reason is
+shown as a daemon notice in the dashboard.
+
+### The daemon is unavailable
+
+Check `~/.obol/daemon.log`. For a downloaded release, Node is bundled with the
+app. For a development build, install Node.js 20 or later, then build the
+daemon and dashboard before launching the native app:
+
+```sh
+npm ci
+npm run build
+```
+
+### macOS blocks the first launch
+
+Right-click **Obol.app**, choose **Open**, and confirm. This is expected for
+the ad-hoc signed public build. A Developer ID-signed release does not need
+this step.
+
+### A project or session is missing
+
+Obol only counts records with timestamps that fall in the selected local day.
+It also ignores subagent transcripts that replay work already attributed to a
+parent session. Project cost history is available for Claude because Claude’s
+project records can be joined to ccusage’s project report; other agents still
+appear in aggregate usage and the work journal.
 
 ## Build from source
 
-    npm ci
-    npm run build
-    npm run package:dmg
+Source builds require macOS, Node.js 20 or later, npm 10, and Xcode 16 or
+later. Install dependencies and build the JavaScript workspaces first:
 
-The package command writes `dist/Obol-VERSION.dmg`, `dist/Obol-VERSION.zip`, and `dist/SHA256SUMS`. The ZIP is the artifact consumed by the in-app updater; it comes from the same signed staging bundle as the DMG. See macos/README.md for universal builds, version stamping, and signing.
+```sh
+npm ci
+npm run build
+```
 
-To run the pieces during development:
+To build a distributable universal app and installer artifacts:
 
-    npm run dev:daemon
-    npm run dev:dashboard
+```sh
+npm run package:dmg
+```
 
-For a one-shot daemon refresh:
+This writes the following to `dist/`:
 
-    npm run once -w daemon
+- `Obol-VERSION.dmg` — drag-to-Applications installer
+- `Obol-VERSION.zip` — artifact used by the in-app updater
+- `SHA256SUMS` — SHA-256 checksums for the DMG and ZIP
 
-## Releasing
+Packaging vendors a universal Node runtime into the app. It may download the
+pinned runtime on the first package build. The public artifact is ad-hoc
+signed by default; signing and notarization details are in
+[`macos/README.md`](macos/README.md).
 
-Merging to main is enough. The release workflow reads every commit since the previous tag and picks the bump level: a `BREAKING CHANGE` footer or `type!:` subject bumps the major version, any `feat:`/`feature:` subject bumps the minor version, everything else patches. `[major]` or `[minor]` in a subject forces a level. It then commits `chore(release): vX.Y.Z`, tags it, builds the universal DMG, ZIP, and checksums on GitHub Actions, and publishes a GitHub Release with the DMG attached for direct download. Release notes are drafted by GitHub Models (free inference with the workflow's own token) from those commits, and fall back to raw commit subjects if the model call fails. Pushing a `v*` tag manually releases that exact version without a bump, and a manual workflow run with dry_run enabled only uploads build artifacts.
+### Development
 
-The public build stays ad-hoc signed; adding `MACOS_CERTIFICATE`, `MACOS_CERTIFICATE_PASSWORD`, `MACOS_SIGN_IDENTITY`, `AC_API_KEY_ID`, `AC_API_ISSUER`, and `AC_API_KEY` secrets switches the same workflow to Developer ID signing and notarization.
+Start the daemon first so the dashboard can read its runtime token, then start
+Vite in a second terminal:
 
-## Contributing and license
+```sh
+# terminal 1
+npm run dev:daemon
 
-See CONTRIBUTING.md for prerequisites, checks, and commit conventions. See SECURITY.md for the local boundary and updater trust model. Obol packages and credits [ccusage](https://github.com/ryoppippi/ccusage) prominently; its license and upstream behavior remain part of the dependency you install. Obol is available under the MIT License; see LICENSE.
+# terminal 2
+npm run dev:dashboard
+```
+
+Other useful commands:
+
+```sh
+npm run once -w daemon       # one refresh and a JSON summary
+npm run typecheck            # TypeScript checks
+npm test                     # JavaScript tests
+npm run lint                 # Biome checks
+node scripts/check-boundaries.mjs
+npm run check-contract-fixtures
+swift test --package-path macos
+```
+
+For native app builds, open [`macos/Obol.xcodeproj`](macos/Obol.xcodeproj)
+after `npm run build`. More details about universal builds, version stamping,
+packaging, and signing live in [`macos/README.md`](macos/README.md).
+
+An Xcode Debug build uses Node from the host Mac rather than the packaged
+runtime. The app checks common Homebrew, MacPorts, system, Volta, nvm, mise,
+and fnm locations. Finder-launched apps do not inherit your shell’s `PATH`, so
+if a Debug build cannot start the daemon, install Node 20+ in one of those
+locations and inspect `~/.obol/daemon.log`.
+
+## Releases and contributing
+
+Merging to `main` triggers the release workflow. Commit subjects determine the
+semantic-version bump, and GitHub Actions builds the universal DMG, updater
+ZIP, and checksums. See [`docs/updater.md`](docs/updater.md) for the local
+update fixture and trust model.
+
+Pull requests are welcome. Start with [`CONTRIBUTING.md`](CONTRIBUTING.md) for
+the required checks and commit conventions, and use [`SECURITY.md`](SECURITY.md)
+for the local boundary and updater security model.
+
+## License
+
+Obol is available under the [MIT License](LICENSE). It uses and credits
+[ccusage](https://github.com/ryoppippi/ccusage) for offline usage estimation.

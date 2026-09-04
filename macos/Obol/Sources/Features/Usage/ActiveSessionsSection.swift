@@ -5,7 +5,12 @@ struct ActiveSessionsSection: View {
     @ObservedObject var controller: DaemonController
     @ObservedObject var currency: CurrencyController
 
+    private static let maxVisibleSessions = 4
+
     var body: some View {
+        let visibleSessions = Array(controller.activeSessions.prefix(Self.maxVisibleSessions))
+        let hiddenSessionCount = controller.activeSessions.count - visibleSessions.count
+
         VStack(alignment: .leading, spacing: 10) {
             HStack(spacing: 7) {
                 Text("Active now")
@@ -35,15 +40,18 @@ struct ActiveSessionsSection: View {
                     .font(WidgetStyle.TypeScale.row)
                     .foregroundStyle(.secondary)
             } else {
-                ScrollView(.vertical) {
-                    LazyVStack(alignment: .leading, spacing: 9) {
-                        ForEach(controller.activeSessions) { session in
-                            activeSessionRow(session)
-                        }
+                VStack(alignment: .leading, spacing: 9) {
+                    ForEach(visibleSessions) { session in
+                        activeSessionRow(session)
+                    }
+
+                    if hiddenSessionCount > 0 {
+                        Text("and \(hiddenSessionCount) more active")
+                            .font(WidgetStyle.TypeScale.footnote)
+                            .foregroundStyle(.tertiary)
+                            .accessibilityLabel("and \(hiddenSessionCount) more active sessions")
                     }
                 }
-                .frame(maxHeight: WidgetStyle.activeSessionsMaxHeight)
-                .clipped()
                 .accessibilityLabel("Active sessions")
             }
         }
