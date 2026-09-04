@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   type DayJournal,
   getConfig,
@@ -190,6 +190,11 @@ export default function App() {
   const [refreshing, setRefreshing] = useState(false);
   const [exportOpen, setExportOpen] = useState(false);
   const [shareOpen, setShareOpen] = useState(false);
+  const headerRef = useRef<HTMLElement>(null);
+  const headingRef = useRef<HTMLDivElement>(null);
+  const headingSentinelRef = useRef<HTMLDivElement>(null);
+  const [headerHeight, setHeaderHeight] = useState(0);
+  const [headingStuck, setHeadingStuck] = useState(false);
 
   useEffect(() => {
     rememberToken();
@@ -248,6 +253,40 @@ export default function App() {
       document.removeEventListener("visibilitychange", refreshOnFocus);
     };
   }, []);
+
+  // The page title parks under the app bar, so both offsets are measured rather
+  // than hardcoded: the bar grows a second row on narrow windows, and the
+  // heading changes height when it condenses. The sum is also the scroll
+  // padding, or the section nav would drop anchors behind the two strips.
+  useEffect(() => {
+    const header = headerRef.current;
+    if (!header) return;
+    const measure = () => {
+      setHeaderHeight(header.offsetHeight);
+      const total = header.offsetHeight + (headingRef.current?.offsetHeight || 0);
+      document.documentElement.style.scrollPaddingTop = `${total}px`;
+    };
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(header);
+    if (headingRef.current) observer.observe(headingRef.current);
+    return () => {
+      observer.disconnect();
+      document.documentElement.style.scrollPaddingTop = "";
+    };
+  }, []);
+
+  // A sentinel in the flow above the heading, rather than a scroll listener:
+  // it reports the stuck state without a handler on every frame.
+  useEffect(() => {
+    const sentinel = headingSentinelRef.current;
+    if (!sentinel || !headerHeight) return;
+    const observer = new IntersectionObserver(([entry]) => setHeadingStuck(!entry.isIntersecting), {
+      rootMargin: `-${headerHeight}px 0px 0px 0px`,
+    });
+    observer.observe(sentinel);
+    return () => observer.disconnect();
+  }, [headerHeight]);
 
   // The menu bar app owns the currency choice and writes it to the shared
   // config; the dashboard follows whatever it finds there.
@@ -359,8 +398,11 @@ export default function App() {
   }
 
   return (
-    <div className="min-h-screen overflow-x-hidden bg-surface text-ink">
-      <header className="sticky top-0 z-20 border-b border-hairline bg-surface/85 backdrop-blur-xl">
+    <div className="min-h-screen bg-surface text-ink">
+      <header
+        className="sticky top-0 z-20 border-b border-hairline bg-surface/85 backdrop-blur-xl"
+        ref={headerRef}
+      >
         <div className="mx-auto flex max-w-[1180px] flex-col gap-2.5 px-8 py-3 max-[760px]:px-[18px]">
           <div className="flex w-full items-center justify-between gap-4">
             <div className="flex min-w-0 items-center gap-3">
@@ -427,19 +469,38 @@ export default function App() {
         className="mx-auto max-w-[1180px] px-8 pb-24 pt-10 max-[760px]:px-[18px] max-[760px]:pt-7"
         aria-busy={loading}
       >
-        <div className="mb-8 flex items-end justify-between gap-8 max-[860px]:flex-col max-[860px]:items-start max-[860px]:gap-5">
+        <div aria-hidden="true" className="h-px" ref={headingSentinelRef} />
+        <div
+          className={`sticky z-10 -mx-8 mb-8 flex items-end justify-between gap-8 px-8 transition-all duration-200 max-[860px]:flex-col max-[860px]:items-start max-[860px]:gap-5 max-[760px]:-mx-[18px] max-[760px]:px-[18px] ${
+            headingStuck ? "border-b border-hairline bg-surface/85 py-3 backdrop-blur-xl" : ""
+          }`}
+          ref={headingRef}
+          style={{ top: headerHeight }}
+        >
           <div className="min-w-0">
-            <h1 className="text-[40px] font-semibold leading-none tracking-[-0.04em] max-[760px]:text-[34px] max-[440px]:text-[30px]">
+            <h1
+              className={`font-semibold leading-none transition-all duration-200 ${
+                headingStuck
+                  ? "text-[19px] tracking-[-0.02em]"
+                  : "text-[40px] tracking-[-0.04em] max-[760px]:text-[34px] max-[440px]:text-[30px]"
+              }`}
+            >
               Token cost
             </h1>
-            <p className="mt-3 inline-flex items-center gap-1.5 text-[11px] text-muted">
+            <p
+              className={`inline-flex items-center gap-1.5 text-[11px] text-muted transition-all duration-200 ${
+                headingStuck ? "mt-1" : "mt-3"
+              }`}
+            >
               <Icon path={CLOCK} className="h-3 w-3 shrink-0" />
               {summary.updatedAt
                 ? `Updated ${formatUpdatedAt(summary.updatedAt)} · ${Intl.DateTimeFormat().resolvedOptions().timeZone}`
                 : "Waiting for first refresh"}
             </p>
           </div>
-          <DayStrip journal={todayJournal} />
+          {/* Today's shape rides along stuck or not; condensed it drops to the
+              ramp and the total, the way the title drops to one line. */}
+          <DayStrip compact={headingStuck} journal={todayJournal} />
         </div>
         {error && (
           <div className="mb-6 rounded-control border border-warn/25 bg-warn-soft px-3.5 py-2.5 text-[11px] text-warn-strong">
