@@ -1,5 +1,8 @@
 import SwiftUI
 
+/// The popover's action row. Freshness moved up beside the live indicator in
+/// the header, so this is only the three places to go from here: the dashboard,
+/// settings, and out.
 struct UsageFooter: View {
     @ObservedObject var controller: DaemonController
     @ObservedObject var updates: UpdateController
@@ -7,7 +10,7 @@ struct UsageFooter: View {
     @State private var dashboardHovered = false
 
     var body: some View {
-        HStack(spacing: 8) {
+        HStack(spacing: 4) {
             Button(action: controller.openDashboard) {
                 Label("Dashboard", systemImage: "rectangle.topthird.inset.filled")
                     .font(.system(size: 12, weight: .medium))
@@ -29,22 +32,8 @@ struct UsageFooter: View {
             .opacity(controller.connected ? 1 : 0.4)
             .help(controller.connected ? "Open dashboard" : "Dashboard starts with the daemon")
 
-            HStack(spacing: 4) {
-                IconButton(systemName: "arrow.clockwise", help: "Refresh usage") {
-                    Task { await controller.refresh() }
-                }
-                .disabled(!controller.connected || controller.isRefreshing)
-                .opacity(controller.isRefreshing ? 0.4 : 1)
+            Spacer(minLength: 8)
 
-                TimelineView(.periodic(from: .now, by: 30)) { context in
-                    Text(controller.isRefreshing ? "Updating…" : recency(at: context.date))
-                        .font(WidgetStyle.TypeScale.footnote)
-                        .foregroundStyle(.secondary)
-                        .lineLimit(1)
-                        .monospacedDigit()
-                }
-            }
-            Spacer(minLength: 0)
             IconButton(systemName: "gearshape", help: "Settings", badge: updates.hasPendingUpdate) {
                 onOpenSettings()
             }
@@ -52,28 +41,5 @@ struct UsageFooter: View {
                 controller.quit()
             }
         }
-    }
-
-    private func recency(at now: Date) -> String {
-        guard let raw = controller.summary.updatedAt else { return "Not synced" }
-        let formatter = ISO8601DateFormatter()
-        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-        var updated = formatter.date(from: raw)
-        if updated == nil {
-            formatter.formatOptions = [.withInternetDateTime]
-            updated = formatter.date(from: raw)
-        }
-        guard let updated else { return "Not synced" }
-        let minutes = max(0, Int(now.timeIntervalSince(updated) / 60))
-        if minutes < 1 {
-            return "Just now"
-        }
-        if minutes < 60 {
-            return "\(minutes)m ago"
-        }
-        if minutes < 1440 {
-            return "\(minutes / 60)h ago"
-        }
-        return "\(minutes / 1440)d ago"
     }
 }

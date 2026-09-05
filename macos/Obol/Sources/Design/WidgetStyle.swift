@@ -73,7 +73,10 @@ enum WidgetStyle {
         static let sectionLabelTracking: CGFloat = 0.4
         /// Provider names, amounts, the settings toggle.
         static let row = Font.system(size: 13)
-        static let status = Font.system(size: 13, weight: .medium)
+        /// The live/cached pill. It shares its row with the refresh button and
+        /// the last-sync time, so it sits at caption size and earns its weight
+        /// from the medium face and its hue, not from being larger.
+        static let status = Font.system(size: 11, weight: .medium)
         static let icon = Font.system(size: 13, weight: .regular)
         /// Error and status text.
         static let caption = Font.system(size: 11)

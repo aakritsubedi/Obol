@@ -1,3 +1,4 @@
+import ObolCore
 import SwiftUI
 
 struct UsageHeader: View {
@@ -5,19 +6,47 @@ struct UsageHeader: View {
     @ObservedObject var currency: CurrencyController
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            HStack(spacing: 4) {
+        VStack(alignment: .leading, spacing: 6) {
+            HStack(spacing: 8) {
                 Text("Today")
                     .font(WidgetStyle.TypeScale.title)
                     .foregroundStyle(.secondary)
 
                 Spacer(minLength: 8)
 
-                statusLabel
+                freshnessControls
             }
 
             totalAmount
         }
+    }
+
+    /// Refresh, the last-sync time and the live indicator answer one question —
+    /// how current is the number below them — so they travel as a single
+    /// trailing cluster instead of being split between the header and the
+    /// footer. The pill anchors the right edge; the quieter two lead into it.
+    private var freshnessControls: some View {
+        HStack(spacing: 4) {
+            IconButton(systemName: "arrow.clockwise", help: "Refresh usage") {
+                Task { await controller.refresh() }
+            }
+            .disabled(!controller.connected || controller.isRefreshing)
+            .opacity(controller.isRefreshing ? 0.4 : 1)
+
+            TimelineView(.periodic(from: .now, by: 30)) { context in
+                Text(controller.isRefreshing
+                    ? "Updating…"
+                    : Recency.label(updatedAt: controller.summary.updatedAt, now: context.date))
+                    .font(WidgetStyle.TypeScale.caption)
+                    .foregroundStyle(.tertiary)
+                    .monospacedDigit()
+                    .lineLimit(1)
+            }
+
+            statusLabel
+                .padding(.leading, 2)
+        }
+        .fixedSize(horizontal: true, vertical: false)
     }
 
     /// Symbol and value are separate runs so the locale-aware currency
@@ -47,17 +76,17 @@ struct UsageHeader: View {
     }
 
     private var statusLabel: some View {
-        HStack(spacing: 6) {
+        HStack(spacing: 5) {
             Circle()
                 .fill(liveStatusColor)
-                .frame(width: 6, height: 6)
+                .frame(width: 5, height: 5)
                 .modifier(PulsingDot(active: !controller.summary.stale))
             Text(controller.liveLabel)
                 .font(WidgetStyle.TypeScale.status)
         }
         .foregroundStyle(liveStatusColor)
-        .padding(.horizontal, 9)
-        .padding(.vertical, 4)
+        .padding(.horizontal, 7)
+        .padding(.vertical, 3)
         .background(Capsule().fill(liveStatusColor.opacity(0.12)))
         .accessibilityElement(children: .combine)
         .accessibilityLabel(controller.liveLabel)

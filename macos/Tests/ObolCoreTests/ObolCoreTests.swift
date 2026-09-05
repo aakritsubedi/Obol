@@ -7,6 +7,18 @@ final class ObolCoreTests: XCTestCase {
         XCTAssertEqual(ObolFormatting.compactTokens(1_200_000), "1.2M")
     }
 
+    func testRecencyReadsBothTimestampSpellingsAndDegradesByUnit() throws {
+        let now = try XCTUnwrap(Recency.parse("2026-09-05T12:00:00.000Z"))
+        XCTAssertEqual(Recency.label(updatedAt: "2026-09-05T11:59:30Z", now: now), "Just now")
+        XCTAssertEqual(Recency.label(updatedAt: "2026-09-05T11:45:00.000Z", now: now), "15m ago")
+        XCTAssertEqual(Recency.label(updatedAt: "2026-09-05T09:00:00Z", now: now), "3h ago")
+        XCTAssertEqual(Recency.label(updatedAt: "2026-09-03T12:00:00Z", now: now), "2d ago")
+        // A clock that ran backwards must not print a negative age.
+        XCTAssertEqual(Recency.label(updatedAt: "2026-09-05T12:30:00Z", now: now), "Just now")
+        XCTAssertEqual(Recency.label(updatedAt: nil, now: now), "Not synced")
+        XCTAssertEqual(Recency.label(updatedAt: "not a date", now: now), "Not synced")
+    }
+
     func testRefreshScheduleUsesThreeDailySlots() throws {
         var calendar = Calendar(identifier: .gregorian)
         calendar.timeZone = try XCTUnwrap(TimeZone(secondsFromGMT: 0))
