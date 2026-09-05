@@ -53,12 +53,18 @@ usage data on your Mac.
 
 1. Download [`Obol.dmg`](https://github.com/aakritsubedi/obol/releases/latest/download/Obol.dmg), or choose a version from [Releases](https://github.com/aakritsubedi/obol/releases).
 2. Open the DMG and drag **Obol** to **Applications**.
-3. Launch Obol. On the first launch after downloading, right-click the app,
-   choose **Open**, and confirm the macOS prompt.
+3. Launch Obol. The first launch after downloading is blocked by macOS with
+   *“Obol” Not Opened*. Click **Done**, then open **System Settings → Privacy &
+   Security**, scroll to the Security section, and click **Open Anyway** next to
+   Obol. Launch Obol again and confirm.
 
-The public build is ad-hoc signed rather than notarized. The one-time
-right-click → **Open** step is expected for this open-source project; it is not
-an Obol permission request.
+On macOS 14 and earlier you can instead right-click the app and choose
+**Open**. macOS 15 (Sequoia) removed that shortcut, so **Open Anyway** in System
+Settings is the path there. Either way it is a one-time step.
+
+The public build is ad-hoc signed rather than notarized, which is why macOS
+cannot verify it. This prompt is expected for an open-source project without a
+paid Apple Developer ID; it is not an Obol permission request.
 
 ### Requirements
 
@@ -154,9 +160,20 @@ npm run build
 
 ### macOS blocks the first launch
 
-Right-click **Obol.app**, choose **Open**, and confirm. This is expected for
-the ad-hoc signed public build. A Developer ID-signed release does not need
-this step.
+macOS shows *“Obol” Not Opened — Apple could not verify “Obol” is free of
+malware*, offering only **Done** and **Move to Trash**. Click **Done**, then go
+to **System Settings → Privacy & Security**, scroll to the Security section, and
+click **Open Anyway** next to Obol. On macOS 14 and earlier, right-clicking
+**Obol.app** and choosing **Open** works too; macOS 15 removed that shortcut.
+
+Equivalently, from a terminal:
+
+```sh
+xattr -dr com.apple.quarantine /Applications/Obol.app
+```
+
+This is expected for the ad-hoc signed public build. A Developer ID-signed,
+notarized release would not need the step.
 
 ### A project or session is missing
 

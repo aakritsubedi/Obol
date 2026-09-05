@@ -317,6 +317,8 @@ echo "Size:       $(du -h "$DMG_PATH" | cut -f1)"
 if [ "$SIGN_IDENTITY" = "-" ]; then
   echo
   echo "Ad-hoc signed and not notarized. On another Mac, macOS quarantines the"
-  echo "app after download; the first launch needs a right click > Open, or:"
+  echo "app after download and blocks the first launch. Clear it with System"
+  echo "Settings > Privacy & Security > Open Anyway (macOS 15 removed the"
+  echo "right click > Open shortcut), or from a terminal:"
   echo "  xattr -dr com.apple.quarantine /Applications/$APP_NAME.app"
 fi

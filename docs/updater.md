@@ -30,7 +30,7 @@ The canonical statement of the updater trust model lives in [SECURITY.md](../SEC
 TLS to GitHub is the real boundary, the SHA-256 digest makes the download tamper-evident, and
 `codesign --verify --deep --strict` is an integrity check only — an ad-hoc signature proves nothing
 about identity. Because the ZIP arrives without a quarantine xattr, those checks are what stand in
-for the right-click-Open prompt the user never sees.
+for the Gatekeeper prompt the user never sees.
 
 ## Local fixture server
 

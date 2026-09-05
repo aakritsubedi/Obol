@@ -12,6 +12,6 @@ What codesign --verify --deep --strict buys: proof the bundle's internal seal is
 
 What is unavailable without a Developer ID: Team ID pinning (SUExpectedBundleTeamIdentifier, SecStaticCodeCheckValidityWithErrors with an certificate leaf[subject.OU] requirement). Leave a // TODO(dev-id): pin SecRequirement at the exact call site so it's a five-line change later.
 
-Because the ZIP arrives via URLSession and not a browser, it carries no com.apple.quarantine xattr, so the replaced app launches without the right-click-Open dance. That is a genuine win over "download the DMG again" — and precisely why the checks above must be done properly, since you are stepping around the prompt that would otherwise be the user's last warning.
+Because the ZIP arrives via URLSession and not a browser, it carries no com.apple.quarantine xattr, so the replaced app launches without the Gatekeeper block (right-click > Open on macOS 14 and earlier, Privacy & Security > Open Anyway on macOS 15+). That is a genuine win over "download the DMG again" — and precisely why the checks above must be done properly, since you are stepping around the prompt that would otherwise be the user's last warning.
 
 The updater refuses releases without a SHA-256 digest or a SHA256SUMS entry, checks the archive's declared size, requires the Obol bundle identifier, rejects downgrades, and verifies the bundle's internal seal before a swap. Report suspected vulnerabilities through a private GitHub Security Advisory rather than a public issue.
