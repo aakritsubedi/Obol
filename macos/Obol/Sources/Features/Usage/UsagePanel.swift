@@ -20,13 +20,16 @@ struct UsagePanel: View {
             hairline
                 .padding(.top, 18)
 
-            TodayShapeSection(journal: controller.todayJournal)
-                .padding(.top, 14)
+            TodayShapeSection(
+                journal: controller.todayJournal,
+                isLoading: controller.showsTodayJournalSkeleton,
+                isUnavailable: controller.todayJournalUnavailable && controller.todayJournal == nil,
+                isPresented: controller.isPopoverPresented
+            )
+            .padding(.top, 14)
 
-            if TodayShapeSection.activeMinutes(in: controller.todayJournal) > 0 {
-                hairline
-                    .padding(.top, 14)
-            }
+            hairline
+                .padding(.top, 14)
 
             ActiveSessionsSection(controller: controller, currency: currency)
                 .padding(.top, 14)
@@ -51,5 +54,6 @@ struct UsagePanel: View {
         Rectangle()
             .fill(WidgetStyle.hairline)
             .frame(height: 1)
+            .padding(.horizontal, -WidgetStyle.inset)
     }
 }

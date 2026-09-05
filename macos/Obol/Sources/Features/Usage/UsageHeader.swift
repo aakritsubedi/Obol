@@ -14,19 +14,6 @@ struct UsageHeader: View {
                 Spacer(minLength: 8)
 
                 statusLabel
-
-                IconButton(systemName: "arrow.triangle.2.circlepath", help: "Refresh usage") {
-                    Task { await controller.refresh() }
-                }
-                IconButton(
-                    systemName: "arrow.up.forward.square",
-                    help: controller.connected ? "Open dashboard" : "Dashboard starts with the daemon"
-                ) {
-                    controller.openDashboard()
-                }
-                .disabled(!controller.connected)
-                .opacity(controller.connected ? 1 : 0.35)
-                .animation(.easeOut(duration: 0.15), value: controller.connected)
             }
 
             totalAmount
@@ -69,7 +56,9 @@ struct UsageHeader: View {
                 .font(WidgetStyle.TypeScale.status)
         }
         .foregroundStyle(liveStatusColor)
-        .padding(.trailing, 4)
+        .padding(.horizontal, 9)
+        .padding(.vertical, 4)
+        .background(Capsule().fill(liveStatusColor.opacity(0.12)))
         .accessibilityElement(children: .combine)
         .accessibilityLabel(controller.liveLabel)
     }

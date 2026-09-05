@@ -53,13 +53,17 @@ struct ProviderBreakdown: View {
             let providers = controller.summary.agents.filter { $0.totalCost > 0 }
             let total = providers.reduce(0) { $0 + $1.totalCost }
             let weights = providers.map(\.totalCost)
+            let gap: CGFloat = 3
+            let availableWidth = max(0, geometry.size.width - gap * CGFloat(max(0, providers.count - 1)))
+            let minimumWidth = min(3, availableWidth / CGFloat(max(1, providers.count)))
+            let proportionalWidth = max(0, availableWidth - minimumWidth * CGFloat(providers.count))
 
-            HStack(spacing: 0) {
+            HStack(spacing: gap) {
                 if total > 0 {
                     ForEach(providers) { provider in
-                        Rectangle()
+                        Capsule()
                             .fill(ProviderPresentation.color(for: provider.agent))
-                            .frame(width: max(2, geometry.size.width * provider.totalCost / total))
+                            .frame(width: minimumWidth + proportionalWidth * provider.totalCost / total)
                     }
                 } else {
                     Rectangle()

@@ -81,7 +81,7 @@ ignored, so installing one agent is enough to get started.
 | OpenCode | `~/.local/share/opencode/opencode.db` | Provider totals, session activity, prompts, tools, edited files, and active work |
 
 Provider totals and history come from [ccusage](https://github.com/ryoppippi/ccusage)
-using its offline report. Project-level cost history is currently Claude-only;
+using its report. Project-level cost history is currently Claude-only;
 Codex and OpenCode still contribute to aggregate provider and daily totals.
 
 ## Accuracy and privacy
@@ -95,7 +95,9 @@ per-project cost source.
 Usage processing is local:
 
 - The daemon reads agent logs or databases from your home directory.
-- ccusage runs with `--offline` and the daemon listens on `127.0.0.1` only.
+- The daemon listens on `127.0.0.1` only. ccusage fetches the public LiteLLM
+  model-pricing table so new models are costed correctly, and falls back to its
+  bundled pricing snapshot when offline. No agent data is sent with that request.
 - Configuration and the last good snapshot stay in `~/.obol`.
 - Obol does not upload agent logs, prompts, usage snapshots, or API keys.
 
@@ -120,7 +122,7 @@ non-USD display currency. Neither request receives your usage data.
   local dashboard ────────┤
                            ▼
                     Node daemon
-                      ├── ccusage --offline
+                      ├── ccusage (live model pricing)
                       ├── Claude / Codex / OpenCode adapters
                       └── ~/.obol snapshot and configuration
 ```
@@ -240,4 +242,4 @@ for the local boundary and updater security model.
 ## License
 
 Obol is available under the [MIT License](LICENSE). It uses and credits
-[ccusage](https://github.com/ryoppippi/ccusage) for offline usage estimation.
+[ccusage](https://github.com/ryoppippi/ccusage) for usage estimation.

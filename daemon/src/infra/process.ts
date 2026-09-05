@@ -124,7 +124,6 @@ export async function runUsage(config?: Pick<WidgetConfig, "historyDays">): Prom
   const since = shiftDate(until, -(historyDays - 1), timezone);
   const reportArgs = [
     "--json",
-    "--offline",
     "--by-agent",
     "-z",
     timezone,
@@ -140,7 +139,6 @@ export async function runUsage(config?: Pick<WidgetConfig, "historyDays">): Prom
     "daily",
     "--instances",
     "--json",
-    "--offline",
     "-z",
     timezone,
     "--since",

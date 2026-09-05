@@ -35,10 +35,24 @@ struct ActiveSessionsSection: View {
                 Spacer(minLength: 0)
             }
 
-            if controller.activeSessions.isEmpty {
-                Text("No agent is running right now.")
+            if controller.showsActiveSessionsSkeleton {
+                HStack(spacing: 10) {
+                    SkeletonBar(width: 20, height: 20)
+                    VStack(alignment: .leading, spacing: 6) {
+                        SkeletonBar(width: 126, height: 12)
+                        SkeletonBar(width: 86, height: 9)
+                    }
+                    Spacer()
+                    SkeletonBar(width: 42, height: 12)
+                }
+                .modifier(SkeletonPulse(active: controller.isPopoverPresented))
+                .accessibilityElement(children: .ignore)
+                .accessibilityLabel("Loading active agents")
+            } else if controller.activeSessions.isEmpty {
+                Text(controller.activeSessionsUnavailable || !controller.hasLoadedActiveSessions ?
+                    "Active agents are unavailable." : "No agent is running right now.")
                     .font(WidgetStyle.TypeScale.row)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(.primary)
             } else {
                 VStack(alignment: .leading, spacing: 9) {
                     ForEach(visibleSessions) { session in

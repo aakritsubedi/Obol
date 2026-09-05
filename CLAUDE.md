@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 Obol is a local-first macOS menu bar app + local dashboard that tracks token usage and estimated spend for AI coding agents (Claude Code, Codex CLI, OpenCode). It has three runtimes that share one contract:
 
-- **daemon** (`daemon/`) — Node/TypeScript. The source of truth. Reads agent logs via `ccusage --offline`, watches filesystem sources, serves HTTP + SSE on `127.0.0.1` only.
+- **daemon** (`daemon/`) — Node/TypeScript. The source of truth. Reads agent logs via `ccusage`, watches filesystem sources, serves HTTP + SSE on `127.0.0.1` only.
 - **dashboard** (`dashboard/`) — React/TypeScript/Vite, served by the daemon.
 - **macos** (`macos/`) — Swift/AppKit menu bar app; a native presenter over the same daemon API.
 - **contract** (`contract/`) — shared TypeScript types (`type`-only exports) consumed by daemon and dashboard. The Swift side hand-writes matching decoding, checked against recorded JSON fixtures (see below).

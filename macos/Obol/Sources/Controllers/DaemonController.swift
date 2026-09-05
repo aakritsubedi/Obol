@@ -13,6 +13,12 @@ final class DaemonController: ObservableObject {
     @Published private(set) var notificationsDenied = false
     @Published private(set) var activeSessions: [ActiveSession] = []
     @Published private(set) var todayJournal: TodayJournal?
+    @Published private(set) var isRefreshing = false
+    @Published private(set) var isLoadingActiveSessions = false
+    @Published private(set) var isLoadingTodayJournal = false
+    @Published private(set) var hasLoadedActiveSessions = false
+    @Published private(set) var activeSessionsUnavailable = false
+    @Published private(set) var todayJournalUnavailable = false
     /// Whether the sleep assertion is actually held right now, as opposed to
     /// merely switched on. Settings shows the difference.
     @Published private(set) var keepAwakeHolding = false
@@ -32,7 +38,6 @@ final class DaemonController: ObservableObject {
     private var pollingTimer: Timer?
     private var baseURL: URL?
     private var token = ""
-    private var fetchInFlight = false
     private var started = false
     private var shuttingDown = false
     private let onCurrencyChanged: (String, Double?) -> Void
@@ -92,6 +97,18 @@ final class DaemonController: ObservableObject {
         summary.stale ? "Cached" : "Live"
     }
 
+    /// Reserve the sections during startup, before a runtime URL is available.
+    /// Subsequent reads keep their last successful content on screen.
+    var showsActiveSessionsSkeleton: Bool {
+        !hasLoadedActiveSessions && !activeSessionsUnavailable &&
+            (isLoadingActiveSessions || statusMessage == nil)
+    }
+
+    var showsTodayJournalSkeleton: Bool {
+        todayJournal == nil && !todayJournalUnavailable &&
+            (isLoadingTodayJournal || statusMessage == nil)
+    }
+
     var launchAtLogin: Bool {
         config.launchAtLogin
     }
@@ -128,17 +145,19 @@ final class DaemonController: ObservableObject {
     }
 
     func refresh() async {
-        guard let baseURL, !token.isEmpty, !fetchInFlight else { return }
-        fetchInFlight = true
-        defer { fetchInFlight = false }
+        guard let baseURL, !token.isEmpty, !isRefreshing else { return }
+        isRefreshing = true
+        defer { isRefreshing = false }
         do {
             let next = try await client.refresh(baseURL: baseURL, token: token)
             apply(next)
-            await loadActiveSessions()
-            await loadTodayJournal()
         } catch {
             statusMessage = "Refresh unavailable; showing the last good snapshot."
         }
+        // These endpoints can still succeed when the usage refresh fails.
+        async let sessions: Void = loadActiveSessions()
+        async let journal: Void = loadTodayJournal()
+        _ = await (sessions, journal)
     }
 
     /// Fetched when the popover is showing the list, and whenever keep-awake is
@@ -152,16 +171,29 @@ final class DaemonController: ObservableObject {
     /// awake through a blip rather than letting it sleep on a running agent.
     private func loadActiveSessions() async {
         guard isPopoverPresented || config.keepAwake else { return }
-        guard let baseURL, !token.isEmpty else { return }
-        guard let next = try? await client.activeSessions(baseURL: baseURL, token: token) else { return }
+        guard let baseURL, !token.isEmpty, !isLoadingActiveSessions else { return }
+        isLoadingActiveSessions = true
+        activeSessionsUnavailable = false
+        defer { isLoadingActiveSessions = false }
+        guard let next = try? await client.activeSessions(baseURL: baseURL, token: token) else {
+            activeSessionsUnavailable = true
+            return
+        }
         activeSessions = next
+        hasLoadedActiveSessions = true
         syncKeepAwake()
     }
 
     private func loadTodayJournal() async {
         guard isPopoverPresented else { return }
-        guard let baseURL, !token.isEmpty else { return }
-        guard let next = try? await client.todayJournal(baseURL: baseURL, token: token) else { return }
+        guard let baseURL, !token.isEmpty, !isLoadingTodayJournal else { return }
+        isLoadingTodayJournal = true
+        todayJournalUnavailable = false
+        defer { isLoadingTodayJournal = false }
+        guard let next = try? await client.todayJournal(baseURL: baseURL, token: token) else {
+            todayJournalUnavailable = true
+            return
+        }
         todayJournal = next
     }
 
@@ -367,6 +399,7 @@ final class DaemonController: ObservableObject {
             apply(next)
             await loadConfig()
             await loadActiveSessions()
+            await loadTodayJournal()
         } catch {
             connected = false
             statusMessage = "Daemon unavailable; showing the last good snapshot."
