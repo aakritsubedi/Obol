@@ -19,7 +19,7 @@ Use Node 20+ and the repository's npm version. From the repository root:
 - `npm run dev:daemon` or `npm run dev:dashboard` starts a local workspace in watch mode.
 - `npm run typecheck` runs TypeScript checks; `npm test` runs all Vitest suites.
 - `npm run lint` and `npm run format:check` run Biome validation.
-- `swift test --package-path macos` runs the SwiftPM tests. For native checks, use `swiftformat --lint macos` and `swiftlint lint --config .swiftlint.yml --path macos`.
+- `swift test --package-path macos` runs the SwiftPM tests. For native checks, use `swiftformat --lint macos` and `swiftlint lint --config .swiftlint.yml macos`.
 - `npm run package:dmg` builds the distributable DMG after the app and web assets are ready.
 
 ## Coding Style & Naming Conventions

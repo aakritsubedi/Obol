@@ -48,7 +48,7 @@ Swift (native app + `ObolCore`/`ObolUpdateCore` SwiftPM package):
 swift test --package-path macos                       # all Swift tests, CLI
 swift test --package-path macos --filter ClassName     # single test class/method
 swiftformat --lint macos                               # CI also runs this
-swiftlint lint --config .swiftlint.yml --path macos     # CI also runs this
+swiftlint lint --config .swiftlint.yml macos           # CI also runs this
 open macos/Obol.xcodeproj                              # after npm run build; Cmd+U also runs Swift tests
 ```
 

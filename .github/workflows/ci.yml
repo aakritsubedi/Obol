@@ -43,7 +43,7 @@ jobs:
       - name: Install SwiftLint
         run: brew install swiftlint
       - run: swiftformat --lint macos
-      - run: swiftlint lint --config .swiftlint.yml --path macos
+      - run: swiftlint lint --config .swiftlint.yml macos
       - run: swift test --package-path macos
       - run: npm ci
       - run: npm run build
