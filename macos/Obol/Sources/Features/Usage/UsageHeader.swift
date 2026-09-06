@@ -21,10 +21,10 @@ struct UsageHeader: View {
         }
     }
 
-    /// Refresh, the last-sync time and the live indicator answer one question —
-    /// how current is the number below them — so they travel as a single
-    /// trailing cluster instead of being split between the header and the
-    /// footer. The pill anchors the right edge; the quieter two lead into it.
+    /// Refresh and the live indicator answer one question — how current is the
+    /// number below them — so they travel as a single trailing cluster instead
+    /// of being split between the header and the footer. The pill anchors the
+    /// right edge; the button leads into it.
     private var freshnessControls: some View {
         HStack(spacing: 4) {
             IconButton(systemName: "arrow.clockwise", help: "Refresh usage") {
@@ -32,16 +32,6 @@ struct UsageHeader: View {
             }
             .disabled(!controller.connected || controller.isRefreshing)
             .opacity(controller.isRefreshing ? 0.4 : 1)
-
-            TimelineView(.periodic(from: .now, by: 30)) { context in
-                Text(controller.isRefreshing
-                    ? "Updating…"
-                    : Recency.label(updatedAt: controller.summary.updatedAt, now: context.date))
-                    .font(WidgetStyle.TypeScale.caption)
-                    .foregroundStyle(.tertiary)
-                    .monospacedDigit()
-                    .lineLimit(1)
-            }
 
             statusLabel
                 .padding(.leading, 2)
