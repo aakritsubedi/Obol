@@ -16,5 +16,6 @@
   "monthly": [],
   "session": [],
   "projects": [],
+  "projectPaths": {},
   "totals": {"inputTokens": 5000, "outputTokens": 4000, "cacheCreationTokens": 1000, "cacheReadTokens": 2500, "totalCost": 12.5, "totalTokens": 12500}
 }

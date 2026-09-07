@@ -15,6 +15,7 @@ import {
   numberValue,
   projectName,
   setMoneyDisplay,
+  vscodeFolderUri,
 } from "./format";
 import { loadMoneyDisplay } from "./money";
 
@@ -169,6 +170,12 @@ describe("projectName", () => {
 
   it("falls back for empty slugs", () => {
     expect(projectName("")).toBe("Unknown project");
+  });
+});
+
+describe("vscodeFolderUri", () => {
+  it("builds a vscode URI for an absolute path", () => {
+    expect(vscodeFolderUri("/Users/dev/demo")).toBe("vscode://file/Users/dev/demo");
   });
 });
 

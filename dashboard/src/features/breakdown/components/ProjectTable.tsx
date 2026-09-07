@@ -1,33 +1,37 @@
 import type { ProjectUsageRow } from "@shared/api";
-import { formatCurrency, formatTokens, projectName } from "@shared/lib/format";
+import { formatCurrency, formatTokens, projectName, vscodeFolderUri } from "@shared/lib/format";
 import { projectColor } from "@shared/providers/catalog";
+import { FOLDER, Icon } from "@shared/ui/icons";
 import SectionHeader from "@shared/ui/SectionHeader";
 import { buttonGhost, emptyState, inputControl, sectionShell, tableHead } from "@shared/ui/tokens";
 import { useEffect, useMemo, useState } from "react";
 
 interface Props {
   projects: ProjectUsageRow[];
+  projectPaths?: Record<string, string>;
 }
 
 interface ProjectSummary {
   project: string;
   key: string;
+  slug: string;
   totalCost: number;
   totalTokens: number;
   periods: Set<string>;
 }
 
-export default function ProjectTable({ projects }: Props) {
+export default function ProjectTable({ projects, projectPaths = {} }: Props) {
   const [query, setQuery] = useState("");
   const [showAll, setShowAll] = useState(false);
   const summaries = useMemo(() => {
     const grouped = new Map<string, ProjectSummary>();
     for (const row of projects) {
-      const label = projectName(row.project);
-      const key = label.toLowerCase();
-      const current = grouped.get(key) || {
+      const slug = row.project;
+      const label = projectName(slug);
+      const current = grouped.get(slug) || {
         project: label,
-        key,
+        key: slug,
+        slug,
         totalCost: 0,
         totalTokens: 0,
         periods: new Set<string>(),
@@ -35,7 +39,7 @@ export default function ProjectTable({ projects }: Props) {
       current.totalCost += row.totalCost;
       current.totalTokens += row.totalTokens;
       current.periods.add(row.period);
-      grouped.set(key, current);
+      grouped.set(slug, current);
     }
     return [...grouped.values()].sort((left, right) => right.totalCost - left.totalCost);
   }, [projects]);
@@ -94,18 +98,41 @@ export default function ProjectTable({ projects }: Props) {
               <tbody>
                 {visible.map((project) => {
                   const share = total > 0 ? (project.totalCost / total) * 100 : 0;
+                  const path = projectPaths[project.slug];
+                  const openHref = path ? vscodeFolderUri(path) : null;
+                  const color = projectColor(project.key);
                   return (
-                    <tr className="border-t border-hairline" key={project.key}>
+                    <tr className="border-t border-hairline" key={project.slug}>
                       <td className="py-3">
                         <div className="flex min-w-0 items-center gap-2">
-                          <i
-                            className="h-2 w-2 shrink-0 rounded-full"
-                            style={{ backgroundColor: projectColor(project.key) }}
-                          />
-                          <span className="truncate font-medium" title={project.project}>
-                            {project.project}
-                          </span>
-                          <span className="text-[10px] text-muted">{project.periods.size} days</span>
+                          {openHref ? (
+                            <a
+                              href={openHref}
+                              className="group flex min-w-0 items-center gap-2 no-underline"
+                              title={`Open ${project.project} in VS Code`}
+                            >
+                              <span className="inline-flex shrink-0 transition-opacity group-hover:opacity-80" style={{ color }}>
+                                <Icon
+                                  path={FOLDER}
+                                  label={`Open ${project.project} in VS Code`}
+                                  className="h-3.5 w-3.5"
+                                />
+                              </span>
+                              <span className="truncate font-medium text-ink group-hover:underline">
+                                {project.project}
+                              </span>
+                            </a>
+                          ) : (
+                            <>
+                              <span className="inline-flex shrink-0" style={{ color }}>
+                                <Icon path={FOLDER} label="Project" className="h-3.5 w-3.5" />
+                              </span>
+                              <span className="truncate font-medium" title={project.project}>
+                                {project.project}
+                              </span>
+                            </>
+                          )}
+                          <span className="shrink-0 text-[10px] text-muted">{project.periods.size} days</span>
                         </div>
                       </td>
                       <td className="px-3 py-3 text-right tabular-nums text-muted">{share.toFixed(2)}%</td>

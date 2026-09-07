@@ -33,8 +33,9 @@ function taskEnd(task: Task): number {
   return Number.isFinite(value) ? value : taskStart(task);
 }
 
-/** Keep the rail newest-first and make idle stretches visible between tasks. */
-function timelineEntries(tasks: Task[]): TimelineEntry[] {
+/** Keep the rail newest-first and surface idle stretches that exceed the merge threshold. */
+function timelineEntries(tasks: Task[], idleMinutes: number): TimelineEntry[] {
+  const threshold = idleMinutes > 0 ? idleMinutes : 15;
   const ordered = [...tasks].sort((left, right) => taskStart(right) - taskStart(left));
   return ordered.flatMap((task, index) => {
     if (index === 0) return [{ kind: "task", task } satisfies TimelineEntry];
@@ -42,11 +43,12 @@ function timelineEntries(tasks: Task[]): TimelineEntry[] {
     const previous = ordered[index - 1];
     const gap = taskStart(previous) - taskEnd(task);
     const entries: TimelineEntry[] = [];
-    if (gap > 0) {
+    const minutes = gap / 60_000;
+    if (minutes >= threshold) {
       entries.push({
         kind: "gap",
         id: `gap-${task.id}-${previous.id}`,
-        minutes: gap / 60_000,
+        minutes,
       });
     }
     entries.push({ kind: "task", task });
@@ -239,7 +241,7 @@ export default function JournalCard({ journal, options, date, onDateChange, load
   const [copied, setCopied] = useState(false);
   const lines = journal ? narrative(journal) : [];
   const tasks = journal ? groupTasks(journal) : [];
-  const timeline = timelineEntries(tasks);
+  const timeline = timelineEntries(tasks, journal?.idleMinutes ?? 15);
 
   useEffect(() => {
     if (!copied) return;

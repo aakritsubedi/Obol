@@ -8,6 +8,7 @@ import { UsageService } from "./app/UsageService.js";
 import type { CcusageReport } from "./data/ccusage/types.js";
 import { ConfigStore, migrateLegacyState } from "./data/config-store.js";
 import { collectLocalUsage, localUsageSinceMs } from "./data/local-usage.js";
+import { collectProjectPaths, refreshProjectPaths } from "./data/project-paths.js";
 import { SnapshotStore } from "./data/snapshot-store.js";
 import { systemTime } from "./domain/time.js";
 import { mergeLocalUsage } from "./domain/usage-merge.js";
@@ -37,19 +38,21 @@ async function main(): Promise<void> {
   let config = await configStore.load();
   const store = new SnapshotStore(configStore.paths.snapshot, config, systemTime);
   await store.load(config);
-  let liveReport: CcusageReport = store.get().report;
+  const timezone = systemTime.timeZone();
+  const sinceMs = localUsageSinceMs(config.historyDays, systemTime.now(), timezone);
+  let liveReport: CcusageReport = await refreshProjectPaths(store.get().report, providers, sinceMs);
 
   if (hasFlag("--once")) {
     const { report, blocks } = await runOnce(config);
     // The one-shot path reports the same figures the server would, so the
     // providers ccusage cannot read are priced and merged here too.
     const timezone = systemTime.timeZone();
-    const localRows = await collectLocalUsage(
-      providers,
-      localUsageSinceMs(config.historyDays, systemTime.now(), timezone),
-      timezone,
-    );
-    await store.apply(mergeLocalUsage(report, localRows), blocks, config);
+    const sinceMs = localUsageSinceMs(config.historyDays, systemTime.now(), timezone);
+    const [localRows, projectPaths] = await Promise.all([
+      collectLocalUsage(providers, sinceMs, timezone),
+      collectProjectPaths(providers, sinceMs),
+    ]);
+    await store.apply(mergeLocalUsage({ ...report, projectPaths }, localRows), blocks, config);
     console.log(
       JSON.stringify(
         {

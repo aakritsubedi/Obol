@@ -15,6 +15,21 @@ describe("estimateCost", () => {
     expect(estimateCost("composer-2.5", million)).toBeGreaterThan(0);
   });
 
+  it("prices Composer 2.5 standard at Cursor's list rates", () => {
+    expect(estimateCost("composer-2.5", million)).toBe(0.5);
+    expect(
+      estimateCost("composer-2.5", { ...million, inputTokens: 0, outputTokens: 1_000_000 }),
+    ).toBe(2.5);
+  });
+
+  it("prices Composer 2.5 Fast higher than standard", () => {
+    expect(estimateCost("composer-2.5-fast", million)).toBe(3);
+    expect(
+      estimateCost("composer-2.5-fast", { ...million, inputTokens: 0, outputTokens: 1_000_000 }),
+    ).toBe(15);
+    expect(estimateCost("composer-2.5-fast", million)).toBeGreaterThan(estimateCost("composer-2.5", million));
+  });
+
   it("prefers the longest matching model key", () => {
     expect(estimateCost("gpt-5-mini", million)).toBeLessThan(estimateCost("gpt-5", million));
   });

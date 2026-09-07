@@ -27,7 +27,7 @@ export function emptyJournal(date: string, timezone: string, idleMinutes: number
 }
 
 export function emptyReport(): CcusageReport {
-  return { daily: [], weekly: [], monthly: [], session: [], projects: [], totals: {} };
+  return { daily: [], weekly: [], monthly: [], session: [], projects: [], projectPaths: {}, totals: {} };
 }
 
 export function emptyBlocks(): BlocksReport {

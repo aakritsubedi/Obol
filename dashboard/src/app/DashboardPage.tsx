@@ -214,7 +214,7 @@ function DashboardPage() {
             />
             <CostChart rows={rangeRows(projects, activeRange)} metric="cost" groupBy="project" />
           </section>
-          <ProjectTable projects={projects} />
+          <ProjectTable projects={projects} projectPaths={report?.projectPaths} />
         </>
       )}
       {!config && <div className={emptyState}>Budget configuration is unavailable.</div>}

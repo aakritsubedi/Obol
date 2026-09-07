@@ -168,6 +168,63 @@ dashboard. It watches supported agent data, refreshes usage on a configurable
 interval, keeps the last good snapshot, and serves the dashboard from the
 same loopback-only process.
 
+### Fetching data from multiple providers
+
+Obol never calls agent APIs or uploads your logs. Every refresh reads files
+already on your Mac and combines them into one normalized report. Providers you
+do not use are skipped; a broken or missing source does not block the others.
+
+There are two tracks that run on each refresh:
+
+| Track | What it covers | How it works |
+| --- | --- | --- |
+| **ccusage** | Claude, Codex, and OpenCode totals; Claude project costs | The daemon spawns the bundled [ccusage](https://github.com/ryoppippi/ccusage) CLI twice in parallel: once for daily, weekly, and monthly totals broken down by agent, and once for Claude per-project daily costs. ccusage reads each agent’s local logs directly and applies its pricing table. |
+| **Local adapters** | Copilot and Cursor totals; the work journal for all five agents | Each agent has a small adapter in the daemon that knows where its data lives and how to parse it. Adapters with a `usage` method return token counts and model names; Obol prices those locally. Every adapter also feeds the journal by discovering transcripts, reading records, and accumulating session activity. |
+
+On refresh the daemon:
+
+1. **Runs ccusage** for the configured history window and your local timezone.
+2. **Collects local usage** by calling each adapter’s optional `usage` method
+   (Copilot and Cursor today).
+3. **Merges** the local rows into ccusage’s normalized report so daily, weekly,
+   monthly, and provider totals include every agent.
+4. **Persists** the merged snapshot to `~/.obol/snapshot.json` and notifies the
+   menu bar app and dashboard over loopback HTTP and SSE.
+
+The work journal is built separately when you open a day: every installed
+adapter discovers transcripts touched since that day, reads them in provider-
+specific form, and folds the records into sessions (prompts, tools, edited
+files, active minutes). Claude subagent and OpenCode child transcripts carry
+their parent’s session id so the same work is not counted twice.
+
+#### Where each agent’s data comes from
+
+| Agent | Cost totals | Journal / session detail | On-disk format |
+| --- | --- | --- | --- |
+| **Claude Code** | ccusage | Adapter reads `~/.claude/projects` | Newline-delimited JSON (`.jsonl`) per session; subagents nested under the parent |
+| **Codex CLI** | ccusage | Adapter reads `~/.codex/sessions` | JSONL rollouts under `YYYY/MM/DD/` |
+| **OpenCode** | ccusage | Adapter queries `~/.local/share/opencode/opencode.db` | SQLite (`session`, `message`, `part` tables) |
+| **GitHub Copilot** | Local adapter (`usage`) | Adapter reads VS Code `workspaceStorage/*/chatSessions` | JSON chat session files (stable VS Code and Insiders paths) |
+| **Cursor** | Local adapter (`usage`) | Adapter queries `~/Library/Application Support/Cursor/User/globalStorage/state.vscdb` | SQLite composer and bubble rows; tokens reconstructed from context shape when the agent records none |
+
+Claude is the only agent whose per-project cost history can be joined to
+sessions: ccusage keys projects by a slug derived from the working directory,
+which matches how Claude names its project folders. Codex, OpenCode, Copilot,
+and Cursor still appear in aggregate provider and daily totals and in the work
+journal.
+
+#### When data refreshes
+
+- On a **timer** — interval from `~/.obol/config.json` (default: every 5 minutes).
+- On **filesystem changes** — the daemon watches known agent directories (and
+  scans `~/.config` for similarly named folders) and debounces writes before
+  refreshing.
+- On **demand** — **Refresh** in the popover or dashboard, or when the native
+  app starts.
+
+If ccusage fails but local adapters still return rows, Obol keeps the last
+merged snapshot rather than double-counting local usage on the next attempt.
+
 ## Troubleshooting
 
 ### The dashboard is empty or stale

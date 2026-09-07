@@ -68,4 +68,12 @@ describe("mergeLocalUsage", () => {
     expect(result.daily).toHaveLength(1);
     expect(result.daily[0]).toMatchObject({ period: "2026-08-26", totalCost: 1.25, totalTokens: 125 });
   });
+
+  it("preserves projectPaths when merging local usage", () => {
+    const result = mergeLocalUsage(
+      { ...report(), projectPaths: { "-Users-dev-demo": "/Users/dev/demo" } },
+      [local()],
+    );
+    expect(result.projectPaths).toEqual({ "-Users-dev-demo": "/Users/dev/demo" });
+  });
 });

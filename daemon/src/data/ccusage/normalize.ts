@@ -9,6 +9,15 @@ import type {
 import { asRecord, numberValue, stringValue } from "../../shared/coerce.js";
 import type { CcusageReport, CcusageRow, ProjectUsageRow } from "./types.js";
 
+function normalizeProjectPaths(value: unknown): Record<string, string> {
+  const input = asRecord(value);
+  const paths: Record<string, string> = {};
+  for (const [key, path] of Object.entries(input)) {
+    if (typeof path === "string" && path.trim()) paths[key] = path.trim();
+  }
+  return paths;
+}
+
 export function normalizeRow(value: unknown, index = 0): CcusageRow {
   const input = asRecord(value);
   const agents = Array.isArray(input.agents) ? input.agents.map((agent) => asRecord(agent)) : [];
@@ -92,6 +101,7 @@ export function normalizeReport(value: unknown): CcusageReport {
     monthly: sortRowsAscending(monthly),
     session,
     projects,
+    projectPaths: normalizeProjectPaths(input.projectPaths),
     totals: asRecord(input.totals),
   };
 }

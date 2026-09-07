@@ -35,6 +35,8 @@ export interface Report {
   monthly: UsageRow[];
   session: UsageRow[];
   projects: ProjectUsageRow[];
+  /** Claude project slug → absolute working directory, read from transcripts. */
+  projectPaths?: Record<string, string>;
   totals?: ReportTotals;
   [key: string]: unknown;
 }

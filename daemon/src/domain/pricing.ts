@@ -50,7 +50,11 @@ const PRICES: Record<string, ModelPrice> = {
   o3: { input: 2, output: 8, cacheRead: 0.5, cacheWrite: 2 },
   geminiflash: { input: 0.3, output: 2.5, cacheRead: 0.075, cacheWrite: 0.3 },
   geminipro: { input: 1.25, output: 10, cacheRead: 0.31, cacheWrite: 1.25 },
-  composer: { input: 1.25, output: 10, cacheRead: 0.125, cacheWrite: 1.25 },
+  // Cursor Composer 2.5 list prices. Fast is the product default and may appear as
+  // composer-2.5-fast in usage; standard is composer-2.5 with Fast toggled off.
+  composer25fast: { input: 3, output: 15, cacheRead: 0.3, cacheWrite: 3.75 },
+  composer25: { input: 0.5, output: 2.5, cacheRead: 0.05, cacheWrite: 0.625 },
+  composer: { input: 0.5, output: 2.5, cacheRead: 0.05, cacheWrite: 0.625 },
 };
 
 // Longest keys first so a specific model never loses to a shorter family name

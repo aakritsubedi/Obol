@@ -30,6 +30,7 @@ export function mergeLocalUsage(report: CcusageReport, rows: LocalUsageRow[]): C
     monthly: mergePeriod(report.monthly, rows, "monthly"),
     session: [...report.session],
     projects: [...report.projects],
+    ...(report.projectPaths ? { projectPaths: { ...report.projectPaths } } : {}),
     totals: { ...report.totals },
   };
 

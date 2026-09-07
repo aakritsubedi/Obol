@@ -1,6 +1,7 @@
 import type { WidgetConfig } from "@obol/contract";
 import type { CcusageReport } from "../data/ccusage/types.js";
 import { collectLocalUsage, localUsageSinceMs } from "../data/local-usage.js";
+import { attachProjectPaths, collectProjectPaths } from "../data/project-paths.js";
 import type { SnapshotStore } from "../data/snapshot-store.js";
 import { emptyBlocks } from "../domain/factories.js";
 import { systemTime, type TimeSource } from "../domain/time.js";
@@ -33,25 +34,32 @@ export class UsageService {
       const current = this.options.store.get();
       const time = this.options.time ?? systemTime;
       const timezone = time.timeZone();
-      const localRows = await collectLocalUsage(
-        this.options.providers ?? providers,
-        localUsageSinceMs(config.historyDays, time.now(), timezone),
-        timezone,
-      );
+      const adapters = this.options.providers ?? providers;
+      const sinceMs = localUsageSinceMs(config.historyDays, time.now(), timezone);
+      const [localRows, projectPaths] = await Promise.all([
+        collectLocalUsage(adapters, sinceMs, timezone),
+        collectProjectPaths(adapters, sinceMs),
+      ]);
+      const withProjectPaths = (report: CcusageReport): CcusageReport => attachProjectPaths(report, projectPaths);
       if (result.report || result.blocks || localRows.length > 0) {
         // Local rows may only be merged into a report ccusage just produced.
         // The stored snapshot already contains the last merge, so folding them
         // in again would add the same usage a second time, and keep adding it
         // for as long as ccusage stays unavailable.
-        const report = result.report ? mergeLocalUsage(result.report, localRows) : current.report;
+        const report = result.report
+          ? mergeLocalUsage(withProjectPaths(result.report), localRows)
+          : withProjectPaths(current.report);
         const fullReport = result.fullReport ?? result.report;
-        const liveReport = fullReport ? mergeLocalUsage(fullReport, localRows) : this.options.getLiveReport();
+        const liveReport = fullReport
+          ? mergeLocalUsage(withProjectPaths(fullReport), localRows)
+          : withProjectPaths(this.options.getLiveReport());
         const blocks = result.blocks ?? emptyBlocks();
         this.options.setLiveReport(liveReport);
         const message = result.errors.length ? result.errors.join("; ") : null;
         await this.options.store.apply(report, blocks, config, message);
         this.options.onChanged();
       } else {
+        this.options.setLiveReport(withProjectPaths(this.options.getLiveReport()));
         await this.options.store.markError(config, result.errors.join("; ") || "ccusage refresh failed");
         this.options.onChanged();
       }

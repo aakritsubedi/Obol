@@ -115,6 +115,10 @@ export function projectName(value: unknown): string {
   return displayName(pieces[pieces.length - 1] || name, "Unknown project");
 }
 
+export function vscodeFolderUri(path: string): string {
+  return `vscode://file${path.startsWith("/") ? path : `/${path}`}`;
+}
+
 export function formatRelativeTime(value: unknown): string {
   if (!value) return "No activity";
   const timestamp = new Date(String(value)).valueOf();
