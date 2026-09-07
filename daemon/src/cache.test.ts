@@ -7,6 +7,7 @@ import { emptyBlocks, normalizeReport } from "./types.js";
 const config: WidgetConfig = {
   port: 4737,
   refreshIntervalMs: 300_000,
+  refreshFloorMs: 60_000,
   dailyBudget: null,
   monthlyBudget: null,
   warningThreshold: 0.8,

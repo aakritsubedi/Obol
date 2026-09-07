@@ -99,7 +99,7 @@ async function main(): Promise<void> {
   const restartFallback = (milliseconds: number): void => {
     if (fallbackTimer) clearInterval(fallbackTimer);
     fallbackTimer = setInterval(() => {
-      void usageService.scheduleRefresh();
+      void usageService.refreshNow();
     }, milliseconds);
   };
 
@@ -146,8 +146,8 @@ async function main(): Promise<void> {
     dashboardUrl: `http://127.0.0.1:${port}/?t=${token}`,
   });
 
-  watcher = new AgentLogWatcher(() => {
-    journalService.forgetToday();
+  watcher = new AgentLogWatcher((changedPath) => {
+    journalService.forgetToday(changedPath);
     void usageService.scheduleRefresh();
   });
   watcher.start();

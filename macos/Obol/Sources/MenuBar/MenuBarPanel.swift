@@ -67,14 +67,19 @@ final class MenuBarPanelController: NSObject {
 
         // A status item sizes itself from its length, not from what is inside
         // it, so the width the label needs has to be measured and pushed back
-        // whenever the total or the currency changes. `objectWillChange` fires
-        // before the value lands; the hop measures the label it will produce.
-        controller.objectWillChange
-            .merge(with: currency.objectWillChange)
-            .sink { [weak self] _ in
-                Task { @MainActor in self?.resizeStatusItem() }
-            }
-            .store(in: &cancellables)
+        // whenever the formatted value changes. The published values fire
+        // before the label lands; the hop measures the label it will produce.
+        Publishers.CombineLatest3(
+            controller.$summary.map { $0.today.totalCost },
+            currency.$selected,
+            currency.$rate
+        )
+        .map { [currency] total, _, _ in currency.display(total) }
+        .removeDuplicates()
+        .sink { [weak self] _ in
+            Task { @MainActor in self?.resizeStatusItem() }
+        }
+        .store(in: &cancellables)
         resizeStatusItem()
     }
 
@@ -135,14 +140,13 @@ final class MenuBarPanelController: NSObject {
     }
 
     private func show() {
-        syncPanelSize()
-
         controller.popoverOpened()
         updates.popoverOpened()
         currency.popoverOpened()
 
         panel.alphaValue = 0
         panel.makeKeyAndOrderFront(nil)
+        syncPanelSize()
         // An accessory app has to activate for the currency search field to
         // take a keystroke; the panel gives focus back the moment it closes.
         NSApp.activate(ignoringOtherApps: true)
@@ -190,6 +194,7 @@ final class MenuBarPanelController: NSObject {
 
     /// Matches the window to the card SwiftUI just laid out and re-anchors it.
     private func syncPanelSize() {
+        guard panel.isVisible else { return }
         guard let content = panel.contentViewController?.view else { return }
         panel.setContentSize(content.fittingSize)
         reposition()

@@ -13,6 +13,7 @@ final class DaemonController: ObservableObject {
     @Published private(set) var notificationsDenied = false
     @Published private(set) var activeSessions: [ActiveSession] = []
     @Published private(set) var todayJournal: TodayJournal?
+    @Published private(set) var todayShape = DayShape()
     @Published private(set) var isRefreshing = false
     @Published private(set) var isLoadingActiveSessions = false
     @Published private(set) var isLoadingTodayJournal = false
@@ -64,7 +65,8 @@ final class DaemonController: ObservableObject {
         self.loginItem = loginItem
         self.onCurrencyChanged = onCurrencyChanged
         notifier.onAuthorizationChange = { [weak self] denied in
-            self?.notificationsDenied = denied
+            guard let self, self.notificationsDenied != denied else { return }
+            self.notificationsDenied = denied
         }
         // config.json is the shared record, but it is a second away at launch,
         // so the remembered choice restores the switch without waiting for it.
@@ -135,13 +137,17 @@ final class DaemonController: ObservableObject {
     }
 
     func popoverOpened() {
-        isPopoverPresented = true
+        if !isPopoverPresented {
+            isPopoverPresented = true
+        }
         guard connected else { return }
         Task { await refresh() }
     }
 
     func popoverClosed() {
-        isPopoverPresented = false
+        if isPopoverPresented {
+            isPopoverPresented = false
+        }
     }
 
     func refresh() async {
@@ -173,28 +179,46 @@ final class DaemonController: ObservableObject {
         guard isPopoverPresented || config.keepAwake else { return }
         guard let baseURL, !token.isEmpty, !isLoadingActiveSessions else { return }
         isLoadingActiveSessions = true
-        activeSessionsUnavailable = false
+        if activeSessionsUnavailable {
+            activeSessionsUnavailable = false
+        }
         defer { isLoadingActiveSessions = false }
         guard let next = try? await client.activeSessions(baseURL: baseURL, token: token) else {
-            activeSessionsUnavailable = true
+            if !activeSessionsUnavailable {
+                activeSessionsUnavailable = true
+            }
             return
         }
-        activeSessions = next
-        hasLoadedActiveSessions = true
-        syncKeepAwake()
+        let changed = activeSessions != next
+        if changed {
+            activeSessions = next
+        }
+        if !hasLoadedActiveSessions {
+            hasLoadedActiveSessions = true
+        }
+        if changed {
+            syncKeepAwake()
+        }
     }
 
     private func loadTodayJournal() async {
         guard isPopoverPresented else { return }
         guard let baseURL, !token.isEmpty, !isLoadingTodayJournal else { return }
         isLoadingTodayJournal = true
-        todayJournalUnavailable = false
+        if todayJournalUnavailable {
+            todayJournalUnavailable = false
+        }
         defer { isLoadingTodayJournal = false }
         guard let next = try? await client.todayJournal(baseURL: baseURL, token: token) else {
-            todayJournalUnavailable = true
+            if !todayJournalUnavailable {
+                todayJournalUnavailable = true
+            }
             return
         }
-        todayJournal = next
+        if todayJournal != next {
+            todayJournal = next
+            todayShape = DayShape.from(next)
+        }
     }
 
     func openDashboard() {
@@ -289,12 +313,20 @@ final class DaemonController: ObservableObject {
     /// outlives a quiet stretch mid-run rather than dropping between turns.
     private func syncKeepAwake() {
         let shouldHold = config.keepAwake && !activeSessions.isEmpty
-        keepAwake.apply(shouldHold)
-        keepAwakeHolding = shouldHold
+        if keepAwakeHolding != shouldHold {
+            keepAwake.apply(shouldHold)
+            keepAwakeHolding = shouldHold
+        }
         // Without the administrator grant the hold cannot be taken at all, so
         // the published state follows what the machine did, not what was asked.
-        _ = lidWake.apply(shouldHold && config.keepAwakeWithLidClosed)
-        lidWakeHolding = lidWake.isHolding
+        let shouldHoldLid = shouldHold && config.keepAwakeWithLidClosed
+        if lidWakeHolding != shouldHoldLid {
+            _ = lidWake.apply(shouldHoldLid)
+            let holding = lidWake.isHolding
+            if lidWakeHolding != holding {
+                lidWakeHolding = holding
+            }
+        }
     }
 
     func quit() {
@@ -318,8 +350,10 @@ final class DaemonController: ObservableObject {
 
     private func loadSnapshot() {
         guard let snapshot = snapshotStore.load() else { return }
-        summary = snapshot
-        notifier.observe(snapshot)
+        if summary != snapshot {
+            summary = snapshot
+            notifier.observe(snapshot)
+        }
     }
 
     private func spawnDaemon() {
@@ -394,36 +428,53 @@ final class DaemonController: ObservableObject {
 
     private func pollSummary() async {
         guard let baseURL, !token.isEmpty else { return }
+        async let summary = client.summary(baseURL: baseURL, token: token)
+        async let config: Void = loadConfig()
+        async let sessions: Void = loadActiveSessions()
+        async let journal: Void = loadTodayJournal()
         do {
-            let next = try await client.summary(baseURL: baseURL, token: token)
+            let next = try await summary
             apply(next)
-            await loadConfig()
-            await loadActiveSessions()
-            await loadTodayJournal()
+            _ = await (config, sessions, journal)
         } catch {
-            connected = false
-            statusMessage = "Daemon unavailable; showing the last good snapshot."
+            _ = await (config, sessions, journal)
+            if connected {
+                connected = false
+            }
+            let message = "Daemon unavailable; showing the last good snapshot."
+            if statusMessage != message {
+                statusMessage = message
+            }
         }
     }
 
     private func loadConfig() async {
         guard let baseURL, !token.isEmpty else { return }
         guard let nextConfig = try? await client.config(baseURL: baseURL, token: token) else { return }
-        config = adoptingKeepAwake(from: nextConfig)
+        let previous = config
+        let adopted = adoptingKeepAwake(from: nextConfig)
+        if config != adopted {
+            config = adopted
+        }
         healLaunchAtLogin()
         // Re-evaluated on every poll so an edit made straight to config.json
         // still takes effect.
         syncKeepAwake()
         // config.json is the shared source of truth for the display currency,
         // so a change made in one surface reaches the other on its next read.
-        onCurrencyChanged(nextConfig.currency, nextConfig.currencyRate)
+        if previous.currency != nextConfig.currency || previous.currencyRate != nextConfig.currencyRate {
+            onCurrencyChanged(nextConfig.currency, nextConfig.currencyRate)
+        }
     }
 
     private func saveConfig() async {
         guard let baseURL, !token.isEmpty else { return }
         do {
             let saved = try await client.update(config: config, baseURL: baseURL, token: token)
-            config = adoptingKeepAwake(from: saved)
+            let adopted = adoptingKeepAwake(from: saved)
+            if config != adopted {
+                config = adopted
+            }
         } catch {
             statusMessage = "Could not save preferences."
         }
@@ -445,9 +496,13 @@ final class DaemonController: ObservableObject {
     }
 
     private func apply(_ next: UsageSummary) {
-        summary = next
-        connected = true
-        notifier.observe(next)
+        if summary != next {
+            summary = next
+            notifier.observe(next)
+        }
+        if !connected {
+            connected = true
+        }
     }
 
     private func healLaunchAtLogin() {

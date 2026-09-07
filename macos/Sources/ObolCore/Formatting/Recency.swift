@@ -7,15 +7,15 @@ import Foundation
 /// here rather than in the view because the phrasing is the contract the
 /// header's live indicator is read against, and it is worth a test.
 public enum Recency {
+    private static let fractionalISO8601 = Date.ISO8601FormatStyle(includingFractionalSeconds: true)
+    private static let wholeISO8601 = Date.ISO8601FormatStyle(includingFractionalSeconds: false)
+
     public static func parse(_ raw: String?) -> Date? {
         guard let raw else { return nil }
-        let formatter = ISO8601DateFormatter()
-        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-        if let date = formatter.date(from: raw) {
+        if let date = try? fractionalISO8601.parse(raw) {
             return date
         }
-        formatter.formatOptions = [.withInternetDateTime]
-        return formatter.date(from: raw)
+        return try? wholeISO8601.parse(raw)
     }
 
     /// Deliberately terse — it sits beside the live pill in a row that also

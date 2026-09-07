@@ -4,7 +4,7 @@ import ObolCore
 /// A subset view of the daemon's config: the fields the menu bar reads or
 /// writes. A PUT of this struct patches only these keys, so the ones the
 /// dashboard owns survive untouched.
-struct WidgetConfig: Codable {
+struct WidgetConfig: Codable, Equatable {
     var port: Int
     var refreshIntervalMs: Int
     var dailyBudget: Double?

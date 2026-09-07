@@ -145,6 +145,7 @@ export interface JournalOptions {
   idleMinutes: number;
   report?: CcusageReport | null;
   providers?: ProviderAdapter[];
+  onSourcePath?: (path: string) => void;
 }
 
 export async function readDayJournal(options: JournalOptions): Promise<DayJournal> {
@@ -170,6 +171,7 @@ export async function readDayJournal(options: JournalOptions): Promise<DayJourna
       continue;
     }
     for (const file of files) {
+      options.onSourcePath?.(file.path);
       try {
         await readTranscript(provider, file, date, timezone, sessions, day);
       } catch {

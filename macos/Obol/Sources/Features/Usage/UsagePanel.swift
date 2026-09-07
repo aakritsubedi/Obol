@@ -32,6 +32,7 @@ struct UsagePanel: View {
 
             TodayShapeSection(
                 journal: controller.todayJournal,
+                shape: controller.todayShape,
                 isLoading: controller.showsTodayJournalSkeleton,
                 isUnavailable: controller.todayJournalUnavailable && controller.todayJournal == nil,
                 isPresented: controller.isPopoverPresented

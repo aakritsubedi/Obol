@@ -7,7 +7,7 @@ public enum BudgetStatus: String, Codable, Sendable {
     case over
 }
 
-public struct TodayUsage: Decodable, Sendable {
+public struct TodayUsage: Decodable, Equatable, Sendable {
     public let period: String
     public let totalCost: Double
     public let totalTokens: Double
@@ -54,7 +54,7 @@ public struct TodayUsage: Decodable, Sendable {
     }
 }
 
-public struct ProviderSummary: Decodable, Identifiable, Sendable {
+public struct ProviderSummary: Decodable, Equatable, Identifiable, Sendable {
     public let agent: String
     public let billing: String?
     public let totalCost: Double
@@ -109,7 +109,7 @@ public struct UsageReport: Decodable, Sendable {
     private enum CodingKeys: String, CodingKey { case daily, weekly, monthly, session, projects }
 }
 
-public struct ActiveSession: Decodable, Identifiable, Sendable {
+public struct ActiveSession: Decodable, Equatable, Identifiable, Sendable {
     public let id: String
     public let provider: String
     public let project: String
@@ -138,7 +138,7 @@ public struct ActiveSession: Decodable, Identifiable, Sendable {
     }
 }
 
-public struct BurnRate: Decodable, Sendable {
+public struct BurnRate: Decodable, Equatable, Sendable {
     public let costPerHour: Double
 
     public init(costPerHour: Double) {
@@ -153,7 +153,7 @@ public struct BurnRate: Decodable, Sendable {
     private enum CodingKeys: String, CodingKey { case costPerHour }
 }
 
-public struct Projection: Decodable, Sendable {
+public struct Projection: Decodable, Equatable, Sendable {
     public let totalCost: Double
 
     public init(totalCost: Double) {
@@ -168,7 +168,7 @@ public struct Projection: Decodable, Sendable {
     private enum CodingKeys: String, CodingKey { case totalCost }
 }
 
-public struct BudgetEvaluation: Decodable, Sendable {
+public struct BudgetEvaluation: Decodable, Equatable, Sendable {
     public let status: BudgetStatus
     public let dailyRatio: Double?
     public let monthlyRatio: Double?
@@ -192,7 +192,7 @@ public struct BudgetEvaluation: Decodable, Sendable {
     private enum CodingKeys: String, CodingKey { case status, dailyRatio, monthlyRatio, reason }
 }
 
-public struct UsageSummary: Decodable, Sendable {
+public struct UsageSummary: Decodable, Equatable, Sendable {
     public let today: TodayUsage
     public let agents: [ProviderSummary]
     public let burnRate: BurnRate
@@ -242,7 +242,7 @@ public struct UsageSummary: Decodable, Sendable {
         CodingKey { case today, agents, burnRate, projection, budgetStatus, budget, updatedAt, stale, error }
 }
 
-public struct JournalSession: Decodable, Sendable {
+public struct JournalSession: Decodable, Equatable, Sendable {
     public let id: String
     public let provider: String
     public let title: String?
@@ -290,7 +290,7 @@ public struct JournalSession: Decodable, Sendable {
     }
 }
 
-public struct JournalProject: Decodable, Sendable {
+public struct JournalProject: Decodable, Equatable, Sendable {
     public let name: String
     public let path: String
     public let activeMinutes: Double
@@ -316,7 +316,7 @@ public struct JournalProject: Decodable, Sendable {
         CodingKey { case name, path, activeMinutes, sessions, filesEdited, toolCalls, providers, totalCost }
 }
 
-public struct DayJournal: Decodable, Sendable {
+public struct DayJournal: Decodable, Equatable, Sendable {
     public let date: String
     public let timezone: String
     public let idleMinutes: Double

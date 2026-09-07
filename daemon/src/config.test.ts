@@ -21,6 +21,7 @@ describe("parseConfig", () => {
       parseConfig({
         port: "8080",
         refreshIntervalMs: "120000",
+        refreshFloorMs: "30000",
         dailyBudget: "12.5",
         monthlyBudget: null,
         warningThreshold: 0.9,
@@ -35,6 +36,7 @@ describe("parseConfig", () => {
     ).toMatchObject({
       port: 8080,
       refreshIntervalMs: 120000,
+      refreshFloorMs: 30000,
       dailyBudget: 12.5,
       monthlyBudget: null,
       warningThreshold: 0.9,
@@ -53,5 +55,11 @@ describe("parseConfig", () => {
       currency: "NPR",
       currencyRate: null,
     });
+  });
+
+  it("keeps the refresh floor within the configured upper bound", () => {
+    expect(parseConfig({ refreshFloorMs: -1 }).refreshFloorMs).toBe(0);
+    expect(parseConfig({ refreshFloorMs: 601_000 }).refreshFloorMs).toBe(600_000);
+    expect(parseConfig({ refreshFloorMs: 0 }).refreshFloorMs).toBe(0);
   });
 });

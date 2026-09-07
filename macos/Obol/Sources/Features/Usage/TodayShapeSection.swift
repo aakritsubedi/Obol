@@ -3,16 +3,12 @@ import SwiftUI
 
 struct TodayShapeSection: View {
     let journal: TodayJournal?
+    let shape: DayShape
     var isLoading = false
     var isUnavailable = false
     var isPresented = true
 
-    static func activeMinutes(in journal: TodayJournal?) -> Double {
-        journal.map { DayShape.from($0).activeMinutes } ?? 0
-    }
-
     var body: some View {
-        let shape = journal.map { DayShape.from($0) } ?? DayShape()
         return Group {
             if isLoading {
                 skeleton

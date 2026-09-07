@@ -7,6 +7,7 @@ export interface BudgetConfig {
 export interface WidgetConfig extends BudgetConfig {
   port: number;
   refreshIntervalMs: number;
+  refreshFloorMs: number;
   launchAtLogin: boolean;
   keepAwake: boolean;
   keepAwakeWithLidClosed: boolean;

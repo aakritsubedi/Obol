@@ -84,13 +84,7 @@ public struct DayShape: Equatable, Sendable {
     }
 
     public static func parseDate(_ iso: String?) -> Date? {
-        guard let iso else { return nil }
-        let formatter = ISO8601DateFormatter()
-        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-        return formatter.date(from: iso) ?? {
-            formatter.formatOptions = [.withInternetDateTime]
-            return formatter.date(from: iso)
-        }()
+        Recency.parse(iso)
     }
 
     public static func accessibilityLabel(_ shape: DayShape) -> String {

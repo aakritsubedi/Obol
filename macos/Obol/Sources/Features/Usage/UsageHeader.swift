@@ -70,7 +70,7 @@ struct UsageHeader: View {
             Circle()
                 .fill(liveStatusColor)
                 .frame(width: 5, height: 5)
-                .modifier(PulsingDot(active: !controller.summary.stale))
+                .modifier(PulsingDot(active: controller.isPopoverPresented && !controller.summary.stale))
             Text(controller.liveLabel)
                 .font(WidgetStyle.TypeScale.status)
         }

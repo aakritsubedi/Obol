@@ -9,6 +9,7 @@ const LEGACY_STATE_DIRECTORY = ".token-cost-widget";
 export const DEFAULT_CONFIG: WidgetConfig = {
   port: 4737,
   refreshIntervalMs: 5 * 60 * 1000,
+  refreshFloorMs: 60 * 1000,
   dailyBudget: null,
   monthlyBudget: null,
   warningThreshold: 0.8,
@@ -86,6 +87,7 @@ export function parseConfig(value: unknown): WidgetConfig {
   const input = typeof value === "object" && value !== null ? (value as Record<string, unknown>) : {};
   const port = Number(input.port);
   const refreshIntervalMs = Number(input.refreshIntervalMs);
+  const refreshFloorMs = Number(input.refreshFloorMs);
   const warningThreshold = Number(input.warningThreshold);
   const historyDays = Number(input.historyDays);
   const journalIdleMinutes = Number(input.journalIdleMinutes);
@@ -96,6 +98,9 @@ export function parseConfig(value: unknown): WidgetConfig {
       Number.isFinite(refreshIntervalMs) && refreshIntervalMs >= 10_000
         ? refreshIntervalMs
         : DEFAULT_CONFIG.refreshIntervalMs,
+    refreshFloorMs: Number.isFinite(refreshFloorMs)
+      ? Math.min(10 * 60 * 1000, Math.max(0, refreshFloorMs))
+      : DEFAULT_CONFIG.refreshFloorMs,
     dailyBudget: nonNegativeOrNull(input.dailyBudget, DEFAULT_CONFIG.dailyBudget),
     monthlyBudget: nonNegativeOrNull(input.monthlyBudget, DEFAULT_CONFIG.monthlyBudget),
     warningThreshold:

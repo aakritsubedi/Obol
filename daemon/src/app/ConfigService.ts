@@ -26,6 +26,9 @@ export class ConfigService {
     if (patch.refreshIntervalMs !== undefined) {
       this.options.onRefreshIntervalChange(config.refreshIntervalMs);
     }
+    if (patch.refreshFloorMs !== undefined) {
+      this.options.usage.setRefreshFloorMs(config.refreshFloorMs);
+    }
     if (patch.historyDays !== undefined) {
       await this.options.usage.scheduleRefresh(true);
     }

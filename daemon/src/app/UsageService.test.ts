@@ -6,7 +6,7 @@ import { DEFAULT_CONFIG } from "../data/config-store.js";
 import { SnapshotStore } from "../data/snapshot-store.js";
 import { emptyReport } from "../domain/factories.js";
 import type { ProviderAdapter } from "../providers/types.js";
-import { UsageService } from "./UsageService.js";
+import { MAX_REFRESH_DEFERRAL_MS, UsageService } from "./UsageService.js";
 
 const NOW = new Date("2026-08-25T10:00:00Z");
 const time = { now: () => NOW, timeZone: () => "UTC" };
@@ -63,6 +63,7 @@ beforeEach(async () => {
 });
 
 afterEach(async () => {
+  vi.useRealTimers();
   await rm(directory, { recursive: true, force: true });
 });
 
@@ -91,5 +92,48 @@ describe("UsageService", () => {
     await usage.refreshNow();
 
     expect(copilotCost()).toBe(afterFirst);
+  });
+
+  it("honors the refresh floor and resolves a superseded schedule", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(NOW);
+    runUsage.mockResolvedValue({ report: emptyReport(), fullReport: null, blocks: null, errors: [] });
+    const usage = service();
+
+    await usage.refreshNow();
+    expect(runUsage).toHaveBeenCalledTimes(1);
+
+    vi.advanceTimersByTime(1_000);
+    const superseded = usage.scheduleRefresh();
+    const scheduled = usage.scheduleRefresh();
+    let supersededResolved = false;
+    void superseded.then(() => {
+      supersededResolved = true;
+    });
+    await Promise.resolve();
+    expect(supersededResolved).toBe(true);
+
+    await vi.advanceTimersByTimeAsync(58_999);
+    expect(runUsage).toHaveBeenCalledTimes(1);
+    await vi.advanceTimersByTimeAsync(1_001);
+    await scheduled;
+    expect(runUsage).toHaveBeenCalledTimes(2);
+  });
+
+  it("forces a refresh after continuous churn reaches the maximum deferral", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(NOW);
+    runUsage.mockResolvedValue({ report: emptyReport(), fullReport: null, blocks: null, errors: [] });
+    const usage = service();
+    let scheduled = usage.scheduleRefresh();
+
+    for (let elapsed = 1_000; elapsed < MAX_REFRESH_DEFERRAL_MS; elapsed += 1_000) {
+      await vi.advanceTimersByTimeAsync(1_000);
+      scheduled = usage.scheduleRefresh();
+    }
+    await vi.advanceTimersByTimeAsync(1_000);
+    await scheduled;
+
+    expect(runUsage).toHaveBeenCalledTimes(1);
   });
 });

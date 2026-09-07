@@ -11,13 +11,15 @@ struct PopoverView: View {
 
     var body: some View {
         Group {
-            if showingSettings {
-                SettingsPanel(controller: controller, updates: updates, currency: currency) {
-                    showingSettings = false
-                }
-            } else {
-                UsagePanel(controller: controller, updates: updates, currency: currency) {
-                    showingSettings = true
+            if controller.isPopoverPresented {
+                if showingSettings {
+                    SettingsPanel(controller: controller, updates: updates, currency: currency) {
+                        showingSettings = false
+                    }
+                } else {
+                    UsagePanel(controller: controller, updates: updates, currency: currency) {
+                        showingSettings = true
+                    }
                 }
             }
         }

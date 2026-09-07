@@ -1,28 +1,25 @@
 import Foundation
 
 public enum ObolFormatting {
+    private static let amountStyle = FloatingPointFormatStyle<Double>.number
+        .precision(.fractionLength(2))
+    private static let compactStyle = FloatingPointFormatStyle<Double>.number
+        .precision(.fractionLength(0 ... 1))
+
     public static func amount(_ value: Double) -> String {
-        let formatter = NumberFormatter()
-        formatter.numberStyle = .decimal
-        formatter.minimumFractionDigits = 2
-        formatter.maximumFractionDigits = 2
-        return formatter.string(from: NSNumber(value: value)) ?? "0.00"
+        value.formatted(amountStyle)
     }
 
     public static func compactTokens(_ value: Double) -> String {
-        let formatter = NumberFormatter()
-        formatter.numberStyle = .decimal
-        formatter.minimumFractionDigits = 0
-        formatter.maximumFractionDigits = 1
         switch value {
         case 1_000_000_000...:
-            return (formatter.string(from: NSNumber(value: value / 1_000_000_000)) ?? "0") + "B"
+            return (value / 1_000_000_000).formatted(compactStyle) + "B"
         case 1_000_000...:
-            return (formatter.string(from: NSNumber(value: value / 1_000_000)) ?? "0") + "M"
+            return (value / 1_000_000).formatted(compactStyle) + "M"
         case 1000...:
-            return (formatter.string(from: NSNumber(value: value / 1000)) ?? "0") + "K"
+            return (value / 1000).formatted(compactStyle) + "K"
         default:
-            return formatter.string(from: NSNumber(value: value.rounded())) ?? "0"
+            return value.rounded().formatted(compactStyle)
         }
     }
 }

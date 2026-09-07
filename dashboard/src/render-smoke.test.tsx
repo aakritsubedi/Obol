@@ -76,6 +76,7 @@ const report: Report = {
 const config: WidgetConfig = {
   port: 4737,
   refreshIntervalMs: 300000,
+  refreshFloorMs: 60000,
   dailyBudget: null,
   monthlyBudget: null,
   warningThreshold: 0.8,
