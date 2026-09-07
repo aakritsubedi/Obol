@@ -165,6 +165,28 @@ describe.skipIf(!SQLITE)("cursor adapter", () => {
     ]);
   });
 
+  it("attributes tokenized bubbles without model metadata to the known daily model", async () => {
+    await appendToDatabase([
+      bubble(PARENT, "missing-model", {
+        type: 2,
+        createdAt: `${DATE}T01:04:00.000Z`,
+        tokenCount: { inputTokens: 100, outputTokens: 2 },
+      }),
+    ]);
+
+    const usage = await cursorAdapter.usage?.(root, Date.parse(`${DATE}T00:00:00Z`), TZ);
+    expect(usage).toEqual([
+      {
+        date: DATE,
+        model: "composer-2.5",
+        inputTokens: 500,
+        outputTokens: 102,
+        cacheReadTokens: 0,
+        cacheCreationTokens: 0,
+      },
+    ]);
+  });
+
   it("returns an empty journal when the database is absent", async () => {
     await rm(join(root, "state.vscdb"), { force: true });
     const journal = await read();

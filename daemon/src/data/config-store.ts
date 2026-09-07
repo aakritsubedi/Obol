@@ -57,6 +57,7 @@ export function statePaths() {
   return {
     directory,
     config: join(directory, "config.json"),
+    pricing: join(directory, "pricing.json"),
     runtime: join(directory, "runtime.json"),
     snapshot: join(directory, "snapshot.json"),
   };

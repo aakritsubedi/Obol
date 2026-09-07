@@ -248,7 +248,28 @@ function usageRows(days: Map<string, DayUsage>): ProviderUsageDay[] {
   const rows: ProviderUsageDay[] = [];
   for (const [date, day] of days) {
     if (day.models.size > 0) {
-      rows.push(...day.models.values());
+      const grouped = new Map<string, ProviderUsageDay>();
+      for (const row of day.models.values()) {
+        // Cursor sometimes omits modelInfo on a bubble even though another
+        // bubble that day identifies the Composer model. Keep those tokens in
+        // the known model's bucket instead of creating a permanently unpriced
+        // `unknown` row beside it.
+        const model = row.model === UNKNOWN_MODEL ? day.seenModel || row.model : row.model;
+        const current = grouped.get(model) ?? {
+          date,
+          model,
+          inputTokens: 0,
+          outputTokens: 0,
+          cacheReadTokens: 0,
+          cacheCreationTokens: 0,
+        };
+        current.inputTokens += row.inputTokens;
+        current.outputTokens += row.outputTokens;
+        current.cacheReadTokens += row.cacheReadTokens;
+        current.cacheCreationTokens += row.cacheCreationTokens;
+        grouped.set(model, current);
+      }
+      rows.push(...grouped.values());
       continue;
     }
     if (!day.active) continue;

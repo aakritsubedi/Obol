@@ -1,9 +1,12 @@
 import type { WidgetConfig } from "@obol/contract";
 import type { CcusageReport } from "../data/ccusage/types.js";
 import { collectLocalUsage, localUsageSinceMs } from "../data/local-usage.js";
+import type { PricingStore } from "../data/pricing-store.js";
 import { attachProjectPaths, collectProjectPaths } from "../data/project-paths.js";
+import { repriceReport } from "../data/reprice-report.js";
 import type { SnapshotStore } from "../data/snapshot-store.js";
 import { emptyBlocks } from "../domain/factories.js";
+import { BUNDLED_PRICING } from "../domain/pricing.js";
 import { systemTime, type TimeSource } from "../domain/time.js";
 import { mergeLocalUsage } from "../domain/usage-merge.js";
 import { runUsage } from "../infra/process.js";
@@ -22,6 +25,7 @@ export interface UsageServiceOptions {
   store: SnapshotStore;
   onChanged: () => void;
   providers?: ProviderAdapter[];
+  pricing?: PricingStore;
   time?: TimeSource;
 }
 
@@ -55,31 +59,34 @@ export class UsageService {
         const timezone = time.timeZone();
         const adapters = this.options.providers ?? providers;
         const sinceMs = localUsageSinceMs(config.historyDays, time.now(), timezone);
+        const pricing = this.options.pricing ? await this.options.pricing.load() : BUNDLED_PRICING;
         const [localRows, projectPaths] = await Promise.all([
-          collectLocalUsage(adapters, sinceMs, timezone),
+          collectLocalUsage(adapters, sinceMs, timezone, pricing),
           collectProjectPaths(adapters, sinceMs),
         ]);
         const withProjectPaths = (report: CcusageReport): CcusageReport =>
           attachProjectPaths(report, projectPaths);
+        const withPricing = (report: CcusageReport): CcusageReport =>
+          repriceReport(withProjectPaths(report), pricing);
         if (result.report || result.blocks || localRows.length > 0) {
           // Local rows may only be merged into a report ccusage just produced.
           // The stored snapshot already contains the last merge, so folding them
           // in again would add the same usage a second time, and keep adding it
           // for as long as ccusage stays unavailable.
           const report = result.report
-            ? mergeLocalUsage(withProjectPaths(result.report), localRows)
-            : withProjectPaths(current.report);
+            ? mergeLocalUsage(withPricing(result.report), localRows)
+            : withPricing(current.report);
           const fullReport = result.fullReport ?? result.report;
           const liveReport = fullReport
-            ? mergeLocalUsage(withProjectPaths(fullReport), localRows)
-            : withProjectPaths(this.options.getLiveReport());
+            ? mergeLocalUsage(withPricing(fullReport), localRows)
+            : withPricing(this.options.getLiveReport());
           const blocks = result.blocks ?? emptyBlocks();
           this.options.setLiveReport(liveReport);
           const message = result.errors.length ? result.errors.join("; ") : null;
           await this.options.store.apply(report, blocks, config, message);
           this.options.onChanged();
         } else {
-          this.options.setLiveReport(withProjectPaths(this.options.getLiveReport()));
+          this.options.setLiveReport(withPricing(this.options.getLiveReport()));
           await this.options.store.markError(config, result.errors.join("; ") || "ccusage refresh failed");
           this.options.onChanged();
         }

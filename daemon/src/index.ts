@@ -8,7 +8,9 @@ import { UsageService } from "./app/UsageService.js";
 import type { CcusageReport } from "./data/ccusage/types.js";
 import { ConfigStore, migrateLegacyState } from "./data/config-store.js";
 import { collectLocalUsage, localUsageSinceMs } from "./data/local-usage.js";
+import { PricingStore } from "./data/pricing-store.js";
 import { collectProjectPaths, refreshProjectPaths } from "./data/project-paths.js";
+import { repriceReport } from "./data/reprice-report.js";
 import { SnapshotStore } from "./data/snapshot-store.js";
 import { systemTime } from "./domain/time.js";
 import { mergeLocalUsage } from "./domain/usage-merge.js";
@@ -36,6 +38,7 @@ async function main(): Promise<void> {
   await migrateLegacyState();
   const configStore = new ConfigStore();
   let config = await configStore.load();
+  const pricingStore = new PricingStore(configStore.paths.pricing);
   const store = new SnapshotStore(configStore.paths.snapshot, config, systemTime);
   await store.load(config);
   const timezone = systemTime.timeZone();
@@ -48,11 +51,16 @@ async function main(): Promise<void> {
     // providers ccusage cannot read are priced and merged here too.
     const timezone = systemTime.timeZone();
     const sinceMs = localUsageSinceMs(config.historyDays, systemTime.now(), timezone);
+    const pricing = await pricingStore.load();
     const [localRows, projectPaths] = await Promise.all([
-      collectLocalUsage(providers, sinceMs, timezone),
+      collectLocalUsage(providers, sinceMs, timezone, pricing),
       collectProjectPaths(providers, sinceMs),
     ]);
-    await store.apply(mergeLocalUsage({ ...report, projectPaths }, localRows), blocks, config);
+    await store.apply(
+      mergeLocalUsage(repriceReport({ ...report, projectPaths }, pricing), localRows),
+      blocks,
+      config,
+    );
     console.log(
       JSON.stringify(
         {
@@ -89,6 +97,7 @@ async function main(): Promise<void> {
       journalService.forgetToday();
       server?.broadcast(store.get().summary);
     },
+    pricing: pricingStore,
   });
   journalService = new JournalService({
     getConfig: () => config,

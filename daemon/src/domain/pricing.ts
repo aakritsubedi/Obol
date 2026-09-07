@@ -8,6 +8,19 @@ export interface ModelPrice {
   cacheWrite: number;
 }
 
+export interface PricingEntry {
+  id: string;
+  aliases: string[];
+  price: ModelPrice;
+}
+
+export interface PricingTable {
+  entries: PricingEntry[];
+  source?: string;
+  fetchedAt?: string;
+  sourceUpdatedAt?: string | null;
+}
+
 export interface TokenCounts {
   inputTokens: number;
   outputTokens: number;
@@ -57,25 +70,72 @@ const PRICES: Record<string, ModelPrice> = {
   composer: { input: 0.5, output: 2.5, cacheRead: 0.05, cacheWrite: 0.625 },
 };
 
-// Longest keys first so a specific model never loses to a shorter family name
-// it happens to contain — the rule the provider catalog matches ids by.
-const priceKeys = Object.keys(PRICES).sort((left, right) => right.length - left.length);
+/** The offline safety net used before the first pricing download or offline. */
+export const BUNDLED_PRICING: PricingTable = {
+  source: "bundled",
+  entries: Object.entries(PRICES).map(([id, price]) => ({ id, aliases: [id], price })),
+};
+
+/** Prefer the downloaded table, but keep provider-specific offline aliases. */
+export function mergePricingTables(
+  primary: PricingTable,
+  fallback: PricingTable = BUNDLED_PRICING,
+): PricingTable {
+  return {
+    ...primary,
+    entries: [...primary.entries, ...fallback.entries],
+  };
+}
 
 function normalizeModel(value: string): string {
   return value.toLowerCase().replace(/[^a-z0-9]/g, "");
 }
 
+function tokens(value: string): string[] {
+  return value.toLowerCase().match(/[a-z]+|\d+/g) ?? [];
+}
+
+function matchScore(model: string, alias: string): number {
+  const normalizedModel = normalizeModel(model);
+  const normalizedAlias = normalizeModel(alias);
+  if (!normalizedModel || !normalizedAlias) return 0;
+  if (normalizedModel === normalizedAlias) return 1_000_000 + normalizedAlias.length;
+  if (normalizedModel.includes(normalizedAlias)) return 100_000 + normalizedAlias.length;
+
+  // Providers do not agree on whether the family comes before or after its
+  // version, e.g. `claude-4.5-sonnet` vs `claude-sonnet-4.5`. Treat the
+  // separator-delimited token set as a weaker match than an exact substring.
+  const modelTokens = tokens(model);
+  const aliasTokens = tokens(alias);
+  if (
+    aliasTokens.length >= 2 &&
+    aliasTokens.every((token) => modelTokens.includes(token)) &&
+    modelTokens.length <= aliasTokens.length + 2
+  ) {
+    return 50_000 + normalizedAlias.length;
+  }
+  return 0;
+}
+
 /** The bundled price for a model, or null when it is not one we know. */
-export function priceFor(model: string): ModelPrice | null {
-  const normalized = normalizeModel(model);
-  if (!normalized) return null;
-  const key = priceKeys.find((candidate) => normalized.includes(candidate));
-  return key ? PRICES[key] : null;
+export function priceFor(model: string, table: PricingTable = BUNDLED_PRICING): ModelPrice | null {
+  let best: { price: ModelPrice; score: number } | null = null;
+  for (const entry of table.entries) {
+    for (const alias of entry.aliases) {
+      const score = matchScore(model, alias);
+      if (score > (best?.score ?? 0)) best = { price: entry.price, score };
+    }
+  }
+  return best?.price ?? null;
 }
 
 /** Estimate USD cost for a day's tokens, pricing each kind at its own rate. */
-export function estimateCost(model: string, tokens: TokenCounts): number {
-  const price = priceFor(model);
+export function estimateCost(
+  model: string,
+  tokens: TokenCounts,
+  table: PricingTable = BUNDLED_PRICING,
+): number {
+  const price = priceFor(model, table);
   if (!price) return 0;
   const per = (count: unknown, rate: number): number => (Math.max(0, numberValue(count)) / 1_000_000) * rate;
   return (
