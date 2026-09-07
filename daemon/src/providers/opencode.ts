@@ -1,7 +1,7 @@
-import { spawn } from "node:child_process";
 import { homedir } from "node:os";
 import { join } from "node:path";
 import { asRecord, numberValue, stringValue } from "../shared/coerce.js";
+import { query } from "./shared/sqlite.js";
 import {
   addPrompt,
   countTool,
@@ -18,68 +18,6 @@ import {
 // The sqlite3 CLI ships with macOS, so the daemon talks to the database through
 // it instead of taking on a native driver.
 const DATABASE = "opencode.db";
-
-// Prefer the absolute macOS path: a developer's PATH often carries another
-// sqlite3 first (homebrew, android platform-tools) whose build may vary.
-let SQLITE_CANDIDATES = ["/usr/bin/sqlite3", "sqlite3"];
-const QUERY_TIMEOUT_MS = 10_000;
-
-interface SqlRow {
-  [column: string]: unknown;
-}
-
-class BinaryMissing extends Error {}
-
-function runQuery(binary: string, database: string, sql: string): Promise<SqlRow[]> {
-  return new Promise((resolve, reject) => {
-    const child = spawn(binary, ["-readonly", "-json", database, sql], {
-      stdio: ["ignore", "pipe", "pipe"],
-    });
-    const stdout: string[] = [];
-    const timer = setTimeout(() => child.kill("SIGKILL"), QUERY_TIMEOUT_MS);
-    child.stdout.on("data", (chunk: string) => stdout.push(chunk));
-    child.on("error", (error) => {
-      clearTimeout(timer);
-      if ((error as NodeJS.ErrnoException).code === "ENOENT") reject(new BinaryMissing(binary));
-      else reject(error);
-    });
-    child.on("close", (code) => {
-      clearTimeout(timer);
-      // A non-zero exit means the database is missing, locked or was migrated
-      // away under us — "no data", not "wrong binary".
-      if (code !== 0) {
-        resolve([]);
-        return;
-      }
-      try {
-        const parsed: unknown = JSON.parse(stdout.join("") || "[]");
-        resolve(Array.isArray(parsed) ? (parsed as SqlRow[]) : []);
-      } catch {
-        resolve([]);
-      }
-    });
-  });
-}
-
-// Tries each candidate once, dropping the ones that do not exist. Returns null
-// when no sqlite3 could run at all, so callers can tell "no agent data" from
-// "nothing answered".
-async function query(database: string, sql: string): Promise<SqlRow[] | null> {
-  let missing = false;
-  for (const binary of [...SQLITE_CANDIDATES]) {
-    try {
-      return await runQuery(binary, database, sql);
-    } catch (error) {
-      if (error instanceof BinaryMissing) {
-        SQLITE_CANDIDATES = SQLITE_CANDIDATES.filter((candidate) => candidate !== binary);
-        missing = true;
-        continue;
-      }
-      return null;
-    }
-  }
-  return missing ? null : [];
-}
 
 // OpenCode marks subagent runs with a parent_id; their work replays inside the
 // parent conversation, so it is attributed there and never surfaces as a

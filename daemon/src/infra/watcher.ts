@@ -8,6 +8,7 @@ const knownRelativeDirectories = [
   ".config/opencode",
   "Library/Application Support/Code/User/workspaceStorage",
   "Library/Application Support/Code - Insiders/User/workspaceStorage",
+  "Library/Application Support/Cursor/User/globalStorage",
   ".continue",
 ];
 

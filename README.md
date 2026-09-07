@@ -5,7 +5,7 @@
 **See what your AI coding agents cost — right from your menu bar.**
 
 Obol is a local-first macOS app for tracking token usage and estimated spend
-from Claude Code, Codex CLI, OpenCode, and GitHub Copilot.
+from Claude Code, Codex CLI, OpenCode, GitHub Copilot, and Cursor.
 
 No account. No API key. No usage data uploads.
 
@@ -86,19 +86,20 @@ ignored, so installing one agent is enough to get started.
 | Codex CLI | `~/.codex/sessions` | Provider totals, session activity, prompts, tools, edited files, and active work |
 | OpenCode | `~/.local/share/opencode/opencode.db` | Provider totals, session activity, prompts, tools, edited files, and active work |
 | GitHub Copilot | `~/Library/Application Support/Code/User/workspaceStorage/*/chatSessions` | Token-priced provider totals, session activity, prompts, tools, edited files, and active work |
+| Cursor | `~/Library/Application Support/Cursor/User/globalStorage/state.vscdb` | Provider totals when token counts are recorded, session activity, and prompts |
 
 Provider totals and history come from [ccusage](https://github.com/ryoppippi/ccusage)
 using its report. Project-level cost history is currently Claude-only;
-Codex, OpenCode, and Copilot still contribute to aggregate provider and daily
-totals. Copilot costs are token-priced estimates against a flat subscription,
-not an invoice.
+Codex, OpenCode, Copilot, and Cursor still contribute to aggregate provider and
+daily totals. Copilot and Cursor costs are token-priced estimates against flat
+subscriptions, not invoices.
 
 ## Accuracy and privacy
 
 Obol shows estimates from ccusage’s pricing table, not provider invoices. A
 session’s cost is not a billing record: ccusage reports daily cost by Claude
 project, so Obol apportions that project total across Claude sessions by output
-tokens. Codex, OpenCode, and Copilot session records do not include a
+tokens. Codex, OpenCode, Copilot, and Cursor session records do not include a
 comparable per-project cost source.
 
 Usage processing is local:
@@ -106,8 +107,8 @@ Usage processing is local:
 - The daemon reads agent logs or databases from your home directory.
 - The daemon listens on `127.0.0.1` only. ccusage fetches the public LiteLLM
   model-pricing table so new models are costed correctly, and falls back to its
-  bundled pricing snapshot when offline. Copilot uses Obol’s bundled model
-  estimates; no agent data is sent with that pricing path.
+  bundled pricing snapshot when offline. Copilot and Cursor use Obol’s bundled
+  model estimates; no agent data is sent with either pricing path.
 - Configuration and the last good snapshot stay in `~/.obol`.
 - Obol does not upload agent logs, prompts, usage snapshots, or API keys.
 
@@ -135,6 +136,7 @@ non-USD display currency. Neither request receives your usage data.
                       ├── ccusage (live model pricing)
                       ├── Claude / Codex / OpenCode adapters
                       ├── Copilot local usage + journal adapter
+                      ├── Cursor SQLite usage + journal adapter
                       └── ~/.obol snapshot and configuration
 ```
 
