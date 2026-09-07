@@ -55,4 +55,11 @@ final class ObolCoreTests: XCTestCase {
         XCTAssertEqual(shape.peakHour, 1)
         XCTAssertEqual(DayShape.duration(shape.activeMinutes), "0h 40m")
     }
+
+    func testDayShapeHourLabelCanIncludeMeridiem() {
+        XCTAssertEqual(DayShape.hourLabel(0, includePeriod: true), "12 AM")
+        XCTAssertEqual(DayShape.hourLabel(12, includePeriod: true), "12 PM")
+        XCTAssertEqual(DayShape.hourLabel(18, includePeriod: true), "6 PM")
+        XCTAssertEqual(DayShape.hourLabel(18), "6")
+    }
 }

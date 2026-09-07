@@ -28,10 +28,7 @@ describe("ProjectTable", () => {
   it("keeps separate rows for different slugs that share a display name", () => {
     render(
       <ProjectTable
-        projects={[
-          projectRow("-Users-dev-work-api", 10),
-          projectRow("-Users-dev-personal-api", 20),
-        ]}
+        projects={[projectRow("-Users-dev-work-api", 10), projectRow("-Users-dev-personal-api", 20)]}
       />,
     );
 

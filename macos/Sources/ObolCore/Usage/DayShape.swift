@@ -74,8 +74,12 @@ public struct DayShape: Equatable, Sendable {
         "\(Int(minutes) / 60)h \(Int(minutes) % 60)m"
     }
 
-    public static func hourLabel(_ hour: Int) -> String {
-        hour == 0 ? "12" : hour > 12 ? "\(hour - 12)" : "\(hour)"
+    public static func hourLabel(_ hour: Int, includePeriod: Bool = false) -> String {
+        let normalizedHour = ((hour % 24) + 24) % 24
+        let displayHour = normalizedHour % 12 == 0 ? 12 : normalizedHour % 12
+        let label = "\(displayHour)"
+        guard includePeriod else { return label }
+        return "\(label) \(normalizedHour < 12 ? "AM" : "PM")"
     }
 
     public static func clock(_ iso: String?) -> String {
@@ -89,6 +93,6 @@ public struct DayShape: Equatable, Sendable {
 
     public static func accessibilityLabel(_ shape: DayShape) -> String {
         "Work started at \(clock(shape.startedAt)), \(duration(shape.activeMinutes)) active today"
-            + (shape.peakHour.map { ", busiest around \(hourLabel($0))" } ?? "")
+            + (shape.peakHour.map { ", busiest around \(hourLabel($0, includePeriod: true))" } ?? "")
     }
 }

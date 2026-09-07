@@ -70,10 +70,9 @@ describe("mergeLocalUsage", () => {
   });
 
   it("preserves projectPaths when merging local usage", () => {
-    const result = mergeLocalUsage(
-      { ...report(), projectPaths: { "-Users-dev-demo": "/Users/dev/demo" } },
-      [local()],
-    );
+    const result = mergeLocalUsage({ ...report(), projectPaths: { "-Users-dev-demo": "/Users/dev/demo" } }, [
+      local(),
+    ]);
     expect(result.projectPaths).toEqual({ "-Users-dev-demo": "/Users/dev/demo" });
   });
 });

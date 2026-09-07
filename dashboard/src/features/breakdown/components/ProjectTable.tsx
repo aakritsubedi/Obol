@@ -111,7 +111,10 @@ export default function ProjectTable({ projects, projectPaths = {} }: Props) {
                               className="group flex min-w-0 items-center gap-2 no-underline"
                               title={`Open ${project.project} in VS Code`}
                             >
-                              <span className="inline-flex shrink-0 transition-opacity group-hover:opacity-80" style={{ color }}>
+                              <span
+                                className="inline-flex shrink-0 transition-opacity group-hover:opacity-80"
+                                style={{ color }}
+                              >
                                 <Icon
                                   path={FOLDER}
                                   label={`Open ${project.project} in VS Code`}

@@ -49,7 +49,7 @@ struct TodayShapeSection: View {
 
                     Text(isUnavailable || journal == nil ? "Today’s activity is unavailable." :
                         shape.activeMinutes > 0 ? "Started \(DayShape.clock(shape.startedAt))" +
-                        (shape.peakHour.map { " · busiest \(DayShape.hourLabel($0))" } ?? "") :
+                        (shape.peakHour.map { " · busiest \(DayShape.hourLabel($0, includePeriod: true))" } ?? "") :
                         "No activity recorded today.")
                         .font(WidgetStyle.TypeScale.footnote)
                         .monospacedDigit()
