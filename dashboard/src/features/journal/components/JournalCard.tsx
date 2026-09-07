@@ -13,6 +13,7 @@ import {
 } from "@features/journal/model/journal";
 import type { DayJournal } from "@shared/api";
 import { formatCurrency, formatDuration } from "@shared/lib/format";
+import { providerName } from "@shared/providers/catalog";
 import { BRANCH, CHECK, CHEVRON_DOWN, CHEVRON_UP, CLOCK, COPY, FOLDER, Icon, LAYERS } from "@shared/ui/icons";
 import SectionHeader from "@shared/ui/SectionHeader";
 import { buttonGhost, sectionShell } from "@shared/ui/tokens";
@@ -116,7 +117,7 @@ function TaskRow({ task, last }: { task: Task; last: boolean }) {
               key={provider}
               className="rounded bg-wash px-1.5 py-0.5 text-[10.5px] font-medium uppercase tracking-[0.06em] text-subtle"
             >
-              {provider}
+              {providerName(provider)}
             </span>
           ))}
           <span className="inline-flex items-center gap-1">

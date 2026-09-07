@@ -12,6 +12,13 @@ interface Props {
 
 export default function ProviderTable({ providers, total }: Props) {
   const hasSubscriptionProvider = providers.some((provider) => provider.billing === "subscription");
+  // A provider billed by subscription never costs nothing. A zero means either
+  // that it reports no token counts at all (Cursor) or that the models it used
+  // have no published rate — both worth saying plainly rather than "Free".
+  const zeroLabel = (provider: ProviderSummary): string => {
+    if (provider.billing !== "subscription") return "Free";
+    return provider.totalTokens > 0 ? "Unpriced" : "No token data";
+  };
   return (
     <section className={`min-w-0 ${sectionShell}`} aria-labelledby="providers-heading">
       <SectionHeader
@@ -37,7 +44,7 @@ export default function ProviderTable({ providers, total }: Props) {
               </strong>
               {providers[0].totalCost === 0 && (
                 <span className="rounded-full bg-wash px-2 py-0.5 text-[10px] font-semibold text-subtle">
-                  Free
+                  {zeroLabel(providers[0])}
                 </span>
               )}
               <span>
@@ -66,12 +73,16 @@ export default function ProviderTable({ providers, total }: Props) {
                         </strong>
                         {free && (
                           <span className="rounded-full bg-wash px-2 py-0.5 text-[10px] font-semibold text-subtle">
-                            Free
+                            {zeroLabel(provider)}
                           </span>
                         )}
                       </span>
                       <span className="text-[11px] tabular-nums text-muted">
-                        {free ? "$0.00" : `${share.toFixed(0)}%`}
+                        {free && provider.billing === "subscription"
+                          ? "—"
+                          : free
+                            ? "$0.00"
+                            : `${share.toFixed(0)}%`}
                       </span>
                     </div>
                     <div className="my-2 h-1 overflow-hidden rounded-full bg-track">
@@ -99,7 +110,8 @@ export default function ProviderTable({ providers, total }: Props) {
       )}
       {hasSubscriptionProvider && (
         <p className="mt-4 text-[10px] leading-relaxed text-muted">
-          * Subscription-provider costs are token-priced estimates for comparison, not invoices.
+          * Subscription-provider costs are token-priced estimates for comparison, not invoices. Models with
+          no published rate count their tokens and show no cost.
         </p>
       )}
     </section>

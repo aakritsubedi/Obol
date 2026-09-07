@@ -7,11 +7,14 @@ import { JournalService } from "./app/JournalService.js";
 import { UsageService } from "./app/UsageService.js";
 import type { CcusageReport } from "./data/ccusage/types.js";
 import { ConfigStore, migrateLegacyState } from "./data/config-store.js";
+import { collectLocalUsage, localUsageSinceMs } from "./data/local-usage.js";
 import { SnapshotStore } from "./data/snapshot-store.js";
 import { systemTime } from "./domain/time.js";
+import { mergeLocalUsage } from "./domain/usage-merge.js";
 import { DaemonServer } from "./http/server.js";
 import { runOnce } from "./infra/process.js";
 import { AgentLogWatcher } from "./infra/watcher.js";
+import { providers } from "./providers/index.js";
 
 const daemonDirectory = resolve(fileURLToPath(new URL(".", import.meta.url)));
 
@@ -38,7 +41,15 @@ async function main(): Promise<void> {
 
   if (hasFlag("--once")) {
     const { report, blocks } = await runOnce(config);
-    await store.apply(report, blocks, config);
+    // The one-shot path reports the same figures the server would, so the
+    // providers ccusage cannot read are priced and merged here too.
+    const timezone = systemTime.timeZone();
+    const localRows = await collectLocalUsage(
+      providers,
+      localUsageSinceMs(config.historyDays, systemTime.now(), timezone),
+      timezone,
+    );
+    await store.apply(mergeLocalUsage(report, localRows), blocks, config);
     console.log(
       JSON.stringify(
         {

@@ -1,40 +1,83 @@
 import { numberValue } from "../shared/coerce.js";
 
-// These are representative blended USD rates per million tokens. Copilot and
-// Cursor are flat-fee subscriptions, so this is a useful comparison estimate,
-// not an invoice. Unknown models deliberately remain unpriced.
-const USD_PER_MILLION: Record<string, number> = {
-  claudeopus45: 15,
-  claudeopus4: 15,
-  claudesonnet45: 7.5,
-  claudesonnet4: 7.5,
-  claudehaiku45: 1.5,
-  claudehaiku4: 1.5,
-  gpt5mini: 1.125,
-  gpt5: 5,
-  gpt4o: 3.75,
-  gpt4: 15,
-  o3mini: 2.25,
-  o3: 8,
-  composer25: 1.5,
-  composer: 1.5,
+/** USD per million tokens, by token kind. */
+export interface ModelPrice {
+  input: number;
+  output: number;
+  cacheRead: number;
+  cacheWrite: number;
+}
+
+export interface TokenCounts {
+  inputTokens: number;
+  outputTokens: number;
+  cacheReadTokens: number;
+  cacheCreationTokens: number;
+}
+
+// Published list prices, USD per million tokens. Output runs several times
+// input and a cache read a fraction of it, so a single blended rate would
+// misprice any agent whose traffic is lopsided — and editor agents send far
+// more context than they generate. Copilot and Cursor are flat-fee
+// subscriptions, so these figures are a comparison estimate, not an invoice.
+// Unknown models stay unpriced rather than being guessed at.
+const PRICES: Record<string, ModelPrice> = {
+  // Anthropic first-party rates. Cache writes bill at 1.25x input and reads at
+  // 0.1x, except Fable 5.1, which reads cache at a flat $0.25.
+  claudefable51: { input: 10, output: 50, cacheRead: 0.25, cacheWrite: 12.5 },
+  claudefable5: { input: 10, output: 50, cacheRead: 1, cacheWrite: 12.5 },
+  claudemythos51: { input: 10, output: 50, cacheRead: 0.25, cacheWrite: 12.5 },
+  claudemythos5: { input: 10, output: 50, cacheRead: 1, cacheWrite: 12.5 },
+  claudeopus5: { input: 5, output: 25, cacheRead: 0.5, cacheWrite: 6.25 },
+  claudeopus48: { input: 5, output: 25, cacheRead: 0.5, cacheWrite: 6.25 },
+  claudeopus47: { input: 5, output: 25, cacheRead: 0.5, cacheWrite: 6.25 },
+  claudeopus46: { input: 5, output: 25, cacheRead: 0.5, cacheWrite: 6.25 },
+  claudeopus45: { input: 5, output: 25, cacheRead: 0.5, cacheWrite: 6.25 },
+  claudesonnet5: { input: 2, output: 10, cacheRead: 0.2, cacheWrite: 2.5 },
+  claudesonnet46: { input: 3, output: 15, cacheRead: 0.3, cacheWrite: 3.75 },
+  claudesonnet45: { input: 3, output: 15, cacheRead: 0.3, cacheWrite: 3.75 },
+  claudehaiku45: { input: 1, output: 5, cacheRead: 0.1, cacheWrite: 1.25 },
+  // OpenAI and Google list prices, for the models Copilot and Cursor route to.
+  gpt5mini: { input: 0.25, output: 2, cacheRead: 0.025, cacheWrite: 0.25 },
+  gpt5nano: { input: 0.05, output: 0.4, cacheRead: 0.005, cacheWrite: 0.05 },
+  gpt5: { input: 1.25, output: 10, cacheRead: 0.125, cacheWrite: 1.25 },
+  gpt41mini: { input: 0.4, output: 1.6, cacheRead: 0.1, cacheWrite: 0.4 },
+  gpt41: { input: 2, output: 8, cacheRead: 0.5, cacheWrite: 2 },
+  gpt4omini: { input: 0.15, output: 0.6, cacheRead: 0.075, cacheWrite: 0.15 },
+  gpt4o: { input: 2.5, output: 10, cacheRead: 1.25, cacheWrite: 2.5 },
+  o4mini: { input: 1.1, output: 4.4, cacheRead: 0.275, cacheWrite: 1.1 },
+  o3mini: { input: 1.1, output: 4.4, cacheRead: 0.55, cacheWrite: 1.1 },
+  o3: { input: 2, output: 8, cacheRead: 0.5, cacheWrite: 2 },
+  geminiflash: { input: 0.3, output: 2.5, cacheRead: 0.075, cacheWrite: 0.3 },
+  geminipro: { input: 1.25, output: 10, cacheRead: 0.31, cacheWrite: 1.25 },
+  composer: { input: 1.25, output: 10, cacheRead: 0.125, cacheWrite: 1.25 },
 };
 
-const priceKeys = Object.keys(USD_PER_MILLION).sort((left, right) => right.length - left.length);
+// Longest keys first so a specific model never loses to a shorter family name
+// it happens to contain — the rule the provider catalog matches ids by.
+const priceKeys = Object.keys(PRICES).sort((left, right) => right.length - left.length);
 
 function normalizeModel(value: string): string {
   return value.toLowerCase().replace(/[^a-z0-9]/g, "");
 }
 
-function pricePerMillion(model: string): number {
+/** The bundled price for a model, or null when it is not one we know. */
+export function priceFor(model: string): ModelPrice | null {
   const normalized = normalizeModel(model);
+  if (!normalized) return null;
   const key = priceKeys.find((candidate) => normalized.includes(candidate));
-  return key ? USD_PER_MILLION[key] : 0;
+  return key ? PRICES[key] : null;
 }
 
-/** Estimate USD cost for a token count using the bundled model table. */
-export function estimateCost(model: string, tokens: number): number {
-  const count = numberValue(tokens);
-  const price = pricePerMillion(model);
-  return count > 0 && price > 0 ? (count / 1_000_000) * price : 0;
+/** Estimate USD cost for a day's tokens, pricing each kind at its own rate. */
+export function estimateCost(model: string, tokens: TokenCounts): number {
+  const price = priceFor(model);
+  if (!price) return 0;
+  const per = (count: unknown, rate: number): number => (Math.max(0, numberValue(count)) / 1_000_000) * rate;
+  return (
+    per(tokens.inputTokens, price.input) +
+    per(tokens.outputTokens, price.output) +
+    per(tokens.cacheReadTokens, price.cacheRead) +
+    per(tokens.cacheCreationTokens, price.cacheWrite)
+  );
 }

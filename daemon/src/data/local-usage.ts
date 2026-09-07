@@ -44,7 +44,12 @@ function pricedRow(agent: string, row: ProviderUsageDay): LocalUsageRow {
     cacheReadTokens,
     cacheCreationTokens,
     totalTokens,
-    totalCost: estimateCost(row.model, totalTokens),
+    totalCost: estimateCost(row.model, {
+      inputTokens,
+      outputTokens,
+      cacheReadTokens,
+      cacheCreationTokens,
+    }),
     billing: "subscription",
   };
 }

@@ -182,3 +182,38 @@ describe("aggregateByProvider", () => {
     expect(aggregateByProvider(noBreakdown)).toEqual([]);
   });
 });
+
+describe("unpriced usage", () => {
+  // Copilot's auto routing lands on internal preview models that have no
+  // published rate, so their tokens are real while their cost is zero. Dropping
+  // them would hide usage the person actually spent their subscription on.
+  const report = (): Report =>
+    ({
+      daily: [
+        row({
+          period: "2026-08-25",
+          modelBreakdowns: [breakdown("oswe-vscode", 0, 500), breakdown("gpt-5-mini", 1.25, 300)],
+          agents: [
+            provider("copilot", 0, 500, [breakdown("oswe-vscode", 0, 500)]),
+            provider("claude", 1.25, 300, [breakdown("gpt-5-mini", 1.25, 300)]),
+          ],
+        }),
+      ],
+      weekly: [],
+      monthly: [],
+    }) as unknown as Report;
+
+  it("keeps a zero-cost model in the model list", () => {
+    const models = aggregateModels(report(), "daily");
+    expect(models.map((model) => model.model)).toContain("oswe-vscode");
+    expect(models.find((model) => model.model === "oswe-vscode")?.totalTokens).toBe(500);
+  });
+
+  it("keeps a provider whose models are all unpriced", () => {
+    const groups = aggregateByProvider(report(), "daily");
+    const copilot = groups.find((group) => group.agent === "copilot");
+    expect(copilot).toBeDefined();
+    expect(copilot?.totalTokens).toBe(500);
+    expect(copilot?.models.map((model) => model.model)).toEqual(["oswe-vscode"]);
+  });
+});
