@@ -33,7 +33,8 @@ usage data on your Mac.
 - **Work journal** — review agent sessions, prompts, projects, branches, tools,
   edited files, active minutes, and currently active work.
 - **Budgets and alerts** — set daily and monthly budgets, choose a warning
-  threshold, and receive native notifications when usage crosses it.
+  threshold, tune the history window and refresh floor, and receive native
+  notifications when usage crosses a budget.
 - **Sharing and export** — export the current history view as CSV or JSON, or
   create a shareable usage image from the dashboard.
 - **Display currencies** — show amounts in a supported currency while keeping
@@ -96,11 +97,13 @@ subscriptions, not invoices.
 
 ## Accuracy and privacy
 
-Obol shows estimates from ccusage’s pricing table, not provider invoices. A
-session’s cost is not a billing record: ccusage reports daily cost by Claude
-project, so Obol apportions that project total across Claude sessions by output
-tokens. Codex, OpenCode, Copilot, and Cursor session records do not include a
-comparable per-project cost source.
+Obol shows cost estimates from its own model-pricing table, not provider
+invoices. [ccusage](https://github.com/ryoppippi/ccusage) supplies token counts
+and model breakdowns for Claude, Codex, and OpenCode; Obol reprices every agent
+with the same table. A session’s cost is not a billing record: ccusage reports
+daily cost by Claude project, so Obol apportions that project total across
+Claude sessions by output tokens. Codex, OpenCode, Copilot, and Cursor session
+records do not include a comparable per-project cost source.
 
 Copilot and Cursor are flat-fee subscriptions, so their cost is Obol pricing the
 tokens behind each turn — a figure for comparison, never a bill. Obol prices only
@@ -123,22 +126,27 @@ roughest of the four.
 Usage processing is local:
 
 - The daemon reads agent logs or databases from your home directory.
-- The daemon listens on `127.0.0.1` only. ccusage fetches the public LiteLLM
-  model-pricing table so new models are costed correctly, and falls back to its
-  bundled pricing snapshot when offline. Copilot and Cursor use Obol’s bundled
-  model estimates; no agent data is sent with either pricing path.
+- The daemon listens on `127.0.0.1` only. Once a day it fetches a public
+  model-pricing table from
+  [aipricing.guru](https://www.aipricing.guru/api/pricing.json), caches it in
+  `~/.obol/pricing.json`, and falls back to a bundled table when offline.
+  ccusage reads local agent logs only; Obol reprices its output and prices
+  Copilot and Cursor locally with that same table. No usage data is sent with
+  the pricing fetch.
 - Configuration and the last good snapshot stay in `~/.obol`.
 - Obol does not upload agent logs, prompts, usage snapshots, or API keys.
 
-The app can still make two kinds of optional network requests: GitHub Release
-checks for the updater and the public Frankfurter API when you select a
-non-USD display currency. Neither request receives your usage data.
+The app can still make three kinds of optional network requests: GitHub Release
+checks for the updater, the public Frankfurter API when you select a non-USD
+display currency, and the daily pricing-table check described above. None of
+these requests receive your usage data.
 
 ### Local state
 
 | File | Purpose |
 | --- | --- |
 | `~/.obol/config.json` | Budgets, refresh settings, display currency, and other preferences |
+| `~/.obol/pricing.json` | Cached model-pricing table used to estimate costs |
 | `~/.obol/snapshot.json` | Last successful usage snapshot used while a refresh is unavailable |
 | `~/.obol/runtime.json` | The running daemon’s loopback port and short-lived access token |
 | `~/.obol/daemon.log` | Daemon startup and runtime diagnostics |
@@ -154,7 +162,7 @@ non-USD display currency. Neither request receives your usage data.
   Claude projects ──┐              ┌────────────────────────────┐
   Codex sessions  ──┤              │ 1. Watch agent data        │───────▶ Menu bar popover
   OpenCode DB     ──┼─────────────▶│ 2. Normalize via adapters  │
-  Copilot chats   ──┤              │ 3. Merge ccusage pricing   │───────▶ Local dashboard (127.0.0.1)
+  Copilot chats   ──┤              │ 3. Reprice with Obol table │───────▶ Local dashboard (127.0.0.1)
   Cursor state    ──┘              │ 4. Summaries & budgets     │
                                    │ 5. Loopback HTTP + SSE     │───────▶ ~/.obol snapshot & config
                                    └────────────────────────────┘
@@ -178,16 +186,17 @@ There are two tracks that run on each refresh:
 
 | Track | What it covers | How it works |
 | --- | --- | --- |
-| **ccusage** | Claude, Codex, and OpenCode totals; Claude project costs | The daemon spawns the bundled [ccusage](https://github.com/ryoppippi/ccusage) CLI twice in parallel: once for daily, weekly, and monthly totals broken down by agent, and once for Claude per-project daily costs. ccusage reads each agent’s local logs directly and applies its pricing table. |
-| **Local adapters** | Copilot and Cursor totals; the work journal for all five agents | Each agent has a small adapter in the daemon that knows where its data lives and how to parse it. Adapters with a `usage` method return token counts and model names; Obol prices those locally. Every adapter also feeds the journal by discovering transcripts, reading records, and accumulating session activity. |
+| **ccusage** | Claude, Codex, and OpenCode totals; Claude project costs | The daemon spawns the bundled [ccusage](https://github.com/ryoppippi/ccusage) CLI twice in parallel: once for daily, weekly, and monthly totals broken down by agent, and once for Claude per-project daily costs. ccusage reads each agent’s local logs and returns token counts; Obol reprices those rows with its model table before merging local-provider usage. |
+| **Local adapters** | Copilot and Cursor totals; the work journal for all five agents | Each agent has a small adapter in the daemon that knows where its data lives and how to parse it. Adapters with a `usage` method return token counts and model names; Obol prices those with the same downloaded or bundled table. Every adapter also feeds the journal by discovering transcripts, reading records, and accumulating session activity. |
 
 On refresh the daemon:
 
 1. **Runs ccusage** for the configured history window and your local timezone.
 2. **Collects local usage** by calling each adapter’s optional `usage` method
    (Copilot and Cursor today).
-3. **Merges** the local rows into ccusage’s normalized report so daily, weekly,
-   monthly, and provider totals include every agent.
+3. **Reprices** ccusage rows and **merges** local-provider rows into the
+   normalized report so daily, weekly, monthly, and provider totals include
+   every agent.
 4. **Persists** the merged snapshot to `~/.obol/snapshot.json` and notifies the
    menu bar app and dashboard over loopback HTTP and SSE.
 
@@ -217,8 +226,9 @@ journal.
 
 - On a **timer** — interval from `~/.obol/config.json` (default: every 5 minutes).
 - On **filesystem changes** — the daemon watches known agent directories (and
-  scans `~/.config` for similarly named folders) and debounces writes before
-  refreshing.
+  scans `~/.config` for similarly named folders), ignores SQLite sidecar writes
+  (`-wal`, `-shm`, `-journal`), debounces bursts, and respects a configurable
+  **refresh floor** (default: 60 seconds) so rapid edits do not hammer ccusage.
 - On **demand** — **Refresh** in the popover or dashboard, or when the native
   app starts.
 

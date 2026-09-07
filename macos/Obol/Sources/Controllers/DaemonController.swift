@@ -37,6 +37,8 @@ final class DaemonController: ObservableObject {
     private let loginItem: LoginItemControlling
     private var runtimeTimer: Timer?
     private var pollingTimer: Timer?
+    private var configSaveTask: Task<Void, Never>?
+    private var configSaveRequested = false
     private var baseURL: URL?
     private var token = ""
     private var started = false
@@ -97,6 +99,13 @@ final class DaemonController: ObservableObject {
 
     var liveLabel: String {
         summary.stale ? "Cached" : "Live"
+    }
+
+    static let minimumRefreshIntervalSeconds = 30
+    static let refreshIntervalStepSeconds = 5
+
+    var refreshIntervalSeconds: Int {
+        max(Self.minimumRefreshIntervalSeconds, config.refreshIntervalMs / 1000)
     }
 
     /// Reserve the sections during startup, before a runtime URL is available.
@@ -240,18 +249,29 @@ final class DaemonController: ObservableObject {
         if currencyChanged || rate != nil {
             config.currencyRate = rate
         }
-        Task { await saveConfig() }
+        requestConfigSave()
     }
 
     func setLaunchAtLogin(_ enabled: Bool) {
         config.launchAtLogin = enabled
         do {
             try loginItem.setEnabled(enabled)
-            Task { await saveConfig() }
+            requestConfigSave()
         } catch {
             config.launchAtLogin = !enabled
             statusMessage = "Could not update Login Item settings."
         }
+    }
+
+    func setRefreshInterval(seconds: Int) {
+        let value = max(0, seconds)
+        let step = Self.refreshIntervalStepSeconds
+        let rounded = value % step == 0 ? value : value + step - value % step
+        let normalized = max(Self.minimumRefreshIntervalSeconds, rounded)
+        let milliseconds = normalized * 1000
+        guard config.refreshIntervalMs != milliseconds else { return }
+        config.refreshIntervalMs = milliseconds
+        requestConfigSave()
     }
 
     func setKeepAwake(_ enabled: Bool) {
@@ -263,10 +283,10 @@ final class DaemonController: ObservableObject {
             // Nothing polls the session list while the setting is off, so
             // switching it on has to go and find out what is running before it
             // can hold anything. The write follows; a failed one costs the
-            // setting only its persistence, which `saveConfig` reports.
+            // setting only its persistence, which the queued write reports.
             await loadActiveSessions()
             await loadTodayJournal()
-            await saveConfig()
+            requestConfigSave()
         }
     }
 
@@ -298,7 +318,7 @@ final class DaemonController: ObservableObject {
         syncKeepAwake()
         Task {
             await loadActiveSessions()
-            await saveConfig()
+            requestConfigSave()
         }
     }
 
@@ -336,6 +356,8 @@ final class DaemonController: ObservableObject {
 
     func stop() {
         shuttingDown = true
+        configSaveTask?.cancel()
+        configSaveTask = nil
         keepAwake.apply(false)
         keepAwakeHolding = false
         _ = lidWake.apply(false)
@@ -408,6 +430,10 @@ final class DaemonController: ObservableObject {
             baseURL = URL(string: "http://127.0.0.1:\(runtime.port)/")
             connected = true
             statusMessage = nil
+            // A setting can be changed while the daemon is starting. Retry it
+            // now that a runtime URL exists instead of letting the first config
+            // poll replace the local choice with the daemon's old value.
+            resumeConfigSave()
             runtimeTimer?.invalidate()
             pollingTimer = Timer.scheduledTimer(withTimeInterval: 15, repeats: true) { [weak self] _ in
                 Task { await self?.pollSummary() }
@@ -452,7 +478,11 @@ final class DaemonController: ObservableObject {
         guard let baseURL, !token.isEmpty else { return }
         guard let nextConfig = try? await client.config(baseURL: baseURL, token: token) else { return }
         let previous = config
-        let adopted = adoptingKeepAwake(from: nextConfig)
+        // A local write owns the in-memory config until the daemon acknowledges
+        // that snapshot. Without this guard, a poll that started before a PUT
+        // completed could put USD back over a freshly selected NPR value.
+        let hasPendingWrite = configSaveRequested || configSaveTask != nil
+        let adopted = hasPendingWrite ? config : adoptingKeepAwake(from: nextConfig)
         if config != adopted {
             config = adopted
         }
@@ -462,21 +492,55 @@ final class DaemonController: ObservableObject {
         syncKeepAwake()
         // config.json is the shared source of truth for the display currency,
         // so a change made in one surface reaches the other on its next read.
-        if previous.currency != nextConfig.currency || previous.currencyRate != nextConfig.currencyRate {
+        if !hasPendingWrite,
+           previous.currency != nextConfig.currency || previous.currencyRate != nextConfig.currencyRate
+        {
             onCurrencyChanged(nextConfig.currency, nextConfig.currencyRate)
         }
     }
 
-    private func saveConfig() async {
-        guard let baseURL, !token.isEmpty else { return }
-        do {
-            let saved = try await client.update(config: config, baseURL: baseURL, token: token)
-            let adopted = adoptingKeepAwake(from: saved)
-            if config != adopted {
-                config = adopted
+    /// Coalesce preference changes and send them in order. A setting can be
+    /// changed before the daemon has published its runtime URL, so the request
+    /// remains pending until the next connection attempt.
+    private func requestConfigSave() {
+        configSaveRequested = true
+        resumeConfigSave()
+    }
+
+    private func resumeConfigSave() {
+        guard configSaveRequested else { return }
+        guard configSaveTask == nil else { return }
+        configSaveTask = Task { @MainActor [weak self] in
+            await self?.drainConfigSaves()
+        }
+    }
+
+    private func drainConfigSaves() async {
+        defer { configSaveTask = nil }
+
+        while configSaveRequested {
+            guard let baseURL, !token.isEmpty else { return }
+            configSaveRequested = false
+            let requested = config
+            do {
+                let saved = try await client.update(config: requested, baseURL: baseURL, token: token)
+                // Keep any newer local change made while the request was in
+                // flight. The loop below sends that newer snapshot next.
+                if config == requested {
+                    let adopted = adoptingKeepAwake(from: saved)
+                    if config != adopted {
+                        config = adopted
+                    }
+                } else {
+                    configSaveRequested = true
+                }
+            } catch {
+                // Keep the dirty bit so a later connection or preference edit
+                // retries the write instead of silently losing the selection.
+                configSaveRequested = true
+                statusMessage = "Could not save preferences."
+                return
             }
-        } catch {
-            statusMessage = "Could not save preferences."
         }
     }
 

@@ -5,6 +5,8 @@ import { join } from "node:path";
 import type { RuntimeState, WidgetConfig } from "@obol/contract";
 
 const LEGACY_STATE_DIRECTORY = ".token-cost-widget";
+const MIN_REFRESH_INTERVAL_MS = 30_000;
+const REFRESH_INTERVAL_STEP_MS = 5_000;
 
 export const DEFAULT_CONFIG: WidgetConfig = {
   port: 4737,
@@ -84,6 +86,12 @@ function positiveOrNull(value: unknown, fallback: number | null): number | null 
   return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
 }
 
+function refreshInterval(value: unknown, fallback: number): number {
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed) || parsed < MIN_REFRESH_INTERVAL_MS) return fallback;
+  return Math.ceil(parsed / REFRESH_INTERVAL_STEP_MS) * REFRESH_INTERVAL_STEP_MS;
+}
+
 export function parseConfig(value: unknown): WidgetConfig {
   const input = typeof value === "object" && value !== null ? (value as Record<string, unknown>) : {};
   const port = Number(input.port);
@@ -95,10 +103,7 @@ export function parseConfig(value: unknown): WidgetConfig {
 
   return {
     port: Number.isInteger(port) && port >= 0 && port <= 65535 ? port : DEFAULT_CONFIG.port,
-    refreshIntervalMs:
-      Number.isFinite(refreshIntervalMs) && refreshIntervalMs >= 10_000
-        ? refreshIntervalMs
-        : DEFAULT_CONFIG.refreshIntervalMs,
+    refreshIntervalMs: refreshInterval(refreshIntervalMs, DEFAULT_CONFIG.refreshIntervalMs),
     refreshFloorMs: Number.isFinite(refreshFloorMs)
       ? Math.min(10 * 60 * 1000, Math.max(0, refreshFloorMs))
       : DEFAULT_CONFIG.refreshFloorMs,

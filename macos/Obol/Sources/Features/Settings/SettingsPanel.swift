@@ -30,6 +30,10 @@ struct SettingsPanel: View {
 
             hairline
 
+            RefreshIntervalRow(controller: controller)
+
+            hairline
+
             // Label and control are separate views rather than a plain Toggle:
             // a Toggle sizes to its content, which parks the switch against the
             // label instead of at the trailing edge the Version row sets.

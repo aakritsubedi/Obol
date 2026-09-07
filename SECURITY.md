@@ -2,7 +2,9 @@
 
 ## Local daemon boundary
 
-The daemon binds to 127.0.0.1, not a network interface. It writes a per-process 32-byte hexadecimal token to ~/.obol/runtime.json; the native app sends it in an x-token header, and the dashboard receives it once via ?t=, keeps it in localStorage, and then sends it in headers too (Server-Sent Events cannot carry headers, so the event stream is the one request that still uses the query parameter). server.ts checks both the token and the request origin, accepting only loopback HTTP origins. Costs are ccusage estimates, and ccusage runs with --offline.
+The daemon binds to 127.0.0.1, not a network interface. It writes a per-process 32-byte hexadecimal token to ~/.obol/runtime.json; the native app sends it in an x-token header, and the dashboard receives it once via ?t=, keeps it in localStorage, and then sends it in headers too (Server-Sent Events cannot carry headers, so the event stream is the one request that still uses the query parameter). server.ts checks both the token and the request origin, accepting only loopback HTTP origins.
+
+Displayed costs are Obol estimates from a locally cached model-pricing table, not provider invoices. ccusage reads local agent logs only and returns token counts; Obol reprices that output and prices Copilot and Cursor with the same table. Once a day the daemon may fetch a public pricing table from aipricing.guru (cached in ~/.obol/pricing.json, bundled fallback when offline). That fetch sends no usage data. Agent logs, prompts, and snapshots never leave the machine through the daemon API.
 
 ## Update trust model
 

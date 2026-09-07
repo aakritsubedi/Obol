@@ -62,4 +62,10 @@ describe("parseConfig", () => {
     expect(parseConfig({ refreshFloorMs: 601_000 }).refreshFloorMs).toBe(600_000);
     expect(parseConfig({ refreshFloorMs: 0 }).refreshFloorMs).toBe(0);
   });
+
+  it("keeps the refresh interval at least 30 seconds and on a 5-second boundary", () => {
+    expect(parseConfig({ refreshIntervalMs: 30_000 }).refreshIntervalMs).toBe(30_000);
+    expect(parseConfig({ refreshIntervalMs: 32_000 }).refreshIntervalMs).toBe(35_000);
+    expect(parseConfig({ refreshIntervalMs: 37_500 }).refreshIntervalMs).toBe(40_000);
+  });
 });

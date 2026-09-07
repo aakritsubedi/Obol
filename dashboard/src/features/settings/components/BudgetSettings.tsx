@@ -10,11 +10,22 @@ interface Props {
   inDialog?: boolean;
 }
 
+const MIN_REFRESH_INTERVAL_SECONDS = 30;
+const REFRESH_INTERVAL_STEP_SECONDS = 5;
+
+function normalizedRefreshIntervalSeconds(value: string): number {
+  const seconds = Math.max(MIN_REFRESH_INTERVAL_SECONDS, Math.round(numberValue(value)));
+  return Math.ceil(seconds / REFRESH_INTERVAL_STEP_SECONDS) * REFRESH_INTERVAL_STEP_SECONDS;
+}
+
 export default function BudgetSettings({ config, onSaved, inDialog = false }: Props) {
   const [daily, setDaily] = useState(config.dailyBudget === null ? "" : String(config.dailyBudget));
   const [monthly, setMonthly] = useState(config.monthlyBudget === null ? "" : String(config.monthlyBudget));
   const [threshold, setThreshold] = useState(String(Math.round(config.warningThreshold * 100)));
   const [historyDays, setHistoryDays] = useState(String(config.historyDays));
+  const [refreshIntervalSeconds, setRefreshIntervalSeconds] = useState(
+    String(config.refreshIntervalMs / 1000),
+  );
   const [refreshFloorSeconds, setRefreshFloorSeconds] = useState(String(config.refreshFloorMs / 1000));
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState("");
@@ -24,6 +35,7 @@ export default function BudgetSettings({ config, onSaved, inDialog = false }: Pr
     setMonthly(config.monthlyBudget === null ? "" : String(config.monthlyBudget));
     setThreshold(String(Math.round(config.warningThreshold * 100)));
     setHistoryDays(String(config.historyDays));
+    setRefreshIntervalSeconds(String(config.refreshIntervalMs / 1000));
     setRefreshFloorSeconds(String(config.refreshFloorMs / 1000));
   }, [config]);
 
@@ -37,6 +49,7 @@ export default function BudgetSettings({ config, onSaved, inDialog = false }: Pr
         monthlyBudget: monthly.trim() ? Math.max(0, numberValue(monthly)) : null,
         warningThreshold: Math.min(1, Math.max(0.01, numberValue(threshold) / 100)),
         historyDays: Math.min(365, Math.max(7, Math.round(numberValue(historyDays)))),
+        refreshIntervalMs: normalizedRefreshIntervalSeconds(refreshIntervalSeconds) * 1000,
         refreshFloorMs: Math.min(600_000, Math.max(0, Math.round(numberValue(refreshFloorSeconds) * 1000))),
       });
       onSaved(saved);
@@ -107,7 +120,21 @@ export default function BudgetSettings({ config, onSaved, inDialog = false }: Pr
           <small className="text-[10px] text-muted">Bounds the daemon’s log parsing on refresh.</small>
         </label>
         <label className="grid gap-2 text-[11px] font-medium text-subtle">
-          Refresh floor (seconds)
+          Refresh interval (seconds)
+          <input
+            className={inputClass}
+            type="number"
+            min={MIN_REFRESH_INTERVAL_SECONDS}
+            step={REFRESH_INTERVAL_STEP_SECONDS}
+            value={refreshIntervalSeconds}
+            onChange={(event) => setRefreshIntervalSeconds(event.target.value)}
+          />
+          <small className="text-[10px] text-muted">
+            Periodic fallback refresh; synced with the popover.
+          </small>
+        </label>
+        <label className="grid gap-2 text-[11px] font-medium text-subtle">
+          Filesystem refresh floor (seconds)
           <input
             className={inputClass}
             type="number"
@@ -118,7 +145,7 @@ export default function BudgetSettings({ config, onSaved, inDialog = false }: Pr
             onChange={(event) => setRefreshFloorSeconds(event.target.value)}
           />
           <small className="text-[10px] text-muted">
-            Minimum time between filesystem-triggered refreshes.
+            Minimum time between filesystem-triggered refreshes; separate from the periodic interval.
           </small>
         </label>
         <label className="col-span-full grid gap-2 text-[11px] font-medium text-subtle max-[760px]:col-span-1">

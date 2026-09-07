@@ -254,7 +254,13 @@ final class CurrencyController: ObservableObject {
     }
 
     func select(_ option: CurrencyOption) {
-        guard option != selected else { return }
+        if option == selected {
+            // The local picker cache can outlive the daemon's config (for
+            // example after an interrupted first save). Re-send an unchanged
+            // selection so opening Settings can repair that split state.
+            onCurrencySelected(option.code, rate?.rate)
+            return
+        }
         apply(option)
         // Persisting through the daemon is what lets the dashboard render the
         // same currency; the local cache above is only the launch-time seed.
@@ -264,6 +270,19 @@ final class CurrencyController: ObservableObject {
     /// Adopt a code the daemon reported. Same effect as `select`, minus the
     /// write back that would bounce the value straight to where it came from.
     func adopt(code: String, rate sharedRate: Double? = nil) {
+        // A pre-currency daemon, an interrupted first save, or a daemon that
+        // restarted before its config write landed can still report the
+        // default USD record. If the native cache has a real non-USD choice,
+        // restore that choice instead of making the popover and dashboard
+        // disagree indefinitely.
+        if code == CurrencyOption.usd.code,
+           sharedRate == nil,
+           selected.code != CurrencyOption.usd.code,
+           let cachedRate = rate?.rate
+        {
+            onCurrencySelected(selected.code, cachedRate)
+            return
+        }
         let option = option(for: code)
         if option.code != selected.code {
             apply(option, refresh: sharedRate == nil)
