@@ -51,12 +51,6 @@ struct ProviderBreakdown: View {
                         )
                     }
                 }
-                if controller.summary.agents.contains(where: { $0.billing == "subscription" }) {
-                    Text("* Subscription-provider costs are token-priced estimates, not invoices.")
-                        .font(.caption2)
-                        .foregroundStyle(.secondary)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
             }
         }
     }

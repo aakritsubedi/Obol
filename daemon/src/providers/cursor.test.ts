@@ -50,12 +50,18 @@ const literal = (value: string): string => value.replace(/'/g, "''");
 function header(
   composerId: string,
   lastUpdatedAt: number,
-  options: { isArchived?: number; isSubagent?: number; value?: Record<string, unknown> } = {},
+  options: {
+    isArchived?: number;
+    isSubagent?: number;
+    value?: Record<string, unknown>;
+    neverUpdated?: boolean;
+  } = {},
 ): string {
+  const updated = options.neverUpdated ? "NULL" : String(lastUpdatedAt);
   return (
     `INSERT INTO composerHeaders ` +
     `(composerId, workspaceId, createdAt, lastUpdatedAt, isArchived, isSubagent, value) VALUES ` +
-    `('${literal(composerId)}', '${DIRECTORY}', ${lastUpdatedAt - 60_000}, ${lastUpdatedAt}, ` +
+    `('${literal(composerId)}', '${DIRECTORY}', ${lastUpdatedAt - 60_000}, ${updated}, ` +
     `${options.isArchived ?? 0}, ${options.isSubagent ?? 0}, '${literal(JSON.stringify(options.value ?? {}))}')`
   );
 }
@@ -76,6 +82,14 @@ async function writeDatabase(statements: string[]): Promise<void> {
   ]);
 }
 
+async function appendToDatabase(statements: string[]): Promise<void> {
+  await run(SQLITE ?? "", ["-batch", join(root, "state.vscdb"), statements.join("; ")]);
+}
+
+function composerData(composerId: string, value: Record<string, unknown>): string {
+  return `INSERT INTO cursorDiskKV (key, value) VALUES ('${literal(`composerData:${composerId}`)}', '${literal(JSON.stringify(value))}')`;
+}
+
 function read() {
   return readDayJournal({
     date: DATE,
@@ -88,7 +102,7 @@ function read() {
 describe.skipIf(!SQLITE)("cursor adapter", () => {
   beforeEach(async () => {
     await writeDatabase([
-      header(PARENT, at("01:02:00")),
+      header(PARENT, at("01:02:00"), { value: { name: "Fix the login redirect flow" } }),
       header(CHILD, at("01:03:00"), { isSubagent: 1, value: { parentComposerId: PARENT } }),
       header("archived", at("02:00:00"), { isArchived: 1 }),
       header("stale", at("01:00:00") - 7 * 86_400_000),
@@ -137,7 +151,7 @@ describe.skipIf(!SQLITE)("cursor adapter", () => {
     expect(journal.sessions[0].endedAt).toBe(new Date(at("01:02:30")).toISOString());
   });
 
-  it("reports only non-zero token counts and never fabricates Cursor cost rows", async () => {
+  it("sums the token counts Cursor did record, without adding a row per bubble", async () => {
     const usage = await cursorAdapter.usage?.(root, Date.parse(`${DATE}T00:00:00Z`), TZ);
     expect(usage).toEqual([
       {
@@ -156,5 +170,160 @@ describe.skipIf(!SQLITE)("cursor adapter", () => {
     const journal = await read();
     expect(journal.sessions).toEqual([]);
     expect(journal.providers).toEqual([]);
+  });
+
+  it("finds a composer Cursor has not stamped an update onto", async () => {
+    // Cursor leaves lastUpdatedAt null until a conversation is revisited, and a
+    // null satisfies no comparison — so a session used exactly once, which is
+    // the common case for a short task, would otherwise never be discovered.
+    await appendToDatabase([
+      header("once-only", at("09:00:00"), { neverUpdated: true }),
+      bubble("once-only", "user", {
+        type: 1,
+        createdAt: `${DATE}T09:00:00.000Z`,
+        text: "Rename the helper",
+      }),
+      bubble("once-only", "assistant", {
+        type: 2,
+        createdAt: `${DATE}T09:01:00.000Z`,
+        modelInfo: { modelName: "composer-3" },
+        tokenCount: { inputTokens: 900, outputTokens: 40 },
+      }),
+    ]);
+
+    const journal = await read();
+    expect(journal.sessions.map((session) => session.id)).toContain("cursor:once-only");
+
+    const usage = await cursorAdapter.usage?.(root, at("00:00:00"), TZ);
+    expect(usage).toContainEqual({
+      date: DATE,
+      model: "composer-3",
+      inputTokens: 900,
+      outputTokens: 40,
+      cacheReadTokens: 0,
+      cacheCreationTokens: 0,
+    });
+  });
+
+  it("titles a session with the name Cursor gives the conversation", async () => {
+    // Cursor labels each composer; that name is more use in the timeline than a
+    // headline derived from whatever the first prompt happened to say.
+    const journal = await read();
+    const session = journal.sessions.find((entry) => entry.id === `cursor:${PARENT}`);
+    expect(session?.title).toBe("Fix the login redirect flow");
+  });
+
+  it("does not treat the header's creation time as session activity", async () => {
+    // The header is metadata; counting its timestamp would start every session
+    // at whenever the conversation was first opened.
+    const journal = await read();
+    const session = journal.sessions.find((entry) => entry.id === `cursor:${PARENT}`);
+    expect(session?.startedAt).toBe(`${DATE}T01:00:00.000Z`);
+  });
+
+  it("still reports a day Cursor worked but recorded no tokens", async () => {
+    // Cursor writes tokenCount on every bubble and leaves it at zero. Skipping
+    // those days would drop Cursor out of the provider and history views
+    // entirely, reading as "never used" rather than "never reported".
+    const NEXT = "2026-08-26";
+    const later = (time: string): number => Date.parse(`${NEXT}T${time}Z`);
+    await appendToDatabase([
+      header("quiet-day", later("09:00:00"), { neverUpdated: true }),
+      bubble("quiet-day", "user", {
+        type: 1,
+        createdAt: `${NEXT}T09:00:00.000Z`,
+        text: "Tidy the imports",
+        modelInfo: { modelName: "composer-2.5" },
+        tokenCount: { inputTokens: 0, outputTokens: 0 },
+      }),
+      bubble("quiet-day", "assistant", {
+        type: 2,
+        createdAt: `${NEXT}T09:01:00.000Z`,
+        tokenCount: { inputTokens: 0, outputTokens: 0 },
+      }),
+    ]);
+
+    const usage = (await cursorAdapter.usage?.(root, at("00:00:00"), TZ)) ?? [];
+    const quiet = usage.filter((row) => row.date === NEXT);
+    expect(quiet).toEqual([
+      {
+        date: NEXT,
+        model: "composer-2.5",
+        inputTokens: 0,
+        outputTokens: 0,
+        cacheReadTokens: 0,
+        cacheCreationTokens: 0,
+      },
+    ]);
+  });
+
+  it("reconstructs usage from the context shape when Cursor counted nothing", async () => {
+    // Every turn re-sends the whole context, so the harness overhead is written
+    // once and read back thereafter, and the conversation is charged as it grew.
+    const NEXT = "2026-08-27";
+    await appendToDatabase([
+      header("modelled", Date.parse(`${NEXT}T09:10:00Z`), { neverUpdated: true }),
+      composerData("modelled", {
+        promptTokenBreakdown: {
+          totalUsedTokens: 1200,
+          categories: [
+            { id: "system_prompt", estimatedTokens: 400 },
+            { id: "tools", estimatedTokens: 600 },
+            { id: "conversation", estimatedTokens: 200 },
+          ],
+        },
+      }),
+      bubble("modelled", "user", {
+        type: 1,
+        createdAt: `${NEXT}T09:00:00.000Z`,
+        text: "Rename the helper",
+        modelInfo: { modelName: "composer-2.5" },
+        tokenCount: { inputTokens: 0, outputTokens: 0 },
+      }),
+      bubble("modelled", "a1", {
+        type: 2,
+        createdAt: `${NEXT}T09:01:00.000Z`,
+        text: "AAAAAAAA",
+        tokenCount: { inputTokens: 0, outputTokens: 0 },
+      }),
+      bubble("modelled", "a2", {
+        type: 2,
+        createdAt: `${NEXT}T09:02:00.000Z`,
+        text: "BBBB",
+        tokenCount: { inputTokens: 0, outputTokens: 0 },
+      }),
+    ]);
+
+    const usage = (await cursorAdapter.usage?.(root, at("00:00:00"), TZ)) ?? [];
+    expect(usage.filter((row) => row.date === NEXT)).toEqual([
+      {
+        date: NEXT,
+        model: "composer-2.5",
+        // The 1000-token harness prefix: written on the first turn, read on the second.
+        cacheCreationTokens: 1000,
+        cacheReadTokens: 1000,
+        // A 200-token conversation across two turns: half, then all of it.
+        inputTokens: 300,
+        // Eight characters then four, at four characters to a token.
+        outputTokens: 3,
+      },
+    ]);
+  });
+
+  it("uses the counts Cursor recorded rather than reconstructing them", async () => {
+    // The shared fixture's parent conversation carries real counts, so its
+    // context shape must be ignored — charging both would double the bill.
+    await appendToDatabase([
+      composerData(PARENT, {
+        promptTokenBreakdown: {
+          categories: [{ id: "tools", estimatedTokens: 99_999 }],
+        },
+      }),
+    ]);
+
+    const usage = (await cursorAdapter.usage?.(root, at("00:00:00"), TZ)) ?? [];
+    const day = usage.find((row) => row.date === DATE);
+    expect(day?.inputTokens).toBe(400);
+    expect(day?.cacheReadTokens).toBe(0);
   });
 });

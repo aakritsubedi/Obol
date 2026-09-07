@@ -5,10 +5,7 @@ import { fileURLToPath } from "node:url";
 import type { BlocksReport, WidgetConfig } from "@obol/contract";
 import { normalizeBlocks, normalizeProjects, normalizeReport } from "../data/ccusage/normalize.js";
 import type { CcusageReport } from "../data/ccusage/types.js";
-import { collectLocalUsage, localUsageSinceMs } from "../data/local-usage.js";
 import { dateForTimeZone, shiftDate, systemTimeZone } from "../domain/time.js";
-import { mergeLocalUsage } from "../domain/usage-merge.js";
-import { providers } from "../providers/index.js";
 import type { RefreshResult } from "../types.js";
 
 const moduleDirectory = dirname(fileURLToPath(import.meta.url));
@@ -194,15 +191,9 @@ export async function runOnce(
 ): Promise<{ report: CcusageReport; fullReport: CcusageReport; blocks: BlocksReport }> {
   const result = await runUsage(config);
   if (!result.report) throw new Error(result.errors.join("; ") || "ccusage report unavailable");
-  const timezone = systemTimeZone();
-  const localRows = await collectLocalUsage(
-    providers,
-    localUsageSinceMs(config?.historyDays ?? 90, new Date(), timezone),
-    timezone,
-  );
   return {
-    report: mergeLocalUsage(result.report, localRows),
-    fullReport: mergeLocalUsage(result.fullReport ?? result.report, localRows),
+    report: result.report,
+    fullReport: result.fullReport ?? result.report,
     blocks: result.blocks ?? normalizeBlocks({ blocks: [] }),
   };
 }

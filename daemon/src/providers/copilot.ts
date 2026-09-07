@@ -1,11 +1,12 @@
-import { createReadStream, type Dirent, existsSync } from "node:fs";
-import { readdir, readFile } from "node:fs/promises";
+import { type Dirent, existsSync } from "node:fs";
+import { readdir } from "node:fs/promises";
 import { homedir } from "node:os";
 import { basename, join } from "node:path";
-import { createInterface } from "node:readline";
 import { dateForTimeZone } from "../domain/time.js";
 import { asRecord, numberValue, stringValue } from "../shared/coerce.js";
 import { keepRecent } from "./claude.js";
+import { readPatchLog } from "./shared/patch-log.js";
+import { workspaceProject } from "./shared/workspace.js";
 import {
   addPrompt,
   countTool,
@@ -26,7 +27,21 @@ const INSIDERS_ROOT = join(
   "User",
   "workspaceStorage",
 );
-const EDIT_TOOLS = new Set(["edit", "write", "edit_file", "write_file", "replace_string_in_file"]);
+// Copilot names a tool once per call, so an exact set is enough — the same rule
+// claude.ts and opencode.ts follow. Matching loosely would count `read_file`
+// and `list_files` as edits and make the file counts incomparable across agents.
+const EDIT_TOOLS = new Set([
+  "edit",
+  "write",
+  "edit_file",
+  "write_file",
+  "create_file",
+  "apply_patch",
+  "insert_edit_into_file",
+  "replace_string_in_file",
+  "multi_replace_string_in_file",
+  "edit_notebook_file",
+]);
 
 function roots(): string[] {
   return [CODE_ROOT, INSIDERS_ROOT];
@@ -43,138 +58,6 @@ function parseTimestamp(value: unknown): number | null {
   return numeric > 0 ? numeric : null;
 }
 
-function projectSlug(folder: unknown): string {
-  const raw = stringValue(folder).trim();
-  if (!raw) return "";
-  try {
-    const parsed = new URL(raw);
-    if (parsed.protocol === "file:") return decodeURIComponent(parsed.pathname).replace(/\//g, "-");
-  } catch {
-    // Workspace files occasionally contain a plain path; handle it below.
-  }
-  return raw.replace(/^file:\/\//, "").replace(/\//g, "-");
-}
-
-async function workspaceProject(directory: string): Promise<string> {
-  try {
-    const workspace = asRecord(JSON.parse(await readFile(join(directory, "workspace.json"), "utf8")));
-    return projectSlug(workspace.folder) || basename(directory);
-  } catch {
-    return basename(directory);
-  }
-}
-
-function cloneValue(value: unknown): unknown {
-  try {
-    return JSON.parse(JSON.stringify(value));
-  } catch {
-    return {};
-  }
-}
-
-function isObject(value: unknown): value is Record<string, unknown> | unknown[] {
-  return typeof value === "object" && value !== null;
-}
-
-function childContainer(nextKey: string | number): Record<string, unknown> | unknown[] {
-  return typeof nextKey === "number" || /^\d+$/.test(String(nextKey)) ? [] : {};
-}
-
-function setPath(root: Record<string, unknown>, path: Array<string | number>, value: unknown): void {
-  if (path.length === 0) return;
-  let current: unknown = root;
-  for (let index = 0; index < path.length - 1; index += 1) {
-    const key = path[index];
-    const nextKey = path[index + 1];
-    if (Array.isArray(current)) {
-      const position = Number(key);
-      if (!Number.isInteger(position) || position < 0) return;
-      if (!isObject(current[position])) current[position] = childContainer(nextKey);
-      current = current[position];
-    } else if (isObject(current)) {
-      const object = current as Record<string, unknown>;
-      if (!isObject(object[String(key)]) || object[String(key)] === null) {
-        object[String(key)] = childContainer(nextKey);
-      }
-      current = object[String(key)];
-    } else {
-      return;
-    }
-  }
-
-  const key = path[path.length - 1];
-  if (Array.isArray(current)) {
-    const position = Number(key);
-    if (Number.isInteger(position) && position >= 0) current[position] = value;
-  } else if (isObject(current)) {
-    (current as Record<string, unknown>)[String(key)] = value;
-  }
-}
-
-function getPath(root: Record<string, unknown>, path: Array<string | number>): unknown {
-  let current: unknown = root;
-  for (const key of path) {
-    if (Array.isArray(current)) {
-      const position = Number(key);
-      if (!Number.isInteger(position) || position < 0) return undefined;
-      current = current[position];
-    } else if (isObject(current)) {
-      current = (current as Record<string, unknown>)[String(key)];
-    } else {
-      return undefined;
-    }
-  }
-  return current;
-}
-
-function appendPath(root: Record<string, unknown>, path: Array<string | number>, value: unknown): void {
-  const current = getPath(root, path);
-  if (Array.isArray(current)) {
-    current.push(value);
-  } else {
-    setPath(root, path, [value]);
-  }
-}
-
-function replayPatchLog(lines: string[]): Record<string, unknown> {
-  let session: Record<string, unknown> = {};
-  for (const line of lines) {
-    if (!line.trim()) continue;
-    let patch: Record<string, unknown>;
-    try {
-      patch = asRecord(JSON.parse(line));
-    } catch {
-      continue;
-    }
-    const kind = numberValue(patch.kind, -1);
-    if (kind === 0) {
-      const seed = cloneValue(patch.v);
-      session = asRecord(seed);
-    } else if (kind === 1 || kind === 2) {
-      const path = Array.isArray(patch.k)
-        ? patch.k.filter((key): key is string | number => typeof key === "string" || typeof key === "number")
-        : [];
-      if (path.length === 0) continue;
-      if (kind === 1) setPath(session, path, cloneValue(patch.v));
-      else appendPath(session, path, cloneValue(patch.v));
-    }
-  }
-  return session;
-}
-
-async function readPatchLog(path: string): Promise<Record<string, unknown>> {
-  const stream = createReadStream(path, { encoding: "utf8" });
-  const lines = createInterface({ input: stream, crlfDelay: Infinity });
-  const values: string[] = [];
-  try {
-    for await (const line of lines) values.push(line);
-  } finally {
-    lines.close();
-    stream.close();
-  }
-  return replayPatchLog(values);
-}
-
 function requestsFrom(session: Record<string, unknown>): Record<string, unknown>[] {
   if (Array.isArray(session.requests)) return session.requests.map(asRecord);
   const requests = asRecord(session.requests);
@@ -183,17 +66,21 @@ function requestsFrom(session: Record<string, unknown>): Record<string, unknown>
     .map((key) => asRecord(requests[key]));
 }
 
+// `modelId` is the picker's entry, not the model that answered: under Copilot's
+// default routing it reads `copilot/auto`, which prices at nothing. The model
+// actually used is reported on the response, and the session's selected model
+// names the family behind the alias — both outrank the alias itself.
 function requestModel(request: Record<string, unknown>): string {
-  const selectedModel = asRecord(request.selectedModel);
-  const metadata = asRecord(selectedModel.metadata);
   const response = Array.isArray(request.response) ? request.response : [];
   const resolvedModel = response
     .map((part) => stringValue(asRecord(part).resolvedModel).trim())
     .find(Boolean);
+  const family = (value: unknown): string => stringValue(asRecord(asRecord(value).metadata).family).trim();
   return (
     stringValue(request.resolvedModel).trim() ||
     resolvedModel ||
-    stringValue(metadata.family).trim() ||
+    family(request.selectedModel) ||
+    family(request.sessionSelectedModel) ||
     stringValue(request.modelId).trim()
   );
 }
@@ -252,7 +139,7 @@ function consumeToolRounds(
   for (const call of toolCalls(rounds)) {
     const normalized = call.name.toLowerCase();
     countTool(session, day, call.name);
-    if (EDIT_TOOLS.has(normalized) || /(?:edit|write|file)/.test(normalized)) {
+    if (EDIT_TOOLS.has(normalized)) {
       recordFile(
         session,
         day,
@@ -306,38 +193,38 @@ export const copilotAdapter: ProviderAdapter = {
     return roots().find((path) => existsSync(path)) ?? CODE_ROOT;
   },
 
+  // Reads the root it is handed and nothing else, so pointing the adapter
+  // somewhere else moves it wholesale — `root()` is what chooses between a
+  // stable VS Code install and Insiders.
   async discover(root: string, sinceMs: number): Promise<TranscriptFile[]> {
-    const searchRoots = process.env.OBOL_COPILOT_ROOT
-      ? [root]
-      : [root, ...roots().filter((candidate) => candidate !== root)];
+    let workspaces: Dirent[];
+    try {
+      workspaces = await readdir(root, { withFileTypes: true });
+    } catch {
+      return [];
+    }
+
     const files: TranscriptFile[] = [];
-    for (const searchRoot of [...new Set(searchRoots)]) {
-      let workspaces: Dirent[];
+    for (const workspace of workspaces) {
+      if (!workspace.isDirectory()) continue;
+      const workspacePath = join(root, workspace.name);
+      const chatRoot = join(workspacePath, "chatSessions");
+      let sessions: Dirent[];
       try {
-        workspaces = await readdir(searchRoot, { withFileTypes: true });
+        sessions = await readdir(chatRoot, { withFileTypes: true });
       } catch {
+        // A workspace the person never opened a chat in.
         continue;
       }
-      for (const workspace of workspaces) {
-        if (!workspace.isDirectory()) continue;
-        const workspacePath = join(searchRoot, workspace.name);
-        const projectDir = await workspaceProject(workspacePath);
-        const chatRoot = join(workspacePath, "chatSessions");
-        let sessions: Dirent[];
-        try {
-          sessions = await readdir(chatRoot, { withFileTypes: true });
-        } catch {
-          continue;
-        }
-        for (const session of sessions) {
-          if (!session.isFile() || !session.name.endsWith(".jsonl")) continue;
-          files.push({
-            path: join(chatRoot, session.name),
-            sessionId: basename(session.name, ".jsonl"),
-            projectDir,
-            isSubagent: false,
-          });
-        }
+      const projectDir = await workspaceProject(workspacePath);
+      for (const session of sessions) {
+        if (!session.isFile() || !session.name.endsWith(".jsonl")) continue;
+        files.push({
+          path: join(chatRoot, session.name),
+          sessionId: basename(session.name, ".jsonl"),
+          projectDir,
+          isSubagent: false,
+        });
       }
     }
     return keepRecent(files, sinceMs);
@@ -351,6 +238,9 @@ export const copilotAdapter: ProviderAdapter = {
         requestIndex,
         creationDate: session.creationDate,
         sessionId: session.sessionId,
+        // The picked model lives on the session, not the turn; carry it along
+        // so a turn can name the family behind a `copilot/auto` alias.
+        sessionSelectedModel: asRecord(session.inputState).selectedModel,
       };
     }
   },

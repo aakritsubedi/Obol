@@ -39,10 +39,15 @@ export class UsageService {
         timezone,
       );
       if (result.report || result.blocks || localRows.length > 0) {
-        const report = mergeLocalUsage(result.report ?? current.report, localRows);
-        const fullReport = mergeLocalUsage(result.fullReport ?? result.report ?? current.report, localRows);
+        // Local rows may only be merged into a report ccusage just produced.
+        // The stored snapshot already contains the last merge, so folding them
+        // in again would add the same usage a second time, and keep adding it
+        // for as long as ccusage stays unavailable.
+        const report = result.report ? mergeLocalUsage(result.report, localRows) : current.report;
+        const fullReport = result.fullReport ?? result.report;
+        const liveReport = fullReport ? mergeLocalUsage(fullReport, localRows) : this.options.getLiveReport();
         const blocks = result.blocks ?? emptyBlocks();
-        this.options.setLiveReport(fullReport);
+        this.options.setLiveReport(liveReport);
         const message = result.errors.length ? result.errors.join("; ") : null;
         await this.options.store.apply(report, blocks, config, message);
         this.options.onChanged();

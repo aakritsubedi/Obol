@@ -86,7 +86,7 @@ ignored, so installing one agent is enough to get started.
 | Codex CLI | `~/.codex/sessions` | Provider totals, session activity, prompts, tools, edited files, and active work |
 | OpenCode | `~/.local/share/opencode/opencode.db` | Provider totals, session activity, prompts, tools, edited files, and active work |
 | GitHub Copilot | `~/Library/Application Support/Code/User/workspaceStorage/*/chatSessions` | Token-priced provider totals, session activity, prompts, tools, edited files, and active work |
-| Cursor | `~/Library/Application Support/Cursor/User/globalStorage/state.vscdb` | Provider totals when token counts are recorded, session activity, and prompts |
+| Cursor | `~/Library/Application Support/Cursor/User/globalStorage/state.vscdb` | Provider totals reconstructed from context shape, session activity, titles, and prompts |
 
 Provider totals and history come from [ccusage](https://github.com/ryoppippi/ccusage)
 using its report. Project-level cost history is currently Claude-only;
@@ -101,6 +101,24 @@ session’s cost is not a billing record: ccusage reports daily cost by Claude
 project, so Obol apportions that project total across Claude sessions by output
 tokens. Codex, OpenCode, Copilot, and Cursor session records do not include a
 comparable per-project cost source.
+
+Copilot and Cursor are flat-fee subscriptions, so their cost is Obol pricing the
+tokens behind each turn — a figure for comparison, never a bill. Obol prices only
+models it has a published rate for; a turn routed to an internal preview model,
+which Copilot's `auto` mode does often, counts its tokens and reports no cost
+rather than inventing one.
+
+Cursor is the one agent that records no token counts of its own — the fields
+exist but stay at zero. It does record the shape of each conversation's context:
+how many tokens the harness occupies (system prompt, tools, rules, skills) and
+how far the conversation had grown. Since every turn re-sends the whole context,
+that shape and the turn times reconstruct what was sent. The overhead, the
+conversation's final size, the turn count, and each turn's text come from Cursor;
+Obol assumes the conversation grew evenly across those turns and that four
+characters make a token. The harness prefix is identical on every turn, so it is
+counted as a cache read after the first — which is what actually happens, and
+what keeps the estimate near the real price. Treat Cursor's number as the
+roughest of the four.
 
 Usage processing is local:
 
@@ -127,17 +145,22 @@ non-USD display currency. Neither request receives your usage data.
 
 ## How it works
 
+### Pipeline
+
 ```text
-  macOS menu-bar app ─────┐
-                           │ loopback HTTP + per-process token
-  local dashboard ────────┤
-                           ▼
-                    Node daemon
-                      ├── ccusage (live model pricing)
-                      ├── Claude / Codex / OpenCode adapters
-                      ├── Copilot local usage + journal adapter
-                      ├── Cursor SQLite usage + journal adapter
-                      └── ~/.obol snapshot and configuration
+ Agent data sources                 Obol daemon                           Outputs
+ ──────────────────                 ───────────                           ───────
+
+  Claude projects ──┐              ┌────────────────────────────┐
+  Codex sessions  ──┤              │ 1. Watch agent data        │───────▶ Menu bar popover
+  OpenCode DB     ──┼─────────────▶│ 2. Normalize via adapters  │
+  Copilot chats   ──┤              │ 3. Merge ccusage pricing   │───────▶ Local dashboard (127.0.0.1)
+  Cursor state    ──┘              │ 4. Summaries & budgets     │
+                                   │ 5. Loopback HTTP + SSE     │───────▶ ~/.obol snapshot & config
+                                   └────────────────────────────┘
+
+                                   ccusage · fs watcher · ~/.obol stores
+                                   (loopback-only, token-authenticated)
 ```
 
 The daemon is the source of truth for both the native popover and the
