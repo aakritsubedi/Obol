@@ -280,8 +280,8 @@ describe.skipIf(!SQLITE)("cursor adapter", () => {
   });
 
   it("reconstructs usage from the context shape when Cursor counted nothing", async () => {
-    // Every turn re-sends the whole context, so the harness overhead is written
-    // once and read back thereafter, and the conversation is charged as it grew.
+    // Every turn re-sends the whole context, so what the previous turn already
+    // sent comes back from cache and only the growth is charged as input.
     const NEXT = "2026-08-27";
     await appendToDatabase([
       header("modelled", Date.parse(`${NEXT}T09:10:00Z`), { neverUpdated: true }),
@@ -321,11 +321,13 @@ describe.skipIf(!SQLITE)("cursor adapter", () => {
       {
         date: NEXT,
         model: "composer-2.5",
-        // The 1000-token harness prefix: written on the first turn, read on the second.
-        cacheCreationTokens: 1000,
-        cacheReadTokens: 1000,
-        // A 200-token conversation across two turns: half, then all of it.
-        inputTokens: 300,
+        // Turn one sends the 1000-token harness prefix plus half the 200-token
+        // conversation, and none of it had been sent before: 1100 written.
+        cacheCreationTokens: 1100,
+        // Turn two re-sends those same 1100 tokens, which come back from cache.
+        cacheReadTokens: 1100,
+        // Only the 100 tokens the conversation grew by are read fresh.
+        inputTokens: 100,
         // Eight characters then four, at four characters to a token.
         outputTokens: 3,
       },

@@ -133,34 +133,76 @@ describe("copilot adapter", () => {
     expect(journal.testRuns).toBe(1);
   });
 
+  // `promptTokens` is the whole prompt for a turn, so what it shares with the
+  // turn before it was served from cache. This session's prompts only shrink,
+  // which leaves nothing fresh to charge after the first turn.
   it("groups finalized request usage by timezone day and model", async () => {
     const usage = await copilotAdapter.usage?.(root, Date.parse(`${DATE}T00:00:00Z`), TZ);
     expect(usage).toEqual([
       {
         date: DATE,
         model: "claude-haiku-4.5",
-        inputTokens: 3_000,
+        inputTokens: 0,
         outputTokens: 30,
-        cacheReadTokens: 0,
+        cacheReadTokens: 3_000,
         cacheCreationTokens: 0,
       },
       {
         date: DATE,
         model: "gpt-4o",
-        inputTokens: 500,
+        inputTokens: 0,
         outputTokens: 10,
-        cacheReadTokens: 0,
+        cacheReadTokens: 500,
         cacheCreationTokens: 0,
       },
       {
         date: DATE,
         model: "gpt-5-mini",
-        inputTokens: 27_000,
+        inputTokens: 0,
         outputTokens: 120,
         cacheReadTokens: 0,
-        cacheCreationTokens: 0,
+        cacheCreationTokens: 27_000,
       },
     ]);
+  });
+
+  it("charges a growing session for its growth, not for the prefix it re-sends", async () => {
+    const storage = join(root, "growing-storage");
+    const workspace = join(storage, "workspace-growing");
+    await mkdir(join(workspace, "chatSessions"), { recursive: true });
+    await writeFile(
+      join(workspace, "chatSessions", "grow.jsonl"),
+      JSON.stringify({
+        kind: 0,
+        v: {
+          sessionId: "grow",
+          creationDate: at("02:00:00"),
+          requests: [
+            { timestamp: at("02:01:00"), modelId: "gpt-4o", promptTokens: 10_000, completionTokens: 100 },
+            { timestamp: at("02:02:00"), modelId: "gpt-4o", promptTokens: 12_000, completionTokens: 100 },
+            { timestamp: at("02:03:00"), modelId: "gpt-4o", promptTokens: 15_000, completionTokens: 100 },
+          ],
+        },
+      }),
+      "utf8",
+    );
+
+    const usage = (await copilotAdapter.usage?.(storage, Date.parse(`${DATE}T00:00:00Z`), TZ)) ?? [];
+    expect(usage).toEqual([
+      {
+        date: DATE,
+        model: "gpt-4o",
+        // Only the 2k and 3k the prompt grew by; the 10k opener is the cache
+        // write, and the 22k of prefix behind the later turns are reads.
+        inputTokens: 5_000,
+        outputTokens: 300,
+        cacheReadTokens: 22_000,
+        cacheCreationTokens: 10_000,
+      },
+    ]);
+    // Every prompt token is still counted, only priced by the right rate.
+    const total = usage[0].inputTokens + usage[0].cacheReadTokens + usage[0].cacheCreationTokens;
+    expect(total).toBe(10_000 + 12_000 + 15_000);
   });
 
   it("reads a turn appended as a list rather than burying it in a wrapper", async () => {
@@ -168,7 +210,9 @@ describe("copilot adapter", () => {
     // list itself would leave the turn unreadable: no tokens, no time, no model.
     const usage = (await copilotAdapter.usage?.(root, Date.parse(`${DATE}T00:00:00Z`), TZ)) ?? [];
     expect(usage.map((row) => row.model)).toContain("claude-haiku-4.5");
-    expect(usage.reduce((total, row) => total + row.inputTokens, 0)).toBe(30_500);
+    const prompt = (row: (typeof usage)[number]): number =>
+      row.inputTokens + row.cacheReadTokens + row.cacheCreationTokens;
+    expect(usage.reduce((total, row) => total + prompt(row), 0)).toBe(30_500);
   });
 
   it("counts a read as a tool call but never as an edited file", async () => {

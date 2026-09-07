@@ -1,5 +1,6 @@
 import { homedir } from "node:os";
 import { join } from "node:path";
+import { splitCachedPrompt } from "../domain/prompt-cache.js";
 import { dateForTimeZone } from "../domain/time.js";
 import { asRecord, numberValue, stringValue } from "../shared/coerce.js";
 import { query, type SqlRow } from "./shared/sqlite.js";
@@ -163,9 +164,14 @@ function outputTokens(record: Record<string, unknown>): number {
 //
 // Exact from Cursor: the overhead, the conversation's final size, the number of
 // turns, and each turn's text. Modelled: the conversation grew evenly across
-// those turns, and four characters make a token. The overhead is byte-identical
-// every turn, so it is reported as a cache read after the first — which is both
-// what actually happens and what keeps the estimate near the real price.
+// those turns, and four characters make a token.
+//
+// What a turn re-sends is served from cache, so each turn's prompt is split
+// against the one before it: the prefix prices as a cache read and only the
+// growth as input. Charging the whole re-sent prompt as input — which is what
+// this did before, for everything but the harness overhead — overstated a long
+// conversation several times over, since the part that repeats is the part that
+// is nearly free.
 interface DayUsage {
   models: Map<string, ProviderUsageDay>;
   seenModel: string;
@@ -234,12 +240,15 @@ function addModelled(
     if (!day.seenModel && model !== UNKNOWN_MODEL) day.seenModel = model;
     const current = modelUsage(day, date, model);
 
-    // The harness prefix is written once and read back on every later turn.
-    if (index === 0) current.cacheCreationTokens += shape.overhead;
-    else current.cacheReadTokens += shape.overhead;
-
-    // The conversation had grown to roughly this share of its final size.
-    current.inputTokens += Math.round((shape.conversation * (index + 1)) / total);
+    // The whole prompt goes out again each turn: the harness prefix, which is
+    // byte-identical every time, and the conversation as it stood. Both were
+    // sent last turn too, so both come back from cache.
+    const prompt = shape.overhead + Math.round((shape.conversation * (index + 1)) / total);
+    const previous = index === 0 ? 0 : shape.overhead + Math.round((shape.conversation * index) / total);
+    const split = splitCachedPrompt(prompt, previous);
+    current.inputTokens += split.inputTokens;
+    current.cacheReadTokens += split.cacheReadTokens;
+    current.cacheCreationTokens += split.cacheCreationTokens;
     current.outputTokens += outputTokens(turn);
   });
 }

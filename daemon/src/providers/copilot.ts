@@ -2,6 +2,7 @@ import { type Dirent, existsSync } from "node:fs";
 import { readdir } from "node:fs/promises";
 import { homedir } from "node:os";
 import { basename, join } from "node:path";
+import { splitCachedPrompt } from "../domain/prompt-cache.js";
 import { dateForTimeZone } from "../domain/time.js";
 import { asRecord, numberValue, stringValue } from "../shared/coerce.js";
 import { keepRecent } from "./claude.js";
@@ -151,17 +152,49 @@ function consumeToolRounds(
   }
 }
 
+// Copilot writes a turn's token counts to the request itself on some builds and
+// only to the result's metadata on others — the two are mixed within a single
+// machine's history, so a reader of just one drops half the traffic.
+function promptTokensOf(request: Record<string, unknown>): number {
+  const metadata = asRecord(asRecord(request.result).metadata);
+  return numberValue(request.promptTokens) || numberValue(metadata.promptTokens);
+}
+
+function completionTokensOf(request: Record<string, unknown>): number {
+  const metadata = asRecord(asRecord(request.result).metadata);
+  return (
+    numberValue(request.completionTokens) ||
+    numberValue(metadata.completionTokens) ||
+    numberValue(metadata.outputTokens)
+  );
+}
+
 function usageFromRequest(
   request: Record<string, unknown>,
+  previousPromptTokens: number,
   timezone: string,
   usage: Map<string, ProviderUsageDay>,
 ): void {
   const timestamp = parseTimestamp(request.timestamp) ?? parseTimestamp(request.creationDate);
   if (timestamp === null) return;
-  const inputTokens = numberValue(request.promptTokens);
-  const outputTokens = numberValue(request.completionTokens);
-  const cacheReadTokens = numberValue(request.cacheReadTokens);
-  const cacheCreationTokens = numberValue(request.cacheCreationTokens);
+  const promptTokens = promptTokensOf(request);
+  const outputTokens = completionTokensOf(request);
+  const recordedRead = numberValue(request.cacheReadTokens);
+  const recordedCreation = numberValue(request.cacheCreationTokens);
+  // `promptTokens` is the whole prompt for the turn, re-sent prefix included,
+  // and Copilot records no cache split of its own. Honour one if a build ever
+  // starts reporting it; otherwise derive it from how far the prompt grew since
+  // the previous turn of this session, so the repeated part prices as the cache
+  // read it is rather than as fresh input.
+  const split =
+    recordedRead + recordedCreation > 0
+      ? {
+          inputTokens: promptTokens,
+          cacheReadTokens: recordedRead,
+          cacheCreationTokens: recordedCreation,
+        }
+      : splitCachedPrompt(promptTokens, previousPromptTokens);
+  const { inputTokens, cacheReadTokens, cacheCreationTokens } = split;
   const credits = numberValue(
     request.copilotCredits ?? request.credits ?? asRecord(request.metadata).copilotCredits,
   );
@@ -251,7 +284,7 @@ export const copilotAdapter: ProviderAdapter = {
 
   consume(record, session, day): void {
     session.assistantTurns += 1;
-    session.outputTokens += numberValue(record.completionTokens);
+    session.outputTokens += completionTokensOf(record);
     const model = requestModel(record);
     if (model) session.models.add(model);
     addPrompt(session, requestPrompt(record));
@@ -262,10 +295,18 @@ export const copilotAdapter: ProviderAdapter = {
     const files = await this.discover(root, sinceMs);
     const usage = new Map<string, ProviderUsageDay>();
     for (const file of files) {
+      // Carried across the whole session, not just its in-window turns: a
+      // session that began before the window still had its prefix cached, and
+      // restating it as fresh input would bill the window's first turn for the
+      // entire conversation that led up to it.
+      let previousPromptTokens = 0;
       for await (const record of this.read?.(file) ?? []) {
         const timestamp = parseTimestamp(record.timestamp) ?? parseTimestamp(record.creationDate);
-        if (timestamp === null || timestamp < sinceMs) continue;
-        usageFromRequest(record, timezone, usage);
+        if (timestamp !== null && timestamp >= sinceMs) {
+          usageFromRequest(record, previousPromptTokens, timezone, usage);
+        }
+        const promptTokens = promptTokensOf(record);
+        if (promptTokens > 0) previousPromptTokens = promptTokens;
       }
     }
     return [...usage.values()].sort(
