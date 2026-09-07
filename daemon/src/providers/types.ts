@@ -15,6 +15,22 @@ export interface TranscriptFile {
   // The provider's own name for the project, used to join against ccusage.
   projectDir: string;
   isSubagent: boolean;
+  // Some providers use one logical session id for several physical sources.
+  // When present, adapters use this to identify the source record while the
+  // journal still folds it into `sessionId`.
+  sourceId?: string;
+}
+
+export interface ProviderUsageDay {
+  /** YYYY-MM-DD in the requested timezone. */
+  date: string;
+  model: string;
+  inputTokens: number;
+  outputTokens: number;
+  cacheReadTokens: number;
+  cacheCreationTokens: number;
+  /** Copilot premium-request credits, when the source records them. */
+  credits?: number;
 }
 
 export interface SessionAccumulator {
@@ -168,4 +184,6 @@ export interface ProviderAdapter {
     day: DayCounters,
     file: TranscriptFile,
   ): void;
+  /** Token usage recorded locally, for agents ccusage cannot report. */
+  usage?(root: string, sinceMs: number, timezone: string): Promise<ProviderUsageDay[]>;
 }

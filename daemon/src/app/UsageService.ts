@@ -1,8 +1,12 @@
 import type { WidgetConfig } from "@obol/contract";
 import type { CcusageReport } from "../data/ccusage/types.js";
+import { collectLocalUsage, localUsageSinceMs } from "../data/local-usage.js";
 import type { SnapshotStore } from "../data/snapshot-store.js";
 import { emptyBlocks } from "../domain/factories.js";
+import { systemTime, type TimeSource } from "../domain/time.js";
+import { mergeLocalUsage } from "../domain/usage-merge.js";
 import { runUsage } from "../infra/process.js";
+import { type ProviderAdapter, providers } from "../providers/index.js";
 
 export interface UsageServiceOptions {
   getConfig: () => WidgetConfig;
@@ -10,6 +14,8 @@ export interface UsageServiceOptions {
   setLiveReport: (report: CcusageReport) => void;
   store: SnapshotStore;
   onChanged: () => void;
+  providers?: ProviderAdapter[];
+  time?: TimeSource;
 }
 
 /** Coordinates refresh triggers while keeping snapshot persistence out of the bootstrap. */
@@ -22,20 +28,26 @@ export class UsageService {
   async refreshNow(): Promise<void> {
     if (this.refreshPromise) return this.refreshPromise;
     this.refreshPromise = (async () => {
-      const result = await runUsage(this.options.getConfig());
+      const config = this.options.getConfig();
+      const result = await runUsage(config);
       const current = this.options.store.get();
-      if (result.report || result.blocks) {
-        const report = result.report ?? current.report;
+      const time = this.options.time ?? systemTime;
+      const timezone = time.timeZone();
+      const localRows = await collectLocalUsage(
+        this.options.providers ?? providers,
+        localUsageSinceMs(config.historyDays, time.now(), timezone),
+        timezone,
+      );
+      if (result.report || result.blocks || localRows.length > 0) {
+        const report = mergeLocalUsage(result.report ?? current.report, localRows);
+        const fullReport = mergeLocalUsage(result.fullReport ?? result.report ?? current.report, localRows);
         const blocks = result.blocks ?? emptyBlocks();
-        this.options.setLiveReport(result.fullReport ?? result.report ?? this.options.getLiveReport());
+        this.options.setLiveReport(fullReport);
         const message = result.errors.length ? result.errors.join("; ") : null;
-        await this.options.store.apply(report, blocks, this.options.getConfig(), message);
+        await this.options.store.apply(report, blocks, config, message);
         this.options.onChanged();
       } else {
-        await this.options.store.markError(
-          this.options.getConfig(),
-          result.errors.join("; ") || "ccusage refresh failed",
-        );
+        await this.options.store.markError(config, result.errors.join("; ") || "ccusage refresh failed");
         this.options.onChanged();
       }
     })();

@@ -4,9 +4,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What this is
 
-Obol is a local-first macOS menu bar app + local dashboard that tracks token usage and estimated spend for AI coding agents (Claude Code, Codex CLI, OpenCode). It has three runtimes that share one contract:
+Obol is a local-first macOS menu bar app + local dashboard that tracks token usage and estimated spend for AI coding agents (Claude Code, Codex CLI, OpenCode, and GitHub Copilot). It has three runtimes that share one contract:
 
-- **daemon** (`daemon/`) — Node/TypeScript. The source of truth. Reads agent logs via `ccusage`, watches filesystem sources, serves HTTP + SSE on `127.0.0.1` only.
+- **daemon** (`daemon/`) — Node/TypeScript. The source of truth. Reads usage via `ccusage` and provider-local adapters, watches filesystem sources, serves HTTP + SSE on `127.0.0.1` only.
 - **dashboard** (`dashboard/`) — React/TypeScript/Vite, served by the daemon.
 - **macos** (`macos/`) — Swift/AppKit menu bar app; a native presenter over the same daemon API.
 - **contract** (`contract/`) — shared TypeScript types (`type`-only exports) consumed by daemon and dashboard. The Swift side hand-writes matching decoding, checked against recorded JSON fixtures (see below).
@@ -71,7 +71,7 @@ All three runtimes follow the same dependency direction: **UI → domain → dat
 
 ### daemon (`daemon/src/`)
 
-Layered by the same rule: `app/` (application services: `ConfigService`, `JournalService`, `UsageService`), `http/` (server + routes), `domain/` (pure transforms: budget, summary, time), `data/` (ccusage normalization, config/snapshot stores, journal), `providers/` (per-agent adapters: `claude.ts`, `codex.ts`, `opencode.ts`), `infra/` (process spawning, filesystem watcher). `src/server.ts` and `src/watcher.ts` at the top level are deprecated re-export shims (`@deprecated` — import from `http/server.js` / `infra/watcher.js` instead); don't add new code there. Entry point is `src/index.ts`, which wires everything and starts the HTTP server with a random per-process auth token.
+Layered by the same rule: `app/` (application services: `ConfigService`, `JournalService`, `UsageService`), `http/` (server + routes), `domain/` (pure transforms: budget, summary, time, pricing, usage merge), `data/` (ccusage normalization, local usage, config/snapshot stores, journal), `providers/` (per-agent adapters: `claude.ts`, `codex.ts`, `copilot.ts`, `opencode.ts`), `infra/` (process spawning, filesystem watcher). `src/server.ts` and `src/watcher.ts` at the top level are deprecated re-export shims (`@deprecated` — import from `http/server.js` / `infra/watcher.js` instead); don't add new code there. Entry point is `src/index.ts`, which wires everything and starts the HTTP server with a random per-process auth token.
 
 ### dashboard (`dashboard/src/`)
 

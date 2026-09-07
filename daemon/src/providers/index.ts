@@ -1,15 +1,14 @@
 import { claudeAdapter } from "./claude.js";
 import { codexAdapter } from "./codex.js";
+import { copilotAdapter } from "./copilot.js";
 import { opencodeAdapter } from "./opencode.js";
 import type { ProviderAdapter } from "./types.js";
 
-// Adding an agent means writing one adapter and listing it here. Only providers
-// that record a per-event timestamp can appear: without one there is no way to
-// place work on a day or measure how long it took. That currently rules out
-// Cursor (its transcripts carry no record times) and Copilot (plain process
-// logs). OpenCode keeps its history in SQLite rather than transcript files, so
-// its adapter reads records straight out of the database.
-export const providers: ProviderAdapter[] = [claudeAdapter, codexAdapter, opencodeAdapter];
+// Journal adapters need per-event timestamps. Cost adapters are a separate
+// track: ccusage supplies Claude/Codex/OpenCode totals, while providers such as
+// Copilot can report token-bearing local records through the optional usage
+// method. OpenCode keeps its journal in SQLite rather than transcript files.
+export const providers: ProviderAdapter[] = [claudeAdapter, codexAdapter, copilotAdapter, opencodeAdapter];
 
 export function providerById(id: string): ProviderAdapter | undefined {
   return providers.find((provider) => provider.id === id);
