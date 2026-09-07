@@ -17,6 +17,8 @@ export interface ModelBreakdown {
 
 export interface ProviderSummary {
   agent: string;
+  /** Flat-subscription providers use token pricing as an estimate, not an invoice. */
+  billing?: "usage" | "subscription";
   totalCost: number;
   totalTokens: number;
   inputTokens: number;

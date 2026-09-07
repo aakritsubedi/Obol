@@ -6,8 +6,8 @@ const knownRelativeDirectories = [
   ".claude/projects",
   ".codex",
   ".config/opencode",
-  ".copilot/logs",
-  ".cursor/projects",
+  "Library/Application Support/Code/User/workspaceStorage",
+  "Library/Application Support/Code - Insiders/User/workspaceStorage",
   ".continue",
 ];
 

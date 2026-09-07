@@ -22,7 +22,14 @@ struct ProviderBreakdown: View {
                     ForEach(controller.summary.agents) { provider in
                         HStack(spacing: 10) {
                             ProviderBadge(agent: provider.agent, size: 20)
-                            Text(ProviderPresentation.name(for: provider.agent))
+                            HStack(spacing: 1) {
+                                Text(ProviderPresentation.name(for: provider.agent))
+                                if provider.billing == "subscription" {
+                                    Text("*")
+                                        .font(.caption2)
+                                        .baselineOffset(4)
+                                }
+                            }
                             Spacer(minLength: 8)
                             // Tokens are secondary context beside the money:
                             // smaller, muted, and pinned to a fixed-width
@@ -43,6 +50,12 @@ struct ProviderBreakdown: View {
                                 + "\(currency.amount(provider.totalCost)) \(currency.active.name)"
                         )
                     }
+                }
+                if controller.summary.agents.contains(where: { $0.billing == "subscription" }) {
+                    Text("* Subscription-provider costs are token-priced estimates, not invoices.")
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
                 }
             }
         }

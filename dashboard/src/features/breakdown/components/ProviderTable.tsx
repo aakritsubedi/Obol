@@ -11,6 +11,7 @@ interface Props {
 }
 
 export default function ProviderTable({ providers, total }: Props) {
+  const hasSubscriptionProvider = providers.some((provider) => provider.billing === "subscription");
   return (
     <section className={`min-w-0 ${sectionShell}`} aria-labelledby="providers-heading">
       <SectionHeader
@@ -30,7 +31,10 @@ export default function ProviderTable({ providers, total }: Props) {
           {providers.length === 1 ? (
             <div className="flex items-center gap-2 text-[11px] text-muted">
               <ProviderLogo agent={providers[0].agent} size={22} />
-              <strong className="font-semibold text-ink">{providerName(providers[0].agent)}</strong>
+              <strong className="font-semibold text-ink">
+                {providerName(providers[0].agent)}
+                {providers[0].billing === "subscription" && <sup className="ml-0.5">*</sup>}
+              </strong>
               {providers[0].totalCost === 0 && (
                 <span className="rounded-full bg-wash px-2 py-0.5 text-[10px] font-semibold text-subtle">
                   Free
@@ -56,7 +60,10 @@ export default function ProviderTable({ providers, total }: Props) {
                   <div className="min-w-0">
                     <div className="flex items-center justify-between gap-3.5 text-[11px]">
                       <span className="flex items-center gap-2">
-                        <strong className="font-semibold">{providerName(provider.agent)}</strong>
+                        <strong className="font-semibold">
+                          {providerName(provider.agent)}
+                          {provider.billing === "subscription" && <sup className="ml-0.5">*</sup>}
+                        </strong>
                         {free && (
                           <span className="rounded-full bg-wash px-2 py-0.5 text-[10px] font-semibold text-subtle">
                             Free
@@ -89,6 +96,11 @@ export default function ProviderTable({ providers, total }: Props) {
             })
           )}
         </div>
+      )}
+      {hasSubscriptionProvider && (
+        <p className="mt-4 text-[10px] leading-relaxed text-muted">
+          * Subscription-provider costs are token-priced estimates for comparison, not invoices.
+        </p>
       )}
     </section>
   );

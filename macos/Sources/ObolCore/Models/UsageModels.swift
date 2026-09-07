@@ -56,6 +56,7 @@ public struct TodayUsage: Decodable, Sendable {
 
 public struct ProviderSummary: Decodable, Identifiable, Sendable {
     public let agent: String
+    public let billing: String?
     public let totalCost: Double
     public let totalTokens: Double
 
@@ -66,11 +67,12 @@ public struct ProviderSummary: Decodable, Identifiable, Sendable {
     public init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         agent = try container.decodeIfPresent(String.self, forKey: .agent) ?? "Unknown"
+        billing = try container.decodeIfPresent(String.self, forKey: .billing)
         totalCost = try container.decodeIfPresent(Double.self, forKey: .totalCost) ?? 0
         totalTokens = try container.decodeIfPresent(Double.self, forKey: .totalTokens) ?? 0
     }
 
-    private enum CodingKeys: String, CodingKey { case agent, totalCost, totalTokens }
+    private enum CodingKeys: String, CodingKey { case agent, billing, totalCost, totalTokens }
 }
 
 public struct UsageRow: Decodable, Sendable {
