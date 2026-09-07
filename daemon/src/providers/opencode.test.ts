@@ -1,4 +1,4 @@
-import { execFile } from "node:child_process";
+import { execFile, execFileSync } from "node:child_process";
 import { accessSync, constants } from "node:fs";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -14,16 +14,23 @@ const DIRECTORY = "/Users/dev/site";
 
 // The adapter drives whatever sqlite3 the machine has; the tests exercise the
 // same binary so a missing CLI skips the suite rather than failing it.
-const SQLITE = ["/usr/bin/sqlite3", "/opt/homebrew/bin/sqlite3", "/usr/local/bin/sqlite3"].find(
-  (candidate) => {
+const SQLITE =
+  ["/usr/bin/sqlite3", "/opt/homebrew/bin/sqlite3", "/usr/local/bin/sqlite3"].find((candidate) => {
     try {
       accessSync(candidate, constants.X_OK);
       return true;
     } catch {
       return false;
     }
-  },
-);
+  }) ??
+  (() => {
+    try {
+      execFileSync("sqlite3", ["--version"], { stdio: "ignore" });
+      return "sqlite3";
+    } catch {
+      return undefined;
+    }
+  })();
 
 const run = promisify(execFile);
 const at = (time: string): number => Date.parse(`${DATE}T${time}Z`);
