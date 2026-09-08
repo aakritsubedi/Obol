@@ -107,7 +107,66 @@ function runCli(cli: string, args: string[], timeoutMs = 120_000): Promise<strin
   });
 }
 
-export async function runUsage(config?: Pick<WidgetConfig, "historyDays">): Promise<RefreshResult> {
+/** The `--since`/`--until` pair a ccusage run covers, as ccusage date strings. */
+export interface UsageWindow {
+  since: string;
+  until: string;
+}
+
+/** The full history window: everything the configured retention still shows. */
+export function historyWindow(historyDays: number | undefined, now: Date, timezone: string): UsageWindow {
+  const until = dateForTimeZone(now, timezone);
+  const days = Math.max(7, Math.min(365, Math.trunc(historyDays ?? 90)));
+  return { since: shiftDate(until, -(days - 1), timezone), until };
+}
+
+// Narrowing this window does not pay: ccusage walks and parses every
+// transcript whatever --since says, and only filters what it prints. Measured
+// across 325MB of transcripts, an 89-day window costs 0.95s of CPU and a
+// one-day window 0.92s. The window is what the dashboard shows, not a budget.
+
+// `--offline` keeps ccusage on its bundled price table instead of fetching
+// LiteLLM's on every run. That fetch was the whole cost of a refresh — 12-26s
+// of process lifetime against 0.4s offline — and it was wasted either way:
+// repriceReport overwrites every row ccusage priced with the daemon's own
+// table, which pricing-store downloads once a day. A model our table does not
+// know keeps ccusage's bundled price, which is the only figure this changes.
+export function reportArgs(window: UsageWindow, timezone: string): string[] {
+  return [
+    "--json",
+    "--by-agent",
+    "--offline",
+    "-z",
+    timezone,
+    "--sections",
+    "daily,weekly,monthly",
+    "--since",
+    window.since,
+    "--until",
+    window.until,
+  ];
+}
+
+export function projectArgs(window: UsageWindow, timezone: string): string[] {
+  return [
+    "claude",
+    "daily",
+    "--instances",
+    "--json",
+    "--offline",
+    "-z",
+    timezone,
+    "--since",
+    window.since,
+    "--until",
+    window.until,
+  ];
+}
+
+export async function runUsage(
+  config?: Pick<WidgetConfig, "historyDays">,
+  window?: UsageWindow,
+): Promise<RefreshResult> {
   let cli: string;
   try {
     cli = await ccusageCli();
@@ -119,36 +178,10 @@ export async function runUsage(config?: Pick<WidgetConfig, "historyDays">): Prom
     };
   }
   const timezone = systemTimeZone();
-  const until = dateForTimeZone(new Date(), timezone);
-  const historyDays = Math.max(7, Math.min(365, Math.trunc(config?.historyDays ?? 90)));
-  const since = shiftDate(until, -(historyDays - 1), timezone);
-  const reportArgs = [
-    "--json",
-    "--by-agent",
-    "-z",
-    timezone,
-    "--sections",
-    "daily,weekly,monthly",
-    "--since",
-    since,
-    "--until",
-    until,
-  ];
-  const projectArgs = [
-    "claude",
-    "daily",
-    "--instances",
-    "--json",
-    "-z",
-    timezone,
-    "--since",
-    since,
-    "--until",
-    until,
-  ];
+  const covered = window ?? historyWindow(config?.historyDays, new Date(), timezone);
   const [reportResult, projectResult] = await Promise.allSettled([
-    runCli(cli, reportArgs),
-    runCli(cli, projectArgs),
+    runCli(cli, reportArgs(covered, timezone)),
+    runCli(cli, projectArgs(covered, timezone)),
   ]);
 
   let report: CcusageReport | null = null;

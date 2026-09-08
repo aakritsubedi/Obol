@@ -12,6 +12,7 @@ import { PricingStore } from "./data/pricing-store.js";
 import { collectProjectPaths, refreshProjectPaths } from "./data/project-paths.js";
 import { repriceReport } from "./data/reprice-report.js";
 import { SnapshotStore } from "./data/snapshot-store.js";
+import { nextIdleMultiplier } from "./domain/refresh-cadence.js";
 import { systemTime } from "./domain/time.js";
 import { mergeLocalUsage } from "./domain/usage-merge.js";
 import { DaemonServer } from "./http/server.js";
@@ -105,11 +106,40 @@ async function main(): Promise<void> {
     time: systemTime,
   });
 
+  // The fallback refresh exists for changes the watcher cannot see. Nothing it
+  // reads can have moved while no agent wrote anything, so a quiet machine
+  // widens the interval instead of rescanning every source on the same cadence
+  // it uses mid-session.
+  let idleMultiplier = 1;
+  let sawActivity = false;
   const restartFallback = (milliseconds: number): void => {
     if (fallbackTimer) clearInterval(fallbackTimer);
     fallbackTimer = setInterval(() => {
+      const next = nextIdleMultiplier(idleMultiplier, sawActivity);
+      sawActivity = false;
       void usageService.refreshNow();
+      if (next !== idleMultiplier) {
+        idleMultiplier = next;
+        // Rescheduling from inside the tick is what makes the widening take
+        // effect; the interval it was armed with is the old one.
+        restartFallback(config.refreshIntervalMs * next);
+      }
     }, milliseconds);
+  };
+
+  const noteActivity = (): void => {
+    sawActivity = true;
+    if (idleMultiplier === 1) return;
+    // Back to the configured cadence straight away rather than at the end of a
+    // widened interval that could be half an hour long.
+    idleMultiplier = 1;
+    restartFallback(config.refreshIntervalMs);
+  };
+
+  const resetFallback = (milliseconds: number): void => {
+    idleMultiplier = 1;
+    sawActivity = false;
+    restartFallback(milliseconds);
   };
 
   const configService = new ConfigService({
@@ -121,7 +151,7 @@ async function main(): Promise<void> {
     },
     usage: usageService,
     journal: journalService,
-    onRefreshIntervalChange: restartFallback,
+    onRefreshIntervalChange: resetFallback,
     onChanged: () => server?.broadcast(store.get().summary),
   });
 
@@ -156,6 +186,7 @@ async function main(): Promise<void> {
   });
 
   watcher = new AgentLogWatcher((changedPath) => {
+    noteActivity();
     journalService.forgetToday(changedPath);
     void usageService.scheduleRefresh();
   });

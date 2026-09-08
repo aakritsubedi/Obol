@@ -1,17 +1,18 @@
-import { createReadStream } from "node:fs";
-import { createInterface } from "node:readline";
 import type { ActiveSession, DayJournal, JournalProject, JournalSession } from "@obol/contract";
-import { dateForTimeZone } from "../domain/time.js";
 import {
   type DayCounters,
   providers as defaultProviders,
+  emptyDay,
   emptySession,
+  mergeDayInto,
+  mergeSessionInto,
   type ProviderAdapter,
   type SessionAccumulator,
   type TranscriptFile,
 } from "../providers/index.js";
-import { asRecord, numberValue } from "../shared/coerce.js";
+import { numberValue } from "../shared/coerce.js";
 import type { CcusageReport, ProjectUsageRow } from "./ccusage/types.js";
+import { TranscriptScanner } from "./transcript-scan.js";
 
 export { promptText } from "../providers/index.js";
 
@@ -55,24 +56,6 @@ export function projectSlug(cwd: string): string {
   return cwd.replace(/\//g, "-");
 }
 
-// Most agents keep newline-delimited JSON, but a torn final line from a live
-// session is normal, so each line parses independently.
-async function* jsonlRecords(path: string): AsyncIterable<Record<string, unknown>> {
-  const stream = createReadStream(path, { encoding: "utf8" });
-  const lines = createInterface({ input: stream, crlfDelay: Infinity });
-  try {
-    for await (const line of lines) {
-      if (!line.trim()) continue;
-      try {
-        yield asRecord(JSON.parse(line));
-      } catch {}
-    }
-  } finally {
-    lines.close();
-    stream.close();
-  }
-}
-
 async function readTranscript(
   provider: ProviderAdapter,
   file: TranscriptFile,
@@ -80,24 +63,19 @@ async function readTranscript(
   timezone: string,
   sessions: Map<string, SessionAccumulator>,
   day: DayCounters,
+  scanner: TranscriptScanner,
 ): Promise<void> {
+  const totals = await scanner.scan(provider, file, date, timezone);
+
   // Sessions are keyed by provider as well as id, so two agents can never
-  // collide on a shared uuid.
+  // collide on a shared uuid. Several transcripts can land on one key — a
+  // Claude subagent carries its parent's id — so a file's totals are merged in
+  // rather than accumulated directly.
   const key = `${provider.id}:${file.sessionId}`;
   const session = sessions.get(key) ?? emptySession(file.sessionId, provider.id, file.projectDir);
   sessions.set(key, session);
-
-  const records = provider.read ? provider.read(file) : jsonlRecords(file.path);
-  for await (const record of records) {
-    provider.meta?.(record, session, file);
-
-    const timestamp = provider.timestampOf(record);
-    if (timestamp === null) continue;
-    if (dateForTimeZone(new Date(timestamp), timezone) !== date) continue;
-
-    session.timestamps.push(timestamp);
-    provider.consume(record, session, day, file);
-  }
+  mergeSessionInto(session, totals.session);
+  mergeDayInto(day, totals.day);
 }
 
 interface ProjectUsage {
@@ -146,6 +124,11 @@ export interface JournalOptions {
   report?: CcusageReport | null;
   providers?: ProviderAdapter[];
   onSourcePath?: (path: string) => void;
+  /**
+   * Carries per-transcript totals between reads so an appended file costs only
+   * its new bytes. Omitted, each read starts cold — correct, just slower.
+   */
+  scanner?: TranscriptScanner;
 }
 
 export async function readDayJournal(options: JournalOptions): Promise<DayJournal> {
@@ -159,7 +142,9 @@ export async function readDayJournal(options: JournalOptions): Promise<DayJourna
   const sinceMs = Date.parse(`${date}T00:00:00Z`) - 36 * 3_600_000;
 
   const sessions = new Map<string, SessionAccumulator>();
-  const day: DayCounters = { testRuns: 0, filesEdited: new Set(), toolMix: new Map() };
+  const day: DayCounters = emptyDay();
+  const scanner = options.scanner ?? new TranscriptScanner();
+  const seen = new Set<string>();
 
   for (const provider of adapters) {
     let files: TranscriptFile[] = [];
@@ -172,13 +157,16 @@ export async function readDayJournal(options: JournalOptions): Promise<DayJourna
     }
     for (const file of files) {
       options.onSourcePath?.(file.path);
+      seen.add(TranscriptScanner.keyFor(provider, file));
       try {
-        await readTranscript(provider, file, date, timezone, sessions, day);
+        await readTranscript(provider, file, date, timezone, sessions, day, scanner);
       } catch {
         // One unreadable transcript must not lose the rest of the day.
       }
     }
   }
+  // Transcripts that have fallen out of the window will not be asked for again.
+  scanner.retain(date, seen);
 
   const active = [...sessions.values()].filter((session) => session.timestamps.length > 0);
   const usage = usageBySlug(report, date);

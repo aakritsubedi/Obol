@@ -28,6 +28,7 @@ final class DaemonController: ObservableObject {
     @Published private(set) var lidWakeHolding = false
 
     private let client: UsageFetching
+    private let events: UsageEventStreaming
     private let notifier: Notifying
     private let keepAwake: KeepAwakeControlling
     private let lidWake: LidWakeControlling
@@ -36,7 +37,11 @@ final class DaemonController: ObservableObject {
     private let snapshotStore: SnapshotStoring
     private let loginItem: LoginItemControlling
     private var runtimeTimer: Timer?
-    private var pollingTimer: Timer?
+    /// Liveness and config, not the summary: the event stream carries that.
+    private var heartbeatTimer: Timer?
+    /// Runs only while a sleep assertion is actually being held.
+    private var keepAwakeTimer: Timer?
+    private var eventsTask: Task<Void, Never>?
     private var configSaveTask: Task<Void, Never>?
     private var configSaveRequested = false
     private var baseURL: URL?
@@ -47,6 +52,7 @@ final class DaemonController: ObservableObject {
 
     init(
         client: UsageFetching = UsageClient(),
+        events: UsageEventStreaming = UsageEventStream(),
         notifier: Notifying = Notifier(),
         keepAwake: KeepAwakeControlling = KeepAwakeController(),
         lidWake: LidWakeControlling? = nil,
@@ -58,6 +64,7 @@ final class DaemonController: ObservableObject {
         startImmediately: Bool = true
     ) {
         self.client = client
+        self.events = events
         self.notifier = notifier
         self.keepAwake = keepAwake
         self.lidWake = lidWake ?? LidWakeController()
@@ -103,6 +110,22 @@ final class DaemonController: ObservableObject {
 
     static let minimumRefreshIntervalSeconds = 30
     static let refreshIntervalStepSeconds = 5
+
+    /// How often the menu bar checks that the daemon is still there and rereads
+    /// config.json. Summaries arrive on the event stream in between, so this is
+    /// a safety net rather than the way data gets in — and it is given a wide
+    /// tolerance so macOS can fold the wake-up into whatever else it is doing.
+    private static let heartbeatSeconds: TimeInterval = 300
+    private static let heartbeatTolerance: TimeInterval = 30
+
+    /// Keep-awake is the one setting that acts on the session list with the
+    /// popover shut, so it gets a tick of its own — and only while it is holding.
+    private static let keepAwakeSeconds: TimeInterval = 60
+    private static let keepAwakeTolerance: TimeInterval = 10
+
+    /// Matches the daemon's own refresh floor: below it, a forced refresh is
+    /// work whose result the daemon would have declined to recompute anyway.
+    private static let popoverRefreshFloor: TimeInterval = 60
 
     var refreshIntervalSeconds: Int {
         max(Self.minimumRefreshIntervalSeconds, config.refreshIntervalMs / 1000)
@@ -150,7 +173,18 @@ final class DaemonController: ObservableObject {
             isPopoverPresented = true
         }
         guard connected else { return }
-        Task { await refresh() }
+        Task {
+            // The summary on screen arrived on the event stream, so opening the
+            // popover only has to fetch what the popover alone shows. Forcing a
+            // rebuild every time re-read every transcript for a number that had
+            // not changed since the last broadcast.
+            if Recency.isStale(updatedAt: summary.updatedAt, now: Date(), olderThan: Self.popoverRefreshFloor) {
+                await refresh()
+            } else {
+                await loadActiveSessions()
+                await loadTodayJournal()
+            }
+        }
     }
 
     func popoverClosed() {
@@ -347,6 +381,7 @@ final class DaemonController: ObservableObject {
                 lidWakeHolding = holding
             }
         }
+        syncKeepAwakeTimer()
     }
 
     func quit() {
@@ -363,9 +398,14 @@ final class DaemonController: ObservableObject {
         _ = lidWake.apply(false)
         lidWakeHolding = false
         runtimeTimer?.invalidate()
-        pollingTimer?.invalidate()
+        heartbeatTimer?.invalidate()
+        keepAwakeTimer?.invalidate()
         runtimeTimer = nil
-        pollingTimer = nil
+        heartbeatTimer = nil
+        keepAwakeTimer = nil
+        eventsTask?.cancel()
+        eventsTask = nil
+        events.stop()
         process.stop()
         connected = false
     }
@@ -435,12 +475,11 @@ final class DaemonController: ObservableObject {
             // poll replace the local choice with the daemon's old value.
             resumeConfigSave()
             runtimeTimer?.invalidate()
-            pollingTimer = Timer.scheduledTimer(withTimeInterval: 15, repeats: true) { [weak self] _ in
-                Task { await self?.pollSummary() }
-            }
+            startEventStream()
+            startHeartbeat()
             // One daemon-managed refresh on startup replaces the disk snapshot;
-            // subsequent polling remains a cheap cached read. The config comes
-            // with it so the display currency does not wait a poll interval.
+            // everything after it arrives on the event stream. The config comes
+            // with it so the display currency does not wait for a heartbeat.
             Task {
                 await refresh()
                 await loadConfig()
@@ -450,6 +489,59 @@ final class DaemonController: ObservableObject {
         runtimeTimer = Timer.scheduledTimer(withTimeInterval: 0.1, repeats: false) { [weak self] _ in
             Task { @MainActor in self?.waitForRuntime(attempt: attempt + 1) }
         }
+    }
+
+    /// Listens for the summaries the daemon broadcasts as it computes them.
+    ///
+    /// Everything that used to justify a 15-second poll happens here instead,
+    /// at the rate the underlying data actually changes.
+    private func startEventStream() {
+        guard let baseURL, !token.isEmpty else { return }
+        eventsTask?.cancel()
+        let stream = events.summaries(baseURL: baseURL, token: token)
+        eventsTask = Task { @MainActor [weak self] in
+            for await next in stream {
+                guard let self else { return }
+                self.apply(next)
+                if self.statusMessage != nil {
+                    self.statusMessage = nil
+                }
+                // A new summary means the day moved on, so the views that read
+                // transcripts are worth re-reading — for whoever is looking.
+                await self.loadActiveSessions()
+                await self.loadTodayJournal()
+            }
+        }
+    }
+
+    private func startHeartbeat() {
+        heartbeatTimer?.invalidate()
+        let timer = Timer.scheduledTimer(withTimeInterval: Self.heartbeatSeconds, repeats: true) { [weak self] _ in
+            Task { await self?.pollSummary() }
+        }
+        // Lets macOS fire this alongside a wake-up it was going to make anyway
+        // rather than starting the CPU for it alone.
+        timer.tolerance = Self.heartbeatTolerance
+        heartbeatTimer = timer
+    }
+
+    /// Scheduled only while keep-awake is switched on and the daemon is
+    /// reachable — the one case where the session list has to be read with the
+    /// popover shut, since a session starting is what the hold waits for. With
+    /// the setting off, nothing is scheduled at all.
+    private func syncKeepAwakeTimer() {
+        let needed = config.keepAwake && connected
+        if !needed {
+            keepAwakeTimer?.invalidate()
+            keepAwakeTimer = nil
+            return
+        }
+        guard keepAwakeTimer == nil else { return }
+        let timer = Timer.scheduledTimer(withTimeInterval: Self.keepAwakeSeconds, repeats: true) { [weak self] _ in
+            Task { await self?.loadActiveSessions() }
+        }
+        timer.tolerance = Self.keepAwakeTolerance
+        keepAwakeTimer = timer
     }
 
     private func pollSummary() async {
@@ -466,6 +558,9 @@ final class DaemonController: ObservableObject {
             _ = await (config, sessions, journal)
             if connected {
                 connected = false
+                // Nothing to read from while the daemon is gone; the stream's
+                // own reconnect is what brings this back.
+                syncKeepAwakeTimer()
             }
             let message = "Daemon unavailable; showing the last good snapshot."
             if statusMessage != message {
@@ -566,6 +661,7 @@ final class DaemonController: ObservableObject {
         }
         if !connected {
             connected = true
+            syncKeepAwakeTimer()
         }
     }
 

@@ -4,7 +4,16 @@ import { isUsageFilename } from "./watcher.js";
 describe("isUsageFilename", () => {
   it("accepts transcript JSON files", () => {
     expect(isUsageFilename("projects/session.jsonl")).toBe(true);
-    expect(isUsageFilename("chatSessions/session.json")).toBe(true);
+    expect(isUsageFilename("codex/rollout-2026-09-08-abc.jsonl")).toBe(true);
+    expect(isUsageFilename("chatSessions/session.jsonl")).toBe(true);
+  });
+
+  // Every adapter discovers `.jsonl` or a database; none reads a plain `.json`.
+  // The watched directories are full of editor state that is rewritten
+  // constantly, so matching it woke a refresh that had nothing new to read.
+  it("rejects plain JSON no adapter reads", () => {
+    expect(isUsageFilename("chatSessions/session.json")).toBe(false);
+    expect(isUsageFilename("workspaceStorage/state.json")).toBe(false);
   });
 
   // Cursor and OpenCode keep their usage in SQLite rather than transcripts, so

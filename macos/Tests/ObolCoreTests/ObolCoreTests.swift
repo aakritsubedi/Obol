@@ -19,6 +19,20 @@ final class ObolCoreTests: XCTestCase {
         XCTAssertEqual(Recency.label(updatedAt: "not a date", now: now), "Not synced")
     }
 
+    func testStalenessDecidesWhetherOpeningThePopoverForcesARefresh() throws {
+        let now = try XCTUnwrap(Recency.parse("2026-09-05T12:00:00.000Z"))
+        // Fresh off the event stream: nothing to rebuild.
+        XCTAssertFalse(Recency.isStale(updatedAt: "2026-09-05T11:59:30Z", now: now, olderThan: 60))
+        XCTAssertTrue(Recency.isStale(updatedAt: "2026-09-05T11:58:00Z", now: now, olderThan: 60))
+        // Exactly at the floor counts as stale, matching the daemon's own rule.
+        XCTAssertTrue(Recency.isStale(updatedAt: "2026-09-05T11:59:00Z", now: now, olderThan: 60))
+        // No timestamp, or one that cannot be read, must not pin a stale popover.
+        XCTAssertTrue(Recency.isStale(updatedAt: nil, now: now, olderThan: 60))
+        XCTAssertTrue(Recency.isStale(updatedAt: "not a date", now: now, olderThan: 60))
+        // A clock that jumped forward is a clock problem, not fresh data.
+        XCTAssertTrue(Recency.isStale(updatedAt: "2026-09-05T12:30:00Z", now: now, olderThan: 60))
+    }
+
     func testRefreshScheduleUsesThreeDailySlots() throws {
         var calendar = Calendar(identifier: .gregorian)
         calendar.timeZone = try XCTUnwrap(TimeZone(secondsFromGMT: 0))

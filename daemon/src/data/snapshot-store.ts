@@ -23,6 +23,8 @@ function emptySnapshot(config: WidgetConfig, time: TimeSource): Snapshot {
 
 export class SnapshotStore {
   private snapshot: Snapshot;
+  /** What is already on disk, so an unchanged snapshot is not rewritten. */
+  private lastSerialized: string | null = null;
   private readonly path: string;
   private readonly time: TimeSource;
 
@@ -114,9 +116,15 @@ export class SnapshotStore {
   }
 
   private async save(): Promise<void> {
+    // Minified rather than indented: this file is a crash-recovery cache the
+    // daemon writes on every refresh and only ever reads back itself, and the
+    // indentation was around a third of the bytes.
+    const serialized = JSON.stringify(this.snapshot);
+    if (serialized === this.lastSerialized) return;
     await mkdir(dirname(this.path), { recursive: true });
     const temporaryPath = `${this.path}.${process.pid}.tmp`;
-    await writeFile(temporaryPath, `${JSON.stringify(this.snapshot, null, 2)}\n`, "utf8");
+    await writeFile(temporaryPath, `${serialized}\n`, "utf8");
     await rename(temporaryPath, this.path);
+    this.lastSerialized = serialized;
   }
 }

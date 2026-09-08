@@ -78,6 +78,52 @@ export interface DayCounters {
   toolMix: Map<string, number>;
 }
 
+export function emptyDay(): DayCounters {
+  return { testRuns: 0, filesEdited: new Set(), toolMix: new Map() };
+}
+
+function addCounts(into: Map<string, number>, from: Map<string, number>): void {
+  for (const [key, count] of from) into.set(key, (into.get(key) ?? 0) + count);
+}
+
+/**
+ * Folds one transcript's totals into the session it belongs to.
+ *
+ * Accumulation is additive, so a session can be built a file at a time and
+ * merged rather than read in one pass. That is what lets a scan resume from
+ * where it stopped: a file's own totals are cached, and only its new records
+ * are read before merging again. Callers must merge in discovery order, which
+ * is what keeps the fields that are not sums — the title, the first cwd, the
+ * kept prompts — resolving the way a single pass resolves them.
+ */
+export function mergeSessionInto(into: SessionAccumulator, from: SessionAccumulator): void {
+  // Last one wins, as in a single pass: a later file's title supersedes.
+  if (from.title) into.title = from.title;
+  // First one wins: the directory a session opened in, never a later subdirectory.
+  if (!into.projectPath && from.projectPath) into.projectPath = from.projectPath;
+  if (from.gitBranch) into.gitBranch = from.gitBranch;
+  into.timestamps.push(...from.timestamps);
+  into.humanPrompts += from.humanPrompts;
+  into.assistantTurns += from.assistantTurns;
+  into.toolCalls += from.toolCalls;
+  into.outputTokens += from.outputTokens;
+  for (const file of from.filesEdited) into.filesEdited.add(file);
+  for (const model of from.models) into.models.add(model);
+  addCounts(into.toolMix, from.toolMix);
+  // The same cap and de-duplication a single pass applies, so a session spread
+  // over several transcripts keeps the first prompts rather than the last.
+  for (const prompt of from.prompts) {
+    if (into.prompts.length >= MAX_PROMPTS_PER_SESSION) break;
+    if (!into.prompts.includes(prompt)) into.prompts.push(prompt);
+  }
+}
+
+export function mergeDayInto(into: DayCounters, from: DayCounters): void {
+  into.testRuns += from.testRuns;
+  for (const file of from.filesEdited) into.filesEdited.add(file);
+  addCounts(into.toolMix, from.toolMix);
+}
+
 export function countTool(session: SessionAccumulator, day: DayCounters, name: string): void {
   session.toolCalls += 1;
   session.toolMix.set(name, (session.toolMix.get(name) ?? 0) + 1);

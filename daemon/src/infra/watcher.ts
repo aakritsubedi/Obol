@@ -16,7 +16,12 @@ const knownRelativeDirectories = [
 // in. The `-wal`/`-shm`/`-journal` sidecars beside those databases are what get
 // dropped: an open editor rewrites them continuously, and the providers read
 // the database itself, so a sidecar write is churn the refresh cannot act on.
-const usageExtensions = [".jsonl", ".json", ".vscdb", ".db", ".sqlite", ".sqlite3"];
+//
+// Plain `.json` is deliberately absent. No adapter discovers one — every
+// transcript is `.jsonl` and every database is `.vscdb` or `.db` — while the
+// directories watched here are full of editor state files that are rewritten
+// constantly. Matching them only ever bought a refresh with nothing to read.
+const usageExtensions = [".jsonl", ".vscdb", ".db", ".sqlite", ".sqlite3"];
 
 export function isUsageFilename(filename: string | Buffer | null): boolean {
   if (filename === null) return false;
@@ -54,12 +59,18 @@ export class AgentLogWatcher {
 
   constructor(
     private readonly onChange: (changedPath?: string) => void,
-    private readonly debounceMs = 2_000,
+    // An agent writes its transcript continuously, so this is not a wait for
+    // quiet so much as a cap on how often a burst can start a refresh. The
+    // refresh floor is a minute, so five seconds costs nothing in freshness.
+    private readonly debounceMs = 5_000,
   ) {}
 
   start(): void {
     this.discover();
-    this.discoveryTimer = setInterval(() => this.discover(), 5 * 60 * 1000);
+    // Only finds directories that did not exist at startup — an agent being
+    // installed, or run for the first time. That does not happen on a
+    // five-minute cadence, and each pass stats every candidate.
+    this.discoveryTimer = setInterval(() => this.discover(), 30 * 60 * 1000);
   }
 
   private discover(): void {

@@ -3,6 +3,7 @@ import { resolve } from "node:path";
 import type { ActiveSession, DayJournal, WidgetConfig } from "@obol/contract";
 import type { CcusageReport } from "../data/ccusage/types.js";
 import { activeSessions, readDayJournal } from "../data/journal.js";
+import { TranscriptScanner } from "../data/transcript-scan.js";
 import { dateForTimeZone, systemTime, type TimeSource } from "../domain/time.js";
 
 export interface JournalServiceOptions {
@@ -20,6 +21,9 @@ interface JournalCacheEntry {
 /** Owns the transcript-derived cache and its invalidation rules. */
 export class JournalService {
   private readonly cache = new Map<string, JournalCacheEntry>();
+  // Outlives any one read, which is the point: a transcript that grew by a few
+  // lines then costs those lines rather than the whole file again.
+  private readonly scanner = new TranscriptScanner();
   private readonly time: TimeSource;
 
   constructor(private readonly options: JournalServiceOptions) {
@@ -35,6 +39,7 @@ export class JournalService {
 
   clear(): void {
     this.cache.clear();
+    this.scanner.clear();
   }
 
   async read(requested: string | null): Promise<DayJournal> {
@@ -56,6 +61,7 @@ export class JournalService {
       idleMinutes: config.journalIdleMinutes,
       report: this.options.getLiveReport(),
       onSourcePath: (path) => sourcePaths.add(resolve(path)),
+      scanner: this.scanner,
     });
     // A report-less journal has no project costs to join, so do not pin a
     // zero-cost result for the rest of the day before the first refresh.

@@ -18,6 +18,20 @@ public enum Recency {
         return try? wholeISO8601.parse(raw)
     }
 
+    /// Whether a summary is old enough to be worth asking the daemon to rebuild.
+    ///
+    /// Opening the menu bar used to force a full refresh every time, which on a
+    /// large history meant re-reading every transcript for a figure the event
+    /// stream had already delivered. A summary younger than the daemon's own
+    /// refresh floor cannot be improved by asking again.
+    /// An unreadable or missing timestamp counts as stale: better one refresh
+    /// too many than a popover that will not update.
+    public static func isStale(updatedAt raw: String?, now: Date, olderThan: TimeInterval) -> Bool {
+        guard let updated = parse(raw) else { return true }
+        // A timestamp in the future is a clock that moved, not fresh data.
+        return abs(now.timeIntervalSince(updated)) >= olderThan
+    }
+
     /// Deliberately terse — it sits beside the live pill in a row that also
     /// carries a title and a button, so it gets one short word of space.
     /// A timestamp from the future reads as "Just now" rather than counting up.
