@@ -10,7 +10,7 @@ const local = (overrides: Partial<LocalUsageRow> = {}): LocalUsageRow => ({
   outputTokens: 20,
   cacheReadTokens: 5,
   cacheCreationTokens: 0,
-  totalTokens: 125,
+  totalTokens: 120,
   totalCost: 1.25,
   billing: "subscription",
   ...overrides,
@@ -46,7 +46,7 @@ describe("mergeLocalUsage", () => {
     expect(result.daily[0]).toMatchObject({
       period: "2026-08-25",
       totalCost: 3.25,
-      totalTokens: 145,
+      totalTokens: 140,
       inputTokens: 100,
       outputTokens: 20,
     });
@@ -54,19 +54,19 @@ describe("mergeLocalUsage", () => {
       agent: "copilot",
       billing: "subscription",
       totalCost: 1.25,
-      totalTokens: 125,
+      totalTokens: 120,
     });
     expect(result.daily[0].modelBreakdowns[0]).toMatchObject({ model: "gpt-5-mini", agent: "copilot" });
     expect(result.weekly[0].period).toBe("2026-08-24");
     expect(result.monthly[0].period).toBe("2026-08");
-    expect(result.totals).toMatchObject({ totalCost: 1.25, totalTokens: 125 });
+    expect(result.totals).toMatchObject({ totalCost: 1.25, totalTokens: 120 });
   });
 
   it("creates a new daily row when ccusage has no row for the date", () => {
     const base = { ...report(), daily: [] };
     const result = mergeLocalUsage(base, [local({ date: "2026-08-26" })]);
     expect(result.daily).toHaveLength(1);
-    expect(result.daily[0]).toMatchObject({ period: "2026-08-26", totalCost: 1.25, totalTokens: 125 });
+    expect(result.daily[0]).toMatchObject({ period: "2026-08-26", totalCost: 1.25, totalTokens: 120 });
   });
 
   it("preserves projectPaths when merging local usage", () => {

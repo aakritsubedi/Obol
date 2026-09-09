@@ -1,6 +1,5 @@
 import { homedir } from "node:os";
 import { join } from "node:path";
-import { splitCachedPrompt } from "../domain/prompt-cache.js";
 import { dateForTimeZone } from "../domain/time.js";
 import { asRecord, numberValue, stringValue } from "../shared/coerce.js";
 import { query, type SqlRow } from "./shared/sqlite.js";
@@ -121,7 +120,15 @@ async function readRecords(file: TranscriptFile): Promise<Record<string, unknown
 // Categories that describe the harness rather than the conversation. Their
 // total is re-sent verbatim on every turn, which is what makes it a cache read
 // rather than fresh input.
-const OVERHEAD_CATEGORIES = new Set(["system_prompt", "tools", "rules", "skills", "mcp", "subagents"]);
+const OVERHEAD_CATEGORIES = new Set([
+  "system_prompt",
+  "tools",
+  "rules",
+  "skills",
+  "mcp",
+  "subagents",
+  "summarized_conversation",
+]);
 
 interface ContextShape {
   /** Harness tokens re-sent every turn: system prompt, tools, rules, skills. */
@@ -150,10 +157,26 @@ function contextShape(record: Record<string, unknown>): ContextShape | null {
 // measure available since Cursor records no output count of its own.
 const CHARS_PER_TOKEN = 4;
 
-function outputTokens(record: Record<string, unknown>): number {
+function outputCharacterCount(record: Record<string, unknown>): number {
   const thinking = parsedRecord(record.thinking);
-  const text = stringValue(record.text).length + stringValue(thinking.text).length;
-  return Math.ceil(text / CHARS_PER_TOKEN);
+  let chars = stringValue(record.text).length + stringValue(thinking.text).length;
+  for (const value of Array.isArray(record.codeBlocks) ? record.codeBlocks : []) {
+    const block = asRecord(value);
+    chars += stringValue(block.content ?? block.code ?? block.text).length;
+  }
+  for (const value of Array.isArray(record.toolResults) ? record.toolResults : []) {
+    const result = asRecord(value);
+    chars += stringValue(result.result ?? result.output ?? result.content ?? result.text).length;
+  }
+  for (const value of Array.isArray(record.allThinkingBlocks) ? record.allThinkingBlocks : []) {
+    const block = asRecord(value);
+    chars += stringValue(block.text ?? block.content).length;
+  }
+  return chars;
+}
+
+function outputTokens(record: Record<string, unknown>): number {
+  return Math.ceil(outputCharacterCount(record) / CHARS_PER_TOKEN);
 }
 
 // Cursor leaves the `tokenCount` on every bubble at zero, so there is no usage
@@ -166,12 +189,11 @@ function outputTokens(record: Record<string, unknown>): number {
 // turns, and each turn's text. Modelled: the conversation grew evenly across
 // those turns, and four characters make a token.
 //
-// What a turn re-sends is served from cache, so each turn's prompt is split
-// against the one before it: the prefix prices as a cache read and only the
-// growth as input. Charging the whole re-sent prompt as input — which is what
-// this did before, for everything but the harness overhead — overstated a long
-// conversation several times over, since the part that repeats is the part that
-// is nearly free.
+// Cursor is a flat subscription, so these figures are a comparison estimate.
+// Summing a full cache read on every turn of a long agent session counts the
+// same prefix thousands of times and blows up both tokens and cost. Instead,
+// write the harness once, charge conversation growth as fresh input, and skip
+// per-turn cache reads — the repeated overhead is already in cacheCreation.
 interface DayUsage {
   models: Map<string, ProviderUsageDay>;
   seenModel: string;
@@ -220,6 +242,12 @@ function addRecorded(record: Record<string, unknown>, timezone: string, days: Ma
   current.cacheCreationTokens += cacheCreationTokens;
 }
 
+function conversationGrowth(index: number, total: number, conversation: number): number {
+  const current = Math.round((conversation * (index + 1)) / total);
+  const previous = index === 0 ? 0 : Math.round((conversation * index) / total);
+  return current - previous;
+}
+
 /** Reconstructs a conversation's usage from its context shape and its turns. */
 function addModelled(
   shape: ContextShape,
@@ -240,15 +268,9 @@ function addModelled(
     if (!day.seenModel && model !== UNKNOWN_MODEL) day.seenModel = model;
     const current = modelUsage(day, date, model);
 
-    // The whole prompt goes out again each turn: the harness prefix, which is
-    // byte-identical every time, and the conversation as it stood. Both were
-    // sent last turn too, so both come back from cache.
-    const prompt = shape.overhead + Math.round((shape.conversation * (index + 1)) / total);
-    const previous = index === 0 ? 0 : shape.overhead + Math.round((shape.conversation * index) / total);
-    const split = splitCachedPrompt(prompt, previous);
-    current.inputTokens += split.inputTokens;
-    current.cacheReadTokens += split.cacheReadTokens;
-    current.cacheCreationTokens += split.cacheCreationTokens;
+    const growth = conversationGrowth(index, total, shape.conversation);
+    if (index === 0) current.cacheCreationTokens += shape.overhead + growth;
+    else current.inputTokens += growth;
     current.outputTokens += outputTokens(turn);
   });
 }

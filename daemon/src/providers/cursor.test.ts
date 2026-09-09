@@ -321,17 +321,86 @@ describe.skipIf(!SQLITE)("cursor adapter", () => {
       {
         date: NEXT,
         model: "composer-2.5",
-        // Turn one sends the 1000-token harness prefix plus half the 200-token
-        // conversation, and none of it had been sent before: 1100 written.
+        // Turn one writes the harness plus the first slice of conversation.
         cacheCreationTokens: 1100,
-        // Turn two re-sends those same 1100 tokens, which come back from cache.
-        cacheReadTokens: 1100,
-        // Only the 100 tokens the conversation grew by are read fresh.
+        cacheReadTokens: 0,
+        // Turn two only adds the remaining conversation growth.
         inputTokens: 100,
         // Eight characters then four, at four characters to a token.
         outputTokens: 3,
       },
     ]);
+  });
+
+  it("does not accumulate cache reads across long agent sessions", async () => {
+    const NEXT = "2026-08-28";
+    const turns = 200;
+    const statements = [
+      header("long-session", Date.parse(`${NEXT}T12:00:00Z`), { neverUpdated: true }),
+      composerData("long-session", {
+        promptTokenBreakdown: {
+          totalUsedTokens: 12_000,
+          categories: [
+            { id: "system_prompt", estimatedTokens: 500 },
+            { id: "tools", estimatedTokens: 9_000 },
+            { id: "conversation", estimatedTokens: 2_500 },
+          ],
+        },
+      }),
+    ];
+    for (let index = 0; index < turns; index += 1) {
+      const minute = String(index % 60).padStart(2, "0");
+      const hour = String(Math.floor(index / 60)).padStart(2, "0");
+      statements.push(
+        bubble("long-session", `a${index}`, {
+          type: 2,
+          createdAt: `${NEXT}T${hour}:${minute}:00.000Z`,
+          text: "x",
+          modelInfo: { modelName: "composer-2.5" },
+          tokenCount: { inputTokens: 0, outputTokens: 0 },
+        }),
+      );
+    }
+    await appendToDatabase(statements);
+
+    const usage = (await cursorAdapter.usage?.(root, at("00:00:00"), TZ)) ?? [];
+    const day = usage.find((row) => row.date === NEXT);
+    expect(day?.cacheReadTokens).toBe(0);
+    expect(day?.cacheCreationTokens).toBe(9_513);
+    expect(day?.inputTokens).toBe(2_487);
+    expect(day?.outputTokens).toBe(turns);
+    expect((day?.cacheReadTokens ?? 0) + (day?.inputTokens ?? 0)).toBeLessThan(100_000);
+  });
+
+  it("treats summarized conversation as harness overhead", async () => {
+    const NEXT = "2026-08-29";
+    await appendToDatabase([
+      header("summarized", Date.parse(`${NEXT}T09:00:00Z`), { neverUpdated: true }),
+      composerData("summarized", {
+        promptTokenBreakdown: {
+          categories: [
+            { id: "tools", estimatedTokens: 1_000 },
+            { id: "summarized_conversation", estimatedTokens: 500 },
+            { id: "conversation", estimatedTokens: 100 },
+          ],
+        },
+      }),
+      bubble("summarized", "a1", {
+        type: 2,
+        createdAt: `${NEXT}T09:01:00.000Z`,
+        text: "AAAA",
+        modelInfo: { modelName: "composer-2.5" },
+        tokenCount: { inputTokens: 0, outputTokens: 0 },
+      }),
+    ]);
+
+    const usage = (await cursorAdapter.usage?.(root, at("00:00:00"), TZ)) ?? [];
+    expect(usage.find((row) => row.date === NEXT)).toMatchObject({
+      cacheCreationTokens: 1_600,
+      inputTokens: 0,
+      cacheReadTokens: 0,
+      outputTokens: 1,
+    });
   });
 
   it("uses the counts Cursor recorded rather than reconstructing them", async () => {

@@ -36,7 +36,9 @@ function pricedRow(agent: string, row: ProviderUsageDay, pricing: PricingTable):
   const outputTokens = numberValue(row.outputTokens);
   const cacheReadTokens = numberValue(row.cacheReadTokens);
   const cacheCreationTokens = numberValue(row.cacheCreationTokens);
-  const totalTokens = inputTokens + outputTokens + cacheReadTokens + cacheCreationTokens;
+  // Unique tokens processed: cache reads are re-sent prefix bytes already
+  // counted in cacheCreation or input, so they must not inflate the total.
+  const totalTokens = inputTokens + outputTokens + cacheCreationTokens;
   return {
     ...row,
     agent,
