@@ -581,7 +581,7 @@ final class DaemonController: ObservableObject {
         if config != adopted {
             config = adopted
         }
-        healLaunchAtLogin()
+        syncLaunchAtLogin()
         // Re-evaluated on every poll so an edit made straight to config.json
         // still takes effect.
         syncKeepAwake()
@@ -665,9 +665,16 @@ final class DaemonController: ObservableObject {
         }
     }
 
-    private func healLaunchAtLogin() {
-        guard config.launchAtLogin, !loginItem.isEnabled else { return }
-        try? loginItem.setEnabled(true)
+    private func syncLaunchAtLogin() {
+        if config.launchAtLogin {
+            guard !loginItem.isEnabled else { return }
+            try? loginItem.setEnabled(true)
+        } else if loginItem.isEnabled {
+            // The config is shared by installed and development copies. If a
+            // different copy turned the setting off, remove this copy's stale
+            // login registration as well.
+            try? loginItem.setEnabled(false)
+        }
     }
 
     private func nodeURL() -> URL? {

@@ -152,13 +152,16 @@ describe.skipIf(!SQLITE)("cursor adapter", () => {
   });
 
   it("sums the token counts Cursor did record, without adding a row per bubble", async () => {
+    // The parent turn carries real counts and is reported as counted. The
+    // subagent conversation carries none, so what it generated is estimated
+    // from its text — five tokens on top of the hundred Cursor recorded.
     const usage = await cursorAdapter.usage?.(root, Date.parse(`${DATE}T00:00:00Z`), TZ);
     expect(usage).toEqual([
       {
         date: DATE,
         model: "composer-2.5",
         inputTokens: 400,
-        outputTokens: 100,
+        outputTokens: 105,
         cacheReadTokens: 0,
         cacheCreationTokens: 0,
       },
@@ -180,7 +183,7 @@ describe.skipIf(!SQLITE)("cursor adapter", () => {
         date: DATE,
         model: "composer-2.5",
         inputTokens: 500,
-        outputTokens: 102,
+        outputTokens: 107,
         cacheReadTokens: 0,
         cacheCreationTokens: 0,
       },
@@ -279,9 +282,10 @@ describe.skipIf(!SQLITE)("cursor adapter", () => {
     ]);
   });
 
-  it("reconstructs usage from the context shape when Cursor counted nothing", async () => {
-    // Every turn re-sends the whole context, so what the previous turn already
-    // sent comes back from cache and only the growth is charged as input.
+  it("reconstructs usage from the context snapshot when Cursor counted nothing", async () => {
+    // With nothing stamped per turn, the composer's own context snapshot is all
+    // there is: one turn sent that whole context, and it was written to cache
+    // rather than read back, because there was no earlier turn to read from.
     const NEXT = "2026-08-27";
     await appendToDatabase([
       header("modelled", Date.parse(`${NEXT}T09:10:00Z`), { neverUpdated: true }),
@@ -321,18 +325,157 @@ describe.skipIf(!SQLITE)("cursor adapter", () => {
       {
         date: NEXT,
         model: "composer-2.5",
-        // Turn one writes the harness plus the first slice of conversation.
-        cacheCreationTokens: 1100,
+        cacheCreationTokens: 1200,
         cacheReadTokens: 0,
-        // Turn two only adds the remaining conversation growth.
-        inputTokens: 100,
+        inputTokens: 0,
         // Eight characters then four, at four characters to a token.
         outputTokens: 3,
       },
     ]);
   });
 
-  it("does not accumulate cache reads across long agent sessions", async () => {
+  it("prices each turn against the context size Cursor stamped on it", async () => {
+    // `contextWindowStatusAtCreation` is written once, when the turn runs, and
+    // never revised — so a day's figures stay put as the conversation grows,
+    // which is what the single end-of-conversation snapshot could not do.
+    const NEXT = "2026-08-30";
+    const status = (tokensUsed: number) => ({ tokensUsed, tokenLimit: 200_000 });
+    await appendToDatabase([
+      header("anchored", Date.parse(`${NEXT}T09:30:00Z`), { neverUpdated: true }),
+      bubble("anchored", "u1", {
+        type: 1,
+        createdAt: `${NEXT}T09:00:00.000Z`,
+        text: "Start",
+        modelInfo: { modelName: "composer-2.5" },
+        contextWindowStatusAtCreation: status(10_000),
+      }),
+      bubble("anchored", "u2", {
+        type: 1,
+        createdAt: `${NEXT}T09:10:00.000Z`,
+        text: "Keep going",
+        modelInfo: { modelName: "composer-2.5" },
+        contextWindowStatusAtCreation: status(25_000),
+      }),
+    ]);
+
+    const usage = (await cursorAdapter.usage?.(root, at("00:00:00"), TZ)) ?? [];
+    expect(usage.find((row) => row.date === NEXT)).toMatchObject({
+      // The first turn writes its whole context; the second re-reads it and
+      // only pays fresh input on the 15,000 it grew by.
+      cacheCreationTokens: 10_000,
+      cacheReadTokens: 10_000,
+      inputTokens: 15_000,
+    });
+  });
+
+  it("charges a cache read for every model call a turn makes", async () => {
+    // Each tool result has to go back to the model to be acted on, so a turn
+    // costs one model call per tool call plus the one that ends it — and every
+    // one of them re-sends the conversation. Dropping those reads is what
+    // priced a thousand-call session as if it had sent its context once.
+    const NEXT = "2026-08-31";
+    const statements = [
+      header("agentic", Date.parse(`${NEXT}T09:30:00Z`), { neverUpdated: true }),
+      bubble("agentic", "u1", {
+        type: 1,
+        createdAt: `${NEXT}T09:00:00.000Z`,
+        text: "Refactor it",
+        modelInfo: { modelName: "composer-2.5" },
+        contextWindowStatusAtCreation: { tokensUsed: 50_000, tokenLimit: 200_000 },
+      }),
+    ];
+    for (let index = 0; index < 9; index += 1) {
+      statements.push(
+        bubble("agentic", `t${index}`, {
+          type: 2,
+          createdAt: `${NEXT}T09:0${index}:30.000Z`,
+          toolFormerData: { name: "read_file_v2", status: "completed" },
+        }),
+      );
+    }
+    await appendToDatabase(statements);
+
+    const usage = (await cursorAdapter.usage?.(root, at("00:00:00"), TZ)) ?? [];
+    // Nine tool calls plus the closing call: one writes the context, nine read
+    // it back.
+    expect(usage.find((row) => row.date === NEXT)).toMatchObject({
+      cacheCreationTokens: 50_000,
+      cacheReadTokens: 9 * 50_000,
+    });
+  });
+
+  it("treats a shrinking context as a compaction that rewrites the cache", async () => {
+    // Cursor summarizes when the window fills, and the sawtooth that leaves in
+    // the context sizes is not a conversation getting cheaper: the summary that
+    // replaces the transcript is new text, so it is written, never read back.
+    const NEXT = "2026-09-01";
+    const status = (tokensUsed: number) => ({ tokensUsed, tokenLimit: 200_000 });
+    await appendToDatabase([
+      header("compacted", Date.parse(`${NEXT}T09:30:00Z`), { neverUpdated: true }),
+      bubble("compacted", "u1", {
+        type: 1,
+        createdAt: `${NEXT}T09:00:00.000Z`,
+        text: "One",
+        modelInfo: { modelName: "composer-2.5" },
+        contextWindowStatusAtCreation: status(180_000),
+      }),
+      bubble("compacted", "u2", {
+        type: 1,
+        createdAt: `${NEXT}T09:10:00.000Z`,
+        text: "Two",
+        modelInfo: { modelName: "composer-2.5" },
+        contextWindowStatusAtCreation: status(30_000),
+      }),
+    ]);
+
+    const usage = (await cursorAdapter.usage?.(root, at("00:00:00"), TZ)) ?? [];
+    expect(usage.find((row) => row.date === NEXT)).toMatchObject({
+      cacheCreationTokens: 180_000 + 30_000,
+      cacheReadTokens: 0,
+      inputTokens: 0,
+    });
+  });
+
+  it("keeps reconstructed turns when a later turn carries real counts", async () => {
+    // The old check flipped a whole conversation to "recorded" as soon as any
+    // one bubble carried a number, which silently dropped every reconstructed
+    // turn beside it — the day's total fell as the conversation grew.
+    const NEXT = "2026-09-02";
+    const status = (tokensUsed: number) => ({ tokensUsed, tokenLimit: 200_000 });
+    await appendToDatabase([
+      header("mixed", Date.parse(`${NEXT}T09:30:00Z`), { neverUpdated: true }),
+      bubble("mixed", "u1", {
+        type: 1,
+        createdAt: `${NEXT}T09:00:00.000Z`,
+        text: "One",
+        modelInfo: { modelName: "composer-2.5" },
+        contextWindowStatusAtCreation: status(8_000),
+        tokenCount: { inputTokens: 0, outputTokens: 0 },
+      }),
+      bubble("mixed", "u2", {
+        type: 1,
+        createdAt: `${NEXT}T09:10:00.000Z`,
+        text: "Two",
+        modelInfo: { modelName: "composer-2.5" },
+        contextWindowStatusAtCreation: status(12_000),
+        tokenCount: { inputTokens: 700, outputTokens: 60 },
+      }),
+    ]);
+
+    const usage = (await cursorAdapter.usage?.(root, at("00:00:00"), TZ)) ?? [];
+    expect(usage.find((row) => row.date === NEXT)).toMatchObject({
+      // Turn one is still reconstructed; turn two is reported as Cursor counted it.
+      cacheCreationTokens: 8_000,
+      cacheReadTokens: 0,
+      inputTokens: 700,
+      outputTokens: 60,
+    });
+  });
+
+  it("does not re-charge a long session's context as fresh input", async () => {
+    // A long session re-sends its context on every call, but the repeat is a
+    // cache read at a tenth of the rate — never fresh input. What is charged as
+    // input stays bounded by how far the context actually grew.
     const NEXT = "2026-08-28";
     const turns = 200;
     const statements = [
@@ -352,8 +495,8 @@ describe.skipIf(!SQLITE)("cursor adapter", () => {
       const minute = String(index % 60).padStart(2, "0");
       const hour = String(Math.floor(index / 60)).padStart(2, "0");
       statements.push(
-        bubble("long-session", `a${index}`, {
-          type: 2,
+        bubble("long-session", `u${index}`, {
+          type: 1,
           createdAt: `${NEXT}T${hour}:${minute}:00.000Z`,
           text: "x",
           modelInfo: { modelName: "composer-2.5" },
@@ -365,11 +508,11 @@ describe.skipIf(!SQLITE)("cursor adapter", () => {
 
     const usage = (await cursorAdapter.usage?.(root, at("00:00:00"), TZ)) ?? [];
     const day = usage.find((row) => row.date === NEXT);
-    expect(day?.cacheReadTokens).toBe(0);
-    expect(day?.cacheCreationTokens).toBe(9_513);
-    expect(day?.inputTokens).toBe(2_487);
-    expect(day?.outputTokens).toBe(turns);
-    expect((day?.cacheReadTokens ?? 0) + (day?.inputTokens ?? 0)).toBeLessThan(100_000);
+    // The context ramps to 12,000 across the session and is never exceeded, so
+    // that is the whole of what gets written and charged fresh.
+    expect((day?.cacheCreationTokens ?? 0) + (day?.inputTokens ?? 0)).toBe(12_000);
+    // The reads are the repeats, and there is one per turn after the first.
+    expect(day?.cacheReadTokens).toBeGreaterThan(12_000);
   });
 
   it("treats summarized conversation as harness overhead", async () => {

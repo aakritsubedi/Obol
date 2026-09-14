@@ -3,9 +3,17 @@ import Foundation
 
 @MainActor
 final class AppDelegate: NSObject, NSApplicationDelegate {
+    private var instanceLock: ApplicationInstanceLock?
     private var environment: AppEnvironment?
 
     func applicationDidFinishLaunching(_: Notification) {
+        guard let instanceLock = ApplicationInstanceLock() else {
+            NSLog("Obol is already running; ignoring duplicate launch.")
+            NSApp.terminate(nil)
+            return
+        }
+        self.instanceLock = instanceLock
+
         let daemon = DaemonController { [weak self] code, rate in
             self?.environment?.currency.adopt(code: code, rate: rate)
         }

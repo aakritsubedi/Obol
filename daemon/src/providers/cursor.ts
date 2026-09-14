@@ -1,5 +1,6 @@
 import { homedir } from "node:os";
 import { join } from "node:path";
+import { splitCachedPrompt } from "../domain/prompt-cache.js";
 import { dateForTimeZone } from "../domain/time.js";
 import { asRecord, numberValue, stringValue } from "../shared/coerce.js";
 import { query, type SqlRow } from "./shared/sqlite.js";
@@ -117,56 +118,47 @@ async function readRecords(file: TranscriptFile): Promise<Record<string, unknown
   return [...leading, ...bubbles];
 }
 
-// Categories that describe the harness rather than the conversation. Their
-// total is re-sent verbatim on every turn, which is what makes it a cache read
-// rather than fresh input.
-const OVERHEAD_CATEGORIES = new Set([
-  "system_prompt",
-  "tools",
-  "rules",
-  "skills",
-  "mcp",
-  "subagents",
-  "summarized_conversation",
-]);
-
-interface ContextShape {
-  /** Harness tokens re-sent every turn: system prompt, tools, rules, skills. */
-  overhead: number;
-  /** Conversation tokens as of the last turn. */
-  conversation: number;
+// Cursor stamps the live context size onto the user bubble that opens a turn:
+// `contextWindowStatusAtCreation.tokensUsed` is the whole prompt that turn sent,
+// harness and conversation together. That value is written once and never
+// rewritten, which is what makes it usable as history — unlike the
+// conversation-level `promptTokenBreakdown`, which is a single snapshot of the
+// context as it stands *now* and therefore shrinks every time Cursor compacts.
+function anchorTokens(record: Record<string, unknown>): number | null {
+  const used = numberValue(parsedRecord(record.contextWindowStatusAtCreation).tokensUsed);
+  return used > 0 ? Math.round(used) : null;
 }
 
-function contextShape(record: Record<string, unknown>): ContextShape | null {
+// The composer's current context size, used as a trailing anchor for turns
+// Cursor did not stamp. `totalUsedTokens` is the figure Cursor itself shows;
+// older builds only wrote the categories it is the sum of.
+function finalContextTokens(record: Record<string, unknown>): number | null {
   const breakdown = parsedRecord(record.promptTokenBreakdown);
+  const total = numberValue(breakdown.totalUsedTokens);
+  if (total > 0) return Math.round(total);
   const categories = Array.isArray(breakdown.categories) ? breakdown.categories : [];
   if (categories.length === 0) return null;
-
-  let overhead = 0;
-  let conversation = 0;
-  for (const value of categories) {
-    const category = asRecord(value);
-    const tokens = numberValue(category.estimatedTokens);
-    if (OVERHEAD_CATEGORIES.has(stringValue(category.id))) overhead += tokens;
-    else conversation += tokens;
-  }
-  return { overhead, conversation };
+  const sum = categories.reduce(
+    (running, value) => running + numberValue(asRecord(value).estimatedTokens),
+    0,
+  );
+  return sum > 0 ? Math.round(sum) : null;
 }
 
 // Roughly four characters to a token — the usual rule of thumb, and the only
 // measure available since Cursor records no output count of its own.
 const CHARS_PER_TOKEN = 4;
 
+// What the model generated, and only that. Tool *results* are deliberately not
+// counted here: they are text the model read, not text it wrote, and charging
+// them at the output rate priced a file read like a page of generated code.
+// They are already paid for as context growth, which is where they belong.
 function outputCharacterCount(record: Record<string, unknown>): number {
   const thinking = parsedRecord(record.thinking);
   let chars = stringValue(record.text).length + stringValue(thinking.text).length;
   for (const value of Array.isArray(record.codeBlocks) ? record.codeBlocks : []) {
     const block = asRecord(value);
     chars += stringValue(block.content ?? block.code ?? block.text).length;
-  }
-  for (const value of Array.isArray(record.toolResults) ? record.toolResults : []) {
-    const result = asRecord(value);
-    chars += stringValue(result.result ?? result.output ?? result.content ?? result.text).length;
   }
   for (const value of Array.isArray(record.allThinkingBlocks) ? record.allThinkingBlocks : []) {
     const block = asRecord(value);
@@ -179,30 +171,130 @@ function outputTokens(record: Record<string, unknown>): number {
   return Math.ceil(outputCharacterCount(record) / CHARS_PER_TOKEN);
 }
 
-// Cursor leaves the `tokenCount` on every bubble at zero, so there is no usage
-// to read directly. What it does record, per conversation, is the shape of the
-// context: how many tokens the harness occupies (system prompt, tools, rules)
-// and how large the conversation had grown. Since every turn re-sends the whole
-// context, that shape plus the turn times reconstructs what was sent.
-//
-// Exact from Cursor: the overhead, the conversation's final size, the number of
-// turns, and each turn's text. Modelled: the conversation grew evenly across
-// those turns, and four characters make a token.
-//
-// Cursor is a flat subscription, so these figures are a comparison estimate.
-// Summing a full cache read on every turn of a long agent session counts the
-// same prefix thousands of times and blows up both tokens and cost. Instead,
-// write the harness once, charge conversation growth as fresh input, and skip
-// per-turn cache reads — the repeated overhead is already in cacheCreation.
+interface TokenTotals {
+  inputTokens: number;
+  outputTokens: number;
+  cacheReadTokens: number;
+  cacheCreationTokens: number;
+}
+
+function recordedTokens(record: Record<string, unknown>): TokenTotals {
+  const tokens = tokenCount(record);
+  return {
+    inputTokens: numberValue(tokens.inputTokens),
+    outputTokens: numberValue(tokens.outputTokens),
+    cacheReadTokens: numberValue(tokens.cacheReadTokens),
+    cacheCreationTokens: numberValue(tokens.cacheCreationTokens),
+  };
+}
+
+function totalOf(tokens: TokenTotals): number {
+  return tokens.inputTokens + tokens.outputTokens + tokens.cacheReadTokens + tokens.cacheCreationTokens;
+}
+
+/**
+ * One exchange: the user's message and every bubble the agent produced before
+ * the next one. Cursor writes a bubble per thinking block, per text chunk and
+ * per tool call, so a bubble is not a model call — but a tool call always is,
+ * because its result has to go back for the model to act on. A turn therefore
+ * costs one model call per tool call, plus the one that ends it.
+ */
+interface Turn {
+  at: number;
+  model: string;
+  anchor: number | null;
+  calls: number;
+  output: number;
+  recorded: TokenTotals;
+}
+
+function emptyTotals(): TokenTotals {
+  return { inputTokens: 0, outputTokens: 0, cacheReadTokens: 0, cacheCreationTokens: 0 };
+}
+
+function turnsOf(bubbles: Record<string, unknown>[]): Turn[] {
+  const turns: Turn[] = [];
+  let current: Turn | null = null;
+
+  for (const record of bubbles) {
+    const when = timestamp(record.createdAt);
+    if (when === null) continue;
+    // A prompt opens a turn. Anything before the first one — a resumed
+    // conversation whose opening prompt Cursor no longer holds — opens its own.
+    if (numberValue(record.type) === 1 || current === null) {
+      current = {
+        at: when,
+        model: UNKNOWN_MODEL,
+        anchor: null,
+        calls: 1,
+        output: 0,
+        recorded: emptyTotals(),
+      };
+      turns.push(current);
+    }
+
+    if (current.model === UNKNOWN_MODEL) current.model = modelName(record);
+    if (current.anchor === null) current.anchor = anchorTokens(record);
+    // The prompt itself generates nothing; only the agent's bubbles do.
+    if (numberValue(record.type) !== 1) current.output += outputTokens(record);
+    if (Object.keys(parsedRecord(record.toolFormerData)).length > 0) current.calls += 1;
+
+    const tokens = recordedTokens(record);
+    current.recorded.inputTokens += tokens.inputTokens;
+    current.recorded.outputTokens += tokens.outputTokens;
+    current.recorded.cacheReadTokens += tokens.cacheReadTokens;
+    current.recorded.cacheCreationTokens += tokens.cacheCreationTokens;
+  }
+  return turns;
+}
+
+/**
+ * Fills in the turns Cursor did not stamp a context size onto, so the series is
+ * complete without inventing a shape where one is known. Between two stamped
+ * turns the context is interpolated; before the first it ramps up from nothing.
+ * The composer's own snapshot anchors the final turn, which is the turn it
+ * describes. A conversation with no stamp anywhere — anything written by a
+ * Cursor build older than the field — is the one case that ramps the whole way
+ * from nothing to that snapshot, which is the best it allows.
+ */
+function fillAnchors(turns: Turn[], finalTokens: number | null): number[] {
+  const known = turns.map((turn) => turn.anchor);
+  const indices = known.map((value, index) => (value === null ? -1 : index)).filter((index) => index >= 0);
+  const points: Array<[number, number]> = indices.map((index) => [index, known[index] ?? 0]);
+
+  // `promptTokenBreakdown` describes the context as of the most recent prompt,
+  // so it anchors the last turn — but only when Cursor stamped nothing there
+  // itself, and never below a size the conversation is already known to reach.
+  const tailIndex = turns.length - 1;
+  const last = indices[indices.length - 1];
+  if (finalTokens !== null && known[tailIndex] === null) {
+    points.push([tailIndex, Math.max(finalTokens, last === undefined ? 0 : (known[last] ?? 0))]);
+  }
+  if (points.length === 0) return turns.map(() => 0);
+
+  const at = new Map(points);
+  return turns.map((_turn, index) => {
+    const exact = at.get(index);
+    if (exact !== undefined) return exact;
+    const after = points.find(([point]) => point > index);
+    const earlier = points.filter(([point]) => point < index);
+    const before = earlier[earlier.length - 1];
+    if (!after) return before ? before[1] : 0;
+    // Nothing before this turn to interpolate from: the context ramps up to the
+    // first size Cursor did record, rather than starting there.
+    if (!before) return Math.round((after[1] * (index + 1)) / (after[0] + 1));
+    const span = after[0] - before[0];
+    return Math.round(before[1] + ((after[1] - before[1]) * (index - before[0])) / span);
+  });
+}
+
 interface DayUsage {
   models: Map<string, ProviderUsageDay>;
   seenModel: string;
-  active: boolean;
 }
 
 function dayFor(days: Map<string, DayUsage>, date: string): DayUsage {
-  const day = days.get(date) ?? { models: new Map(), seenModel: "", active: false };
-  day.active = true;
+  const day = days.get(date) ?? { models: new Map(), seenModel: "" };
   days.set(date, day);
   return day;
 }
@@ -220,98 +312,96 @@ function modelUsage(day: DayUsage, date: string, model: string): ProviderUsageDa
   return current;
 }
 
-function addRecorded(record: Record<string, unknown>, timezone: string, days: Map<string, DayUsage>): void {
-  const when = timestamp(record.createdAt);
-  if (when === null) return;
-  const date = dateForTimeZone(new Date(when), timezone);
-  const day = dayFor(days, date);
-  const model = modelName(record);
-  if (!day.seenModel && model !== UNKNOWN_MODEL) day.seenModel = model;
-
-  const tokens = tokenCount(record);
-  const inputTokens = numberValue(tokens.inputTokens);
-  const outputTokens = numberValue(tokens.outputTokens);
-  const cacheReadTokens = numberValue(tokens.cacheReadTokens);
-  const cacheCreationTokens = numberValue(tokens.cacheCreationTokens);
-  if (inputTokens + outputTokens + cacheReadTokens + cacheCreationTokens <= 0) return;
-
-  const current = modelUsage(day, date, model);
-  current.inputTokens += inputTokens;
-  current.outputTokens += outputTokens;
-  current.cacheReadTokens += cacheReadTokens;
-  current.cacheCreationTokens += cacheCreationTokens;
-}
-
-function conversationGrowth(index: number, total: number, conversation: number): number {
-  const current = Math.round((conversation * (index + 1)) / total);
-  const previous = index === 0 ? 0 : Math.round((conversation * index) / total);
-  return current - previous;
-}
-
-/** Reconstructs a conversation's usage from its context shape and its turns. */
-function addModelled(
-  shape: ContextShape,
-  turns: Record<string, unknown>[],
-  fallbackModel: string,
+/**
+ * Turns the per-turn context series into billable tokens.
+ *
+ * Every model call re-sends the whole conversation, and the provider behind
+ * Cursor caches that prefix, so the repeat is a cache read rather than fresh
+ * input — a tenth of the input rate. That is most of what an agent session
+ * costs, and the previous model dropped it entirely on the grounds that it
+ * would double-count; the effect was to price a thousand-call session as if it
+ * had sent its context once, which is where the estimate lost an order of
+ * magnitude. The reads are real traffic and the other adapters already report
+ * them; leaving them out is what made Cursor look free beside Claude Code.
+ *
+ * Within a turn the context keeps growing as tool results come back, so the
+ * calls after the first read somewhere between this turn's size and the next
+ * one's — the midpoint stands in for that.
+ */
+function addTurns(
+  turns: Turn[],
+  anchors: number[],
+  visible: boolean[],
   timezone: string,
   days: Map<string, DayUsage>,
 ): void {
-  const total = turns.length;
-  if (total === 0) return;
-
+  let previous = 0;
   turns.forEach((turn, index) => {
-    const when = timestamp(turn.createdAt);
-    if (when === null) return;
-    const date = dateForTimeZone(new Date(when), timezone);
-    const day = dayFor(days, date);
-    const model = modelName(turn) !== UNKNOWN_MODEL ? modelName(turn) : fallbackModel;
-    if (!day.seenModel && model !== UNKNOWN_MODEL) day.seenModel = model;
-    const current = modelUsage(day, date, model);
+    const prompt = anchors[index] ?? 0;
+    const next = anchors[index + 1] ?? prompt;
+    // A turn Cursor counted itself is reported as counted. Deciding this per
+    // turn rather than per conversation matters: the old check flipped a whole
+    // conversation to "recorded" the moment any single bubble carried a number,
+    // which dropped every reconstructed turn beside it and made the day's total
+    // fall as the conversation grew.
+    const recorded = totalOf(turn.recorded) > 0;
+    // A prompt smaller than the last one means Cursor compacted the context.
+    // The prefix that replaces it is a freshly built summary, so none of it can
+    // come back from cache — it is written, not read.
+    const compacted = prompt > 0 && prompt < previous;
+    const split = splitCachedPrompt(prompt, compacted ? 0 : previous);
+    // The context this turn opened at is what the next turn reads back from
+    // cache; whatever the turn then grew by shows up as that turn's input.
+    previous = prompt;
+    if (!visible[index]) return;
 
-    const growth = conversationGrowth(index, total, shape.conversation);
-    if (index === 0) current.cacheCreationTokens += shape.overhead + growth;
-    else current.inputTokens += growth;
-    current.outputTokens += outputTokens(turn);
+    // A day Cursor worked on is reported even when nothing priced, so the day
+    // reads as "never reported" rather than dropping out of history entirely.
+    const date = dateForTimeZone(new Date(turn.at), timezone);
+    const day = dayFor(days, date);
+    if (!day.seenModel && turn.model !== UNKNOWN_MODEL) day.seenModel = turn.model;
+    const current = modelUsage(day, date, turn.model);
+    if (recorded) {
+      current.inputTokens += turn.recorded.inputTokens;
+      current.outputTokens += turn.recorded.outputTokens;
+      current.cacheReadTokens += turn.recorded.cacheReadTokens;
+      current.cacheCreationTokens += turn.recorded.cacheCreationTokens;
+      return;
+    }
+    current.inputTokens += split.inputTokens;
+    current.cacheReadTokens += split.cacheReadTokens;
+    current.cacheCreationTokens += split.cacheCreationTokens;
+    const repeats = Math.max(0, turn.calls - 1);
+    current.cacheReadTokens += repeats * Math.round((prompt + Math.max(prompt, next)) / 2);
+    current.outputTokens += turn.output;
   });
 }
 
 function usageRows(days: Map<string, DayUsage>): ProviderUsageDay[] {
   const rows: ProviderUsageDay[] = [];
   for (const [date, day] of days) {
-    if (day.models.size > 0) {
-      const grouped = new Map<string, ProviderUsageDay>();
-      for (const row of day.models.values()) {
-        // Cursor sometimes omits modelInfo on a bubble even though another
-        // bubble that day identifies the Composer model. Keep those tokens in
-        // the known model's bucket instead of creating a permanently unpriced
-        // `unknown` row beside it.
-        const model = row.model === UNKNOWN_MODEL ? day.seenModel || row.model : row.model;
-        const current = grouped.get(model) ?? {
-          date,
-          model,
-          inputTokens: 0,
-          outputTokens: 0,
-          cacheReadTokens: 0,
-          cacheCreationTokens: 0,
-        };
-        current.inputTokens += row.inputTokens;
-        current.outputTokens += row.outputTokens;
-        current.cacheReadTokens += row.cacheReadTokens;
-        current.cacheCreationTokens += row.cacheCreationTokens;
-        grouped.set(model, current);
-      }
-      rows.push(...grouped.values());
-      continue;
+    const grouped = new Map<string, ProviderUsageDay>();
+    for (const row of day.models.values()) {
+      // Cursor sometimes omits modelInfo on a turn even though another turn
+      // that day identifies the Composer model. Keep those tokens in the known
+      // model's bucket instead of creating a permanently unpriced `unknown`
+      // row beside it.
+      const model = row.model === UNKNOWN_MODEL ? day.seenModel || row.model : row.model;
+      const current = grouped.get(model) ?? {
+        date,
+        model,
+        inputTokens: 0,
+        outputTokens: 0,
+        cacheReadTokens: 0,
+        cacheCreationTokens: 0,
+      };
+      current.inputTokens += row.inputTokens;
+      current.outputTokens += row.outputTokens;
+      current.cacheReadTokens += row.cacheReadTokens;
+      current.cacheCreationTokens += row.cacheCreationTokens;
+      grouped.set(model, current);
     }
-    if (!day.active) continue;
-    rows.push({
-      date,
-      model: day.seenModel || UNKNOWN_MODEL,
-      inputTokens: 0,
-      outputTokens: 0,
-      cacheReadTokens: 0,
-      cacheCreationTokens: 0,
-    });
+    rows.push(...grouped.values());
   }
   return rows.sort(
     (left, right) => left.date.localeCompare(right.date) || left.model.localeCompare(right.model),
@@ -399,44 +489,25 @@ export const cursorAdapter: ProviderAdapter = {
     const days = new Map<string, DayUsage>();
     for (const file of files) {
       const records = await readRecords({ ...file, path: immutableDatabase(file.path) });
-      const shape = records.map(contextShape).find((value): value is ContextShape => value !== null);
       const bubbles = records.filter((record) => stringValue(record.kind) === "bubble");
-      const inWindow = bubbles.filter((record) => (timestamp(record.createdAt) ?? 0) >= sinceMs);
+      const turns = turnsOf(bubbles);
+      if (turns.length === 0) continue;
 
-      // A conversation Cursor did count is reported as counted; the rest is
-      // reconstructed from its context shape. Never both, or the turns that
-      // carry real numbers would be paid for twice.
-      const recorded = bubbles.some((record) => {
-        const tokens = tokenCount(record);
-        return (
-          numberValue(tokens.inputTokens) +
-            numberValue(tokens.outputTokens) +
-            numberValue(tokens.cacheReadTokens) +
-            numberValue(tokens.cacheCreationTokens) >
-          0
-        );
-      });
+      // The whole conversation is walked even when only its tail falls inside
+      // the window, because a turn's cache split is defined against the turn
+      // before it. Only the turns inside the window are reported.
+      const finalTokens = records.map(finalContextTokens).find((value) => value !== null) ?? null;
+      const anchors = fillAnchors(turns, finalTokens);
+      const visible = turns.map((turn) => turn.at >= sinceMs);
 
-      if (recorded || !shape) {
-        for (const record of inWindow) addRecorded(record, timezone, days);
-        continue;
+      // A conversation can name its model on one turn and leave the rest blank;
+      // Cursor writes `modelInfo` onto the prompt bubble, not the replies.
+      const known = turns.map((turn) => turn.model).find((model) => model !== UNKNOWN_MODEL);
+      if (known) {
+        for (const turn of turns) if (turn.model === UNKNOWN_MODEL) turn.model = known;
       }
 
-      // Turn indices come from the whole conversation so a turn's share of the
-      // context does not jump when only part of it falls inside the window.
-      const answers = bubbles.filter((record) => numberValue(record.type) === 2);
-      const visible = new Set(inWindow);
-      const model = bubbles.map(modelName).find((name) => name !== UNKNOWN_MODEL) ?? UNKNOWN_MODEL;
-      addModelled(
-        shape,
-        answers.map((turn) => (visible.has(turn) ? turn : { ...turn, createdAt: null })),
-        model,
-        timezone,
-        days,
-      );
-      for (const record of inWindow.filter((record) => numberValue(record.type) !== 2)) {
-        dayFor(days, dateForTimeZone(new Date(timestamp(record.createdAt) ?? 0), timezone));
-      }
+      addTurns(turns, anchors, visible, timezone, days);
     }
     return usageRows(days);
   },
